@@ -1,6 +1,6 @@
 # Politik
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15403519.svg)](https://doi.org/10.5281/zenodo.15403519)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19490359.svg)](https://doi.org/10.5281/zenodo.19490359)
 
 A governed multi-agent framework built on git.
 
@@ -10,6 +10,6 @@ Pluggable governance protocols. Stateless agent workers. Git as the session subs
 
 **Architecture:** [POLITIK-ARCHITECTURE.md](POLITIK-ARCHITECTURE.md)
 
-**DOI:** [10.5281/zenodo.15403519](https://doi.org/10.5281/zenodo.15403519)
+**DOI:** [10.5281/zenodo.19490359](https://doi.org/10.5281/zenodo.19490359)
 
 **License:** MIT
