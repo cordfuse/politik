@@ -1,5 +1,7 @@
 # Politik
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15403519.svg)](https://doi.org/10.5281/zenodo.15403519)
+
 A governed multi-agent framework built on git.
 
 Pluggable governance protocols. Stateless agent workers. Git as the session substrate. Immutable Hansard. Append-only LEDGER. Human constitutional authority.
@@ -8,6 +10,6 @@ Pluggable governance protocols. Stateless agent workers. Git as the session subs
 
 **Architecture:** [POLITIK-ARCHITECTURE.md](POLITIK-ARCHITECTURE.md)
 
-**DOI:** `doi.org/10.5281/zenodo.XXXXXXX` *(placeholder — update after Zenodo mint)*
+**DOI:** [10.5281/zenodo.15403519](https://doi.org/10.5281/zenodo.15403519)
 
 **License:** MIT
