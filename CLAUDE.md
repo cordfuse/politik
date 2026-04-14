@@ -6,6 +6,8 @@ Politik is a governed multi-agent framework built on git. This repository contai
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
+**Current status: SLOW BURN.** Architecture locked, DOI established. No scaffolding work — Crosstalk (`cordfuse/crosstalk`) is the active implementation priority. Politik implementation is a thousands-of-hours build. Do not propose scaffolding, code, or implementation work unless explicitly asked. Documentation and architecture cleanup only.
+
 ---
 
 ## Key Concepts
