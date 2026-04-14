@@ -164,16 +164,7 @@ Game Theory:  Formal analytical structures (Zero-Sum, Cooperative,
 [ ] Ollama local — zero cost, zero auth
 ```
 
-### PHASE 7 — AgentBox Integration
-```
-[ ] Define Speaker console interface
-[ ] Writ Drop from AgentBox
-[ ] Point of Order routing to AgentBox
-[ ] Hansard review on prorogation
-[ ] Document AgentBox vs Politik boundary explicitly
-```
-
-### PHASE 8 — SCM Provider SDK
+### PHASE 7 — SCM Provider SDK
 ```
 [ ] Document SCM provider interface
 [ ] GitLab provider (community)
@@ -182,7 +173,7 @@ Game Theory:  Formal analytical structures (Zero-Sum, Cooperative,
 [ ] Provider contribution guide
 ```
 
-### PHASE 9 — Public Launch
+### PHASE 8 — Public Launch
 ```
 [ ] All namespaces secured
 [ ] README hero section with tagline
@@ -196,7 +187,7 @@ Game Theory:  Formal analytical structures (Zero-Sum, Cooperative,
 [ ] Announcement — TBD channel
 ```
 
-### PHASE 9.5 — Obsidian Visualisation Layer (post-v1, pre-academic)
+### PHASE 8.5 — Obsidian Visualisation Layer (post-v1, pre-academic)
 
 **Target:** After v1.0.0 stable, before the enterprise research phase.
 
@@ -234,25 +225,19 @@ Claude Code (Speaker)  ← both MCPs connected simultaneously
 
 **Versioning target:** v1.x.x — ships as an optional community integration after v1.0.0 stable.
 
-### PHASE 10 — Academic Collaboration
+### PHASE 9 — Academic Collaboration
 
 **Finding collaborators:**
 ```
-[ ] Reach out to former comp sci professor (warm)
-    → Wait 2 weeks for response
-    → If no response → cold outreach
-
 [ ] Identify SE researcher candidates
     → Google Scholar: "empirical software engineering" "AI agents"
     → arXiv cs.SE recent papers on agent collaboration
-    → UWaterloo / UofT / McMaster (proximity advantage)
-    → Target 10-15 outreach emails, expect 1-2 conversations
+    → Target: university CS departments with empirical SE focus
 
 [ ] Identify game theory researcher candidates
     → Google Scholar: "mechanism design" "multi-agent"
     → arXiv cs.GT recent papers
     → EC conference author lists
-    → Target 5-10 outreach emails
 ```
 
 **Collaboration structure:**
@@ -264,7 +249,7 @@ Claude Code (Speaker)  ← both MCPs connected simultaneously
 [ ] Establish working cadence
 ```
 
-### PHASE 11 — Research & Publication
+### PHASE 10 — Research & Publication
 
 **One Unified Paper — Framework + Experiment + Game Theory:**
 ```
