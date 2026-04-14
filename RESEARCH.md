@@ -101,7 +101,7 @@ The velocity metric — designed to measure team throughput — became the most 
 
 Machine agents running an Agile Protocol do not sandbag estimates. They do not perform wellness in retrospectives. They do not protect their velocity number. They do not size stories based on what their manager wants to see. The LEDGER provides actual elapsed time. The Hansard provides actual output. The measurement is the thing itself — not a human approximation of it.
 
-This is the research contribution that lands closest to home for the software engineering audience. Not Soviet collectivism. Not Roman republicanism. The standup they sat through this morning.
+This is the research contribution that lands closest to home for the software engineering audience. Not Soviet collectivism. Not Roman republicanism. The standup from this morning's sprint.
 
 #### Case Study II — The Soviet Apparatus: Nomenklatura as the Product
 
@@ -363,13 +363,9 @@ The game theorist's academic contribution becomes a permanent feature of the fra
 
 ## RESEARCH THESIS & PUBLICATION STRATEGY
 
-### Enterprise Testing — Formal Validation Path
+### Enterprise Validation Path
 
-Before bringing in academic collaborators, private verification with a real enterprise project is the credibility play. Showing results beats asking for validation.
-
-**The enterprise validation path:**
-
-Once the DOI is established and the framework is privately verified, approach enterprise teams willing to participate as research subjects in a formal protocol comparison study.
+Empirical credibility requires a real engineering problem of meaningful complexity — not a toy project. Enterprise partners running existing Scrum processes provide the baseline. Politik runs the same project under Agile Protocol, then under two alternative protocols. The delta between their human Scrum outcome and the Politik Agile Protocol outcome is a data point. The delta between protocols is the research contribution.
 
 **What the enterprise partner gets:**
 - A free AI-assisted development experiment run on a real project
@@ -378,22 +374,9 @@ Once the DOI is established and the framework is privately verified, approach en
 - Attribution as a research participant in the published paper
 
 **What the research gets:**
-- A real engineering problem of meaningful complexity — not a toy project
 - Authentic Scrum/Agile context with a real product manager and team
 - Measurable outcomes against a known baseline
-- Enterprise credibility in the paper
-
-**The Scrum-specific angle:**
-
-An enterprise partner running their existing Scrum process provides the baseline. Politik runs the same project under Agile Protocol (mirroring their Scrum), then under two alternative protocols. The delta between their human Scrum outcome and the Politik Agile Protocol outcome is a data point. The delta between protocols is the research contribution.
-
-```
-Private verification (solo)    →  Does the framework work at all?
-Enterprise partner recruited   →  Real project, real Scrum baseline
-Results in hand                →  Approach academic collaborators
-Paper co-authored              →  Framework + experiment + game theory
-Published                      →  Prior art fully established
-```
+- Enterprise-scale validation in the paper
 
 ### The Core Thesis
 
@@ -448,7 +431,7 @@ The provocative paper title:
 
 | Role | Contributor | Brings |
 |---|---|---|
-| Framework inventor | Steve Krisjanovs, Cordfuse | Novel architecture, practitioner insight, working code, 25yr systems experience |
+| Framework inventor | Steve Krisjanovs, Cordfuse | Novel architecture, practitioner insight, working implementation |
 | SE Researcher (PhD) | TBD | Empirical methodology, software metrics, publishing infrastructure, peer review navigation |
 | Game Theorist (PhD) | TBD | Formal protocol models, Nash Eq analysis, mechanism design evaluation, EC venue access |
 
@@ -463,34 +446,11 @@ That combination is rare. Most papers have one or two. All three is genuinely pu
 
 ### Finding Academic Collaborators
 
-**Step 1 — SE Researcher (cold outreach)**
-Search terms:
-```
-"empirical software engineering" "AI agents"
-"multi-agent systems" "software development"
-"LLM agents" "collaboration" "code review"
-```
-Target institutions (proximity advantage):
-- UWaterloo — strong CS
-- UofT — strong AI program
-- McMaster — Hamilton, close proximity
-- Any Canadian university (easier to meet in person)
+SE researcher: target empirical software engineering researchers with AI agent or multi-agent systems focus. arXiv cs.SE and CS department faculty lists.
 
-**Step 2 — Game Theorist (cold outreach)**
-Search terms:
-```
-"mechanism design" "multi-agent"
-"game theory" "AI agents"
-"Nash equilibrium" "autonomous agents"
-"cooperative game theory" "AI collaboration"
-```
-Target venues: EC conference author lists, arXiv cs.GT recent papers
+Game theorist: target mechanism design and multi-agent game theory researchers. arXiv cs.GT and EC conference author lists.
 
-**Outreach approach:**
-- Reference their specific published work
-- State the research question explicitly
-- Link to Zenodo DOI
-- Prior art timestamps establish priority
+Outreach: reference their specific published work, state the research question, link to the Zenodo DOI.
 
 ---
 
