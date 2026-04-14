@@ -16,9 +16,8 @@
 ---
 
 ## STATUS
-- **Visibility:** Public · DOI: 10.5281/zenodo.19490359 (NEVER make private)
-- **Stage:** Architecture locked — pre-scaffold — slow burn
-- **Active priority:** Crosstalk scaffolds first. Politik implementation is thousands of hours. No scaffolding until further notice.
+- **Visibility:** Public · DOI: 10.5281/zenodo.19490359
+- **Stage:** Architecture locked — pre-scaffold
 
 ---
 
