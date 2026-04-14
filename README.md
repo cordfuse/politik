@@ -137,6 +137,6 @@ MIT licensed. The entire framework — CANON, protocol library, session engine, 
 ---
 
 **Attribution:** Steve Krisjanovs, Cordfuse  
-**Architecture:** [POLITIK-ARCHITECTURE.md](POLITIK-ARCHITECTURE.md)  
+**Architecture:** [POLITIK-ARCHITECTURE.md](POLITIK-ARCHITECTURE.md) · [PROTOCOLS.md](PROTOCOLS.md) · [RUNTIME.md](RUNTIME.md) · [RESEARCH.md](RESEARCH.md) · [EXECUTION.md](EXECUTION.md)  
 **DOI:** [10.5281/zenodo.19490359](https://doi.org/10.5281/zenodo.19490359)  
 **License:** MIT
