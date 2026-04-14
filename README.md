@@ -6,7 +6,7 @@ A governed multi-agent framework built on git.
 
 Pluggable governance protocols. Stateless agent workers. Git as the session substrate. Immutable Hansard. Append-only LEDGER. Human constitutional authority.
 
-**Attribution:** Steve Krisjanovs, Cordfuse Inc.
+**Attribution:** Steve Krisjanovs
 
 **Architecture:** [POLITIK-ARCHITECTURE.md](POLITIK-ARCHITECTURE.md)
 
