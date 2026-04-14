@@ -31,7 +31,11 @@ The git repository IS the Politik session — charter, record, state, and invite
 
 ## Reading This Repo
 
-- **POLITIK-ARCHITECTURE.md** — The complete architecture specification. Read this first and in full before making any changes.
+- **POLITIK-ARCHITECTURE.md** — Lean core: CANON, session structure, broadcast envelope, chamber transport. Read this first.
+- **PROTOCOLS.md** — Full protocol library, 35+ protocols across 12 domains.
+- **RUNTIME.md** — Session mechanics, escalation flows, cost model, governance tiers, fault handling.
+- **RESEARCH.md** — Human Flaw thesis, game theory analytical layer, publication strategy.
+- **EXECUTION.md** — Phases 0–11, Politik Tree hierarchical architecture.
 - **README.md** — Public-facing brief description with DOI.
 
 ---
