@@ -3,7 +3,7 @@
 
 **Framework name: Politik**
 **Repo:** `cordfuse/politik`
-**Attribution:** Steve Krisjanovs
+**Attribution:** Steve Krisjanovs, Cordfuse
 
 **Note:** "Parliament" appears throughout as the default protocol vocabulary — not the framework name. The framework is Politik.
 
@@ -3468,7 +3468,7 @@ The provocative paper title:
 
 | Role | Contributor | Brings |
 |---|---|---|
-| Framework inventor | Steve Krisjanovs | Novel architecture, practitioner insight, working code, 25yr systems experience |
+| Framework inventor | Steve Krisjanovs, Cordfuse | Novel architecture, practitioner insight, working code, 25yr systems experience |
 | SE Researcher (PhD) | TBD | Empirical methodology, software metrics, publishing infrastructure, peer review navigation |
 | Game Theorist (PhD) | TBD | Formal protocol models, Nash Eq analysis, mechanism design evaluation, EC venue access |
 
@@ -3518,7 +3518,7 @@ Target venues: EC conference author lists, arXiv cs.GT recent papers
 
 ### Inventor Attribution
 
-**Steve Krisjanovs**
+**Steve Krisjanovs, Cordfuse**
 
 ### Publication Path
 
@@ -4041,5 +4041,5 @@ All other Cordfuse projects are deprioritised until Politik has a DOI, a working
 
 ---
 
-*Attribution: Steve Krisjanovs*  
+*Attribution: Steve Krisjanovs, Cordfuse*  
 *Status: Architecture locked — pre-scaffold*

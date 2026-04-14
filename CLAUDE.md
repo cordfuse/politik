@@ -4,7 +4,7 @@
 
 Politik is a governed multi-agent framework built on git. This repository contains the architecture specification and invention disclosure for the framework. It is pre-scaffold — no runtime code yet, markdown only.
 
-**Attribution:** Steve Krisjanovs
+**Attribution:** Steve Krisjanovs, Cordfuse
 
 ---
 
@@ -40,7 +40,7 @@ The git repository IS the Politik session — charter, record, state, and invite
 
 1. **Do not modify POLITIK-ARCHITECTURE.md without explicit human instruction.** This is the invention disclosure. Every word matters for prior art.
 2. **Do not add files without explicit instruction.** This is a minimal repo by design.
-3. **Attribution is always:** Steve Krisjanovs — always.
+3. **Attribution is always:** Steve Krisjanovs, Cordfuse — always.
 4. **No personal details, no dates, no employer references** in any committed file.
 5. **Commit discipline:** After every file change, commit immediately with a descriptive message. Do not batch changes.
 
