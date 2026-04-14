@@ -34,10 +34,8 @@ Nothing gets committed to a public repo, npm, Docker Hub, or Homebrew until thes
 [x] Verify npm namespace — @cordfuse/politik
 [x] Verify GitHub org/repo name — cordfuse/politik
 [x] Verify Docker Hub namespace — cordfuse/politik
-[ ] Register all namespaces privately (before first public release)
-[ ] Domain check (optional but smart)
 ```
-**Status:** Framework name locked. CANON locked. All namespaces verified. Register before public release.
+**Status:** Framework name locked. CANON locked. All namespaces verified.
 
 **Constraints:**
 - Cannot contain "GitHub", "git", or any provider trademark
@@ -661,24 +659,6 @@ Politik produces a superior project record as a zero-overhead side effect of gov
 ### IDE Agent Compatibility
 
 IDE-first agents (Cursor, Windsurf, GitHub Copilot Workspace) cannot be spawned as Politik constituencies directly. They are not competitors — the developer using an IDE agent is an OPERATOR in the Politik session. The IDE agent produces the code. Politik governs whether it ships via Division, Hansard record, and LEDGER attribution.
-
----
-
-
-## RELATIONSHIP TO OTHER CORDFUSE PROJECTS
-
-### Priority Declaration
-
-**Politik is the primary Cordfuse project.**
-
-All other Cordfuse projects are deprioritised until Politik has a working reference implementation and at least one successful private verification session. DOI is established: 10.5281/zenodo.19490359.
-
-| Project | Status | Relationship to Politik |
-|---|---|---|
-| **Politik** | **ACTIVE — all energy here** | This document |
-| IronBound | Deprioritised | Different model — human-to-agent, user's CLI. No conflict. Could eventually run as a Politik constituency. |
-| AgentBox | Deprioritised | Speaker's console. Starts/ends sessions. Not the chamber. Integration planned Phase 7. |
-| IronForge | Deprioritised | Orchestration layer — may converge with Politik architecture later. |
 
 ---
 
