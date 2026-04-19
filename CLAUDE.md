@@ -1,3 +1,4 @@
+<!-- parent: librarian -->
 # Politik — Claude Code Instructions
 
 ## What This Repo Is
