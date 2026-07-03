@@ -38,7 +38,7 @@ See [POLITIK-ARCHITECTURE.md](POLITIK-ARCHITECTURE.md) for CANON and the engine 
 [ ] Finalize broadcast envelope format
 [ ] Finalize session repo structure
 [ ] Finalize SCM provider interface spec
-[ ] Choose transport (libp2p vs NATS)
+[ ] Transport hook: NATS default (Tailscale + NATS for multi-machine), git/Crosstalk ambient alternative — libp2p rejected (over-built for known permissioned assemblies)
 [ ] Document all decisions in ADRs (Architecture Decision Records)
 [ ] Draft arXiv preprint — unified paper (framework + experiment)
 ```
