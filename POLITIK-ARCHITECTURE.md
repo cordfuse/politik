@@ -269,8 +269,8 @@ The underlying intelligence — independent of the seat. The "smartness" of the 
 constituency:
   role: OPERATOR
   model:
-    required: claude-sonnet-4-6          # minimum model version
-    preferred: claude-opus-4-6           # optimal for this work type
+    required: claude-sonnet-5            # minimum model version
+    preferred: claude-opus-4-8           # optimal for this work type
     domain_specialisation: BC_AL         # fine-tuned variant if available
     knowledge_cutoff_minimum: 2025-01    # must know post-2025 BC releases
 ```
