@@ -52,7 +52,7 @@ Politik is a **governed multi-agent operating system** where:
 - A **human** is the constitutional authority — present but not operational
 - **Agents** are CLI processes that spawn, do work, and dispose
 - A **SCM repository** (GitHub or any SCM) IS the session — charter, record, state, and invite in one
-- A **peer-to-peer mesh** is the chamber floor
+- A **pluggable transport** is the chamber floor
 - **Pluggable governance protocols** map the framework to any industry vocabulary
 - **No new infrastructure required** — GitHub already built it
 
