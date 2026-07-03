@@ -574,7 +574,7 @@ Session paused pending ruling
 
 ## BROADCAST ENVELOPE
 
-The self-describing motion packet that travels the gossip mesh:
+The self-describing motion packet that travels the transport:
 
 ```markdown
 # [SESSION-GUID]
@@ -588,7 +588,7 @@ The self-describing motion packet that travels the gossip mesh:
 ```
 
 ### Self-Organization Protocol
-1. Broadcast received by all peers on mesh
+1. Broadcast received by all peers subscribed to the session
 2. Agent checks: do I match `target-actor`?
 3. Agent checks: are `slots-remaining` > 0?
 4. First agent per Constituency declares participation
@@ -607,25 +607,28 @@ On a single machine with multiple agents:
 
 ## CHAMBER TRANSPORT
 
-### Recommended: libp2p gossipsub
-- Pure peer-to-peer, no central broker
-- Gossip protocol = native broadcast
-- No ports to open (hole-punching + relay fallback)
-- Session GUID = gossipsub topic
-- Envelope = message payload
-- Agents are peers on a topic mesh
+Transport is a **pluggable hook**, not a fixed dependency. The durable substrate is always the session repo — the Hansard is the ordered, attributable source of truth, and slot claims commit there atomically. Transport carries only the *ephemeral real-time nudge* ("a motion is live"); a dropped message loses nothing, since peers fall back to reading the repo.
 
-### Alternative: NATS
-- Single binary, self-hosted
-- Pub/sub + queue groups built in
-- Lower complexity than libp2p
-- Requires one node to host NATS server
+### Recommended: NATS
+- Single ~15 MB binary, no dependencies, self-hosted
+- Pub/sub — Session GUID = subject, envelope = message payload
+- **Queue groups deliver each message to exactly one subscriber** — the native primitive for the First-Actor-Per-Constituency rule, with no hand-rolled mutex
+- Optional JetStream adds persistence/replay if wanted
 
-### Tailscale + NATS (recommended for multi-machine)
-- Tailscale handles networking invisibly
-- NATS handles messaging
+### Recommended for multi-machine: Tailscale + NATS
+- Tailscale handles networking invisibly — stable private addressing, Magic DNS discovery
 - No port forwarding, no VPN config, no firewall rules
-- Magic DNS for agent discovery
+- The NATS node is simply `nats://<host>:4222`, reachable from anywhere on the tailnet
+
+### Ambient alternative: git-based transport (Crosstalk)
+- Politik's optional ambient transport layer — no broker at all
+- Broadcast and slot-claim ride the same git substrate as the Hansard
+- Higher latency (poll/commit cadence) traded for zero added infrastructure
+
+### Rejected: pure P2P mesh (libp2p gossipsub)
+- A DHT / gossip mesh / NAT hole-punching earns its complexity in large, open, permissionless, high-churn swarms — not in small, known, permissioned assemblies
+- "No central broker" is illusory: hole-punch failure falls back to relays, which are brokers
+- Heavy, churning dependency surface — a poor fit for a lean MIT reference implementation
 
 ---
 
