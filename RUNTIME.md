@@ -242,8 +242,8 @@ Politik inherits both the problem and the solution.
 - Roo Code — VS Code extension primary
 - Continue — IDE extension
 
-### AgentBox stdio Compatible (subset)
-AgentBox orchestrates via JSON stdio. Only these agents support it:
+### Structured stdio/JSON Compatible (subset)
+A subset of agents support structured JSON-over-stdio — useful when an operator console drives them programmatically rather than by plain prompt. Only these support it:
 
 | Agent | stdio support |
 |---|---|
@@ -253,39 +253,39 @@ AgentBox orchestrates via JSON stdio. Only these agents support it:
 | OpenCode | ✅ |
 | Qwen Code | ✅ stream-json |
 
-**This is not a Politik limitation.** Remaining agents participate via direct prompt invocation. AgentBox is one optional orchestration layer.
+**This is not a Politik limitation.** Remaining agents participate via direct prompt invocation. Structured-stdio orchestration is one optional layer.
 
 ---
 
-## AGENTBOX ROLE IN POLITIK
+## THE OPERATOR CONSOLE (CLERK OF THE HOUSE)
 
-AgentBox is the **Clerk of the House**, not a Chamber participant.
+The **operator console** is the Speaker's window into a session — how a human drops the Writ, receives escalations, and reads the Hansard. It is **not a specific product**. Any interactive session serves as the console: an agent CLI itself (Claude Code, Gemini CLI, etc.), a plain terminal, or a thin Politik CLI. The console is the Clerk of the House — it convenes and closes sessions and relays to the Speaker; it is not a Chamber participant.
 
 | Component | Role |
 |---|---|
-| AgentBox | Speaker's console. Starts/ends sessions. Not the Chamber. |
-| Chamber floor | NATS/gossip mesh — peer-to-peer, AgentBox has no listener here |
+| Operator console | Speaker's window. Drops/closes the Writ. Any interactive session, incl. an agent CLI. Not the Chamber. |
+| Chamber floor | The transport (NATS default, or git-ambient). The console has no listener here. |
 | Constituency | CLI agent process — spawns, works, disposes |
 
-### What AgentBox CAN do
-- Drop the Writ (create and configure session repo)
-- Receive Point of Order notifications
-- Review Hansard when session prorogues
-- Intervene if Speaker is escalated to
+### What the console does
+- Drop the Writ (create and configure the session repo)
+- Receive Point of Order notifications (email / SCM)
+- Review the Hansard when the session prorogues
+- Intervene when a Point of Order escalates to the Speaker
 
-### What AgentBox CANNOT do
-- See real-time agent chatter (gossip mesh is peer-to-peer)
-- Tail live agent output (spawn-dispose means no persistent stdout)
-- Monitor mid-session state without polling the repo
+### What the console does not do
+- See real-time agent chatter — the Chamber floor is carried by the transport, not the console
+- Tail live agent output — spawn-and-dispose means no persistent stdout
+- Monitor mid-session state without reading the repo
 
-### AgentBox execution model vs Politik
-| | AgentBox | Politik |
+### Console vs Chamber — two execution models
+| | Operator console | Politik constituency |
 |---|---|---|
-| Session model | Persistent | Ephemeral |
-| State location | Agent process | Git repo |
-| Agent lifecycle | Long-lived | Spawn and dispose |
+| Session model | Interactive / persistent | Ephemeral |
+| State location | The console session | Git repo |
+| Lifecycle | Long-lived (the human is present) | Spawn and dispose |
 
-They are different products. They do not compose directly. They coexist.
+The console is where the human is constitutionally present. The constituencies are where work happens and disposes. They coexist by design — the console never needs to tail the Chamber, because the Hansard is the session.
 
 ---
 
