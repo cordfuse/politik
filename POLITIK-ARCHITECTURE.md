@@ -609,21 +609,25 @@ On a single machine with multiple agents:
 
 Transport is a **pluggable hook**, not a fixed dependency. The durable substrate is always the session repo — the Hansard is the ordered, attributable source of truth, and slot claims commit there atomically. Transport carries only the *ephemeral real-time nudge* ("a motion is live"); a dropped message loses nothing, since peers fall back to reading the repo.
 
-### Recommended: NATS
+### Default: git-based transport (zero infrastructure)
+- No broker, nothing new to run — the SCM repository that already **is** the session is also the bus
+- Broadcast and slot-claim ride the same git substrate as the Hansard
+- Latency is the poll/commit cadence — perfectly adequate for governed sessions, which deliberate in minutes, not milliseconds
+- This is the reference transport: it keeps the "git already built it — no new infrastructure" promise intact
+- (Crosstalk is one such git-based transport implementation)
+
+### Opt-in upgrade: NATS (low-latency)
+For latency-sensitive sessions that want real-time nudges instead of poll cadence:
 - Single ~15 MB binary, no dependencies, self-hosted
 - Pub/sub — Session GUID = subject, envelope = message payload
-- **Queue groups deliver each message to exactly one subscriber** — the native primitive for the First-Actor-Per-Constituency rule, with no hand-rolled mutex
+- **Queue groups deliver each message to exactly one subscriber** — a native primitive for the First-Actor-Per-Constituency rule, with no hand-rolled mutex
 - Optional JetStream adds persistence/replay if wanted
+- The trade is a broker to run. The durable truth still lives in git — NATS only accelerates the nudge.
 
-### Recommended for multi-machine: Tailscale + NATS
+### Opt-in upgrade, multi-machine: Tailscale + NATS
 - Tailscale handles networking invisibly — stable private addressing, Magic DNS discovery
 - No port forwarding, no VPN config, no firewall rules
 - The NATS node is simply `nats://<host>:4222`, reachable from anywhere on the tailnet
-
-### Ambient alternative: git-based transport (Crosstalk)
-- Politik's optional ambient transport layer — no broker at all
-- Broadcast and slot-claim ride the same git substrate as the Hansard
-- Higher latency (poll/commit cadence) traded for zero added infrastructure
 
 ### Rejected: pure P2P mesh (libp2p gossipsub)
 - A DHT / gossip mesh / NAT hole-punching earns its complexity in large, open, permissionless, high-churn swarms — not in small, known, permissioned assemblies
