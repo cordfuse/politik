@@ -264,7 +264,7 @@ The **operator console** is the Speaker's window into a session — how a human 
 | Component | Role |
 |---|---|
 | Operator console | Speaker's window. Drops/closes the Writ. Any interactive session, incl. an agent CLI. Not the Chamber. |
-| Chamber floor | The transport (NATS default, or git-ambient). The console has no listener here. |
+| Chamber floor | The transport (git-based default, NATS an opt-in upgrade). The console has no listener here. |
 | Constituency | CLI agent process — spawns, works, disposes |
 
 ### What the console does
