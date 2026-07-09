@@ -11,10 +11,13 @@ Politik is a governed multi-agent framework built on git. This repository contai
 by explicit human instruction; Crosstalk reached and passed alpha. Politik is no
 longer on slow burn.
 
-Phase 1 must close before Phase 2 code is written. Architecture decisions are
-recorded in [`docs/adr/`](docs/adr/). Two rulings block the lock — both are
-listed in `EXECUTION.md` § Phase 1, and both require amending
-`POLITIK-ARCHITECTURE.md`, which needs explicit human instruction (see Rule 1).
+Architecture decisions are recorded in [`docs/adr/`](docs/adr/). ADR-0001
+(transport), ADR-0002 (CHARTER.md schema) and ADR-0003 (STATE.json schema) are
+all **Accepted**. `POLITIK-ARCHITECTURE.md` was not amended to reach the lock.
+
+Phase 1 is closed but for the arXiv preprint. The SCM provider interface names
+ten methods without return types — a signature exercise, to be settled in the
+scaffold. **Phase 2 (reference implementation) is clear to start.**
 
 **Implementation stack (decided):** Node + TypeScript, npm `@cordfuse/politik`,
 binary `politik`. Consistent with the namespace reserved in Phase 0 and the
