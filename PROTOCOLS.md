@@ -23,10 +23,12 @@ See [POLITIK-ARCHITECTURE.md](POLITIK-ARCHITECTURE.md) for CANON, session struct
 | RECORD | Hansard |
 | MOTION | Tabled Motion |
 | DIVISION | Division |
+| ASSENT | Royal Assent |
 | ESCALATION | Point of Order |
 | SUSPENSION | Adjournment |
 | DISSOLVE | Prorogation |
 | EXIT | Resigned from the House |
+| CONFLICT | Competing Amendments |
 | DEADLOCK | Hung Parliament |
 | PROMOTE | Appointed to Cabinet |
 | DEMOTE | Returned to Backbench |
@@ -116,10 +118,12 @@ Mode: Authoritarian with Constitutional elements
 | RECORD | Commit Log |
 | MOTION | Pull Request |
 | DIVISION | Code Review Vote |
+| ASSENT | Merge |
 | ESCALATION | Blocker |
 | SUSPENSION | Sprint Close |
 | EXIT | Offboarded |
-| DEADLOCK | Merge Conflict |
+| CONFLICT | Merge Conflict |
+| DEADLOCK | Irreconcilable Review — Tech Lead rules |
 | PROMOTE | Promoted to Tech Lead |
 Mode: Constitutional
 
