@@ -144,7 +144,8 @@ This design enables the Human Flaw research thesis: the same protocol can be run
 | `ESCALATION` | Point of Order — an Issue |
 | `SUSPENSION` | Session pause — proceeding open, agents stopped, resumable |
 | `QUORUM` | Minimum actors for valid session |
-| `DEADLOCK` | Irreconcilable state — no valid Division outcome |
+| `CONFLICT` | Two Motions touch the same lines — mechanical, routine, resolved by any actor holding WRITE. Not a governance failure. |
+| `DEADLOCK` | Irreconcilable state — no valid Division outcome. A governance failure, distinct from CONFLICT. |
 
 ### Session States
 These are the valid states a proceeding can be in at any point:
@@ -171,6 +172,7 @@ These are the valid states a proceeding can be in at any point:
 | `READ` | View files, read Hansard |
 | `WRITE` | Commit, table motion |
 | `VOTE` | Division, approve/reject |
+| `ASSENT` | Enact a carried Motion — merge the PR. Distinct from VOTE: the Division decides, the Assent enacts. Invalid unless the Motion carried, the proceeding is CONVENED, and no VETO is outstanding. Defaults to AUTHORITY; grantable by Charter. |
 | `ESCALATE` | File Point of Order |
 | `PROMOTE` | Elevate actor trust level |
 | `DEMOTE` | Reduce actor trust level |
@@ -490,6 +492,7 @@ SCM Provider Interface
 scm.commit(message, files)
 scm.openPR(title, body, branch)
 scm.requestReview(pr, actors)
+scm.merge(pr, strategy)              // strategy: merge_commit | squash | fast_forward
 scm.openIssue(title, body, labels)
 scm.openDiscussion(title, body, category)
 scm.closeMilestone(id)
