@@ -31,17 +31,35 @@ See [POLITIK-ARCHITECTURE.md](POLITIK-ARCHITECTURE.md) for CANON and the engine 
 ```
 
 ### PHASE 1 — Architecture Lock
+
+ADRs live in [`docs/adr/`](docs/adr/). An item is ticked only when a decision is
+recorded **and** nothing blocks it.
+
 ```
-[ ] Finalize CANON primitive layer names
-[ ] Finalize protocol schema format
-[ ] Finalize CHARTER.md spec
-[ ] Finalize broadcast envelope format
-[ ] Finalize session repo structure
-[ ] Finalize SCM provider interface spec
+[x] Finalize CANON primitive layer names          — POLITIK-ARCHITECTURE.md
+[x] Finalize protocol schema format               — POLITIK-ARCHITECTURE.md
+[x] Finalize broadcast envelope format            — POLITIK-ARCHITECTURE.md
+[x] Finalize session repo structure               — POLITIK-ARCHITECTURE.md
 [x] Transport hook: git-based default (zero infrastructure, reference transport; Crosstalk is one such implementation), NATS an opt-in latency upgrade (Tailscale + NATS for multi-machine) — libp2p rejected (over-built for known permissioned assemblies). See ADR-0001.
-[ ] Document all decisions in ADRs (Architecture Decision Records)
+[~] Finalize CHARTER.md spec                      — ADR-0002 (Proposed), blocked on ruling #1
+[~] Finalize STATE.json schema                    — ADR-0003 (Proposed), blocked on ruling #2
+[~] Finalize SCM provider interface spec          — 10 methods named; return types unspecified
+[~] Document all decisions in ADRs                — 0001 Accepted; 0002/0003 Proposed
 [ ] Draft arXiv preprint — unified paper (framework + experiment)
 ```
+
+**Two rulings block the lock.** Both require amending `POLITIK-ARCHITECTURE.md`,
+which no agent may modify without explicit human instruction:
+
+1. **`mode` / `record_mode` key collision.** `protocol.mode` and
+   `protocol.record_mode` have fixed enums in POLITIK-ARCHITECTURE.md.
+   RUNTIME.md § Single-Player Sessions reuses both key names under `session:`
+   with values (`solo`, `full`) that are in neither enum. Two namespaces, or a
+   conflict? See ADR-0002.
+2. **Is `CONSTITUTIONAL_CRISIS` a state or a fault?** CANON lists five states and
+   it is not among them; EXECUTION § Obsidian colour-codes it as a peer of the
+   real states. ADR-0003 treats it as a fault attribute. If it must halt the
+   session as a terminal state, CANON needs a sixth state. See ADR-0003.
 
 ### PHASE 2 — Reference Implementation (GitHub SCM)
 ```
