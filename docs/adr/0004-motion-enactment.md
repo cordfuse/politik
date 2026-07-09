@@ -2,7 +2,7 @@
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
-**Status:** Proposed — requires human ruling. Amends CANON.
+**Status:** Accepted — ruled by Steve Krisjanovs. CANON amended.
 
 ---
 
@@ -139,7 +139,15 @@ resolves it like any other halt.
 
 ---
 
-## Rulings required
+## Rulings — all four settled
+
+All four rulings below were **accepted as recommended**. CANON is amended:
+`ASSENT` added to the verb table, `CONFLICT` added to the primitive table,
+`scm.merge(pr, strategy)` added to the SCM provider interface. `merge_strategy`
+and `assent` are Charter keys (ADR-0002). `DEADLOCK` is a suspension cause
+(ADR-0003).
+
+The original text of each ruling is preserved below for the record.
 
 **Ruling 1 — Is `squash` banned, or merely off by default?**
 
