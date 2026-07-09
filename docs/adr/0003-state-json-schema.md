@@ -2,7 +2,7 @@
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
-**Status:** Proposed
+**Status:** Accepted
 
 ---
 
@@ -13,7 +13,7 @@ exclusively, and every actor reads it before every action — a suspended sessio
 must stop agents immediately. Phase 2 requires the session repo initializer and
 the Hansard commit writer, both of which read and write this file.
 
-No schema exists. The documents mutate it through three overlapping
+No schema existed. The documents mutated it through three overlapping
 vocabularies:
 
 | Source | Vocabulary used |
@@ -24,9 +24,7 @@ vocabularies:
 
 These cannot all be the schema. `active` and `CONVENED` are the same condition
 under two names. `paused` (Point of Order filed) and `suspended` (heartbeat
-stale) are two *causes* that the CANON collapses into one state, `SUSPENDED` —
-but the engine must distinguish them, because a Point of Order resumes on a
-Speaker ruling while a stale session resumes on a heartbeat.
+stale) are two *causes*, not two states.
 
 ## Decision
 
@@ -39,7 +37,6 @@ Speaker ruling while a stale session resumes on a heartbeat.
   "protocol": "parliamentary",
   "state": "CONVENED",
   "suspension": null,
-  "fault": null,
   "quorum": { "required": 2, "present": 2 },
   "hansard_head": "4863a96...",
   "updated_at": "2026-04-08T14:02:11Z",
@@ -54,13 +51,21 @@ When `state` is `SUSPENDED`, `suspension` is populated:
 
 ```json
 "suspension": {
-  "cause": "POINT_OF_ORDER",
+  "cause": "CONSTITUTIONAL_CRISIS",
   "since": "2026-04-08T14:02:11Z",
+  "record_ref": "HANSARD.md#L482",
   "escalation_ref": "escalations/2026-04-08-001.md"
 }
 ```
 
-`cause` is one of `POINT_OF_ORDER | SPEAKER_ORDER | DISPUTED_EXIT`.
+`cause` is one of:
+
+| cause | Filed by | Resolved by |
+|---|---|---|
+| `POINT_OF_ORDER` | any actor | Speaker ruling (`escalations/ruling-NNN.md`) |
+| `SPEAKER_ORDER` | AUTHORITY | AUTHORITY |
+| `DISPUTED_EXIT` | any actor | Speaker ruling — `UPHELD` / `REVERSED` |
+| `CONSTITUTIONAL_CRISIS` | OBSERVER with `can_file`, or OPERATOR supermajority | human AUTHORITY above the node |
 
 ### Mapping the legacy vocabularies
 
@@ -77,19 +82,43 @@ When `state` is `SUSPENDED`, `suspension` is populated:
 `suspension`. This keeps "a human paused it" and "the agents went quiet"
 distinguishable without a boolean soup.
 
-### Faults are not states
+## Ruling — is `CONSTITUTIONAL_CRISIS` a state or a fault? (resolved)
 
-`CONSTITUTIONAL_CRISIS`, `SESSION_FAULT`, and `SESSION_FAULT_CRITICAL` are
-Hansard record types, not session states. EXECUTION § Obsidian colour-codes
-"constitutional crisis" alongside three real states, which reads as a fourth
-state but is not one. The schema carries it as:
+Neither. **It is a cause of suspension.**
 
-```json
-"fault": { "level": "CONSTITUTIONAL_CRISIS", "record": "HANSARD.md#L482" }
-```
+`RUNTIME.md` § Constitutional Capture already defines its effect: when a
+supermajority of OPERATOR actors file escalations against AUTHORITY, "the
+session auto-suspends and notifies." A designated OBSERVER with `can_file:
+CONSTITUTIONAL_CRISIS` produces the same effect.
 
-A session may be `CONVENED` with a non-null `fault`. The Obsidian sync script
-colours red on `fault != null`, not on `state`.
+So the behaviour is already specified, and it is *suspension*. Structurally it is
+a Point of Order — something is filed, the session halts, a human resolves it.
+The only difference is who stands accused.
+
+**Ruling: add `CONSTITUTIONAL_CRISIS` to the `suspension.cause` enum. Do not add
+a sixth CANON state, and do not model it as a free-standing fault attribute.**
+
+Rationale:
+
+- Agents already halt on `SUSPENDED`. No agent logic changes.
+- CANON stays at five states, so `POLITIK-ARCHITECTURE.md` is untouched.
+- The Obsidian layer still colours red — it reads `suspension.cause`, not a new
+  state.
+
+An earlier draft of this ADR modelled the crisis as a `fault` object on a
+still-`CONVENED` session. That was wrong: a session in constitutional crisis is
+halted, not running-with-a-warning. The `fault` field is removed from the
+schema.
+
+**Accepted trade-off:** a crisis and a routine Point of Order both read as
+`SUSPENDED` at a glance; a reader must check `cause` to tell an emergency from
+paperwork. This is correct — the governance response to both is identical (halt,
+escalate to a human). It is the cause that differs, not the state, and the schema
+says so.
+
+`SESSION_FAULT` and `SESSION_FAULT_CRITICAL` remain Hansard record types. They do
+not appear in `STATE.json`; their effect on state, if any, is expressed through
+`state` and `suspension` like everything else.
 
 ## Consequences
 
@@ -100,11 +129,5 @@ colours red on `fault != null`, not on `state`.
 - The RECORD agent is the sole writer. Any other actor writing `STATE.json` is a
   Standing Orders violation.
 - `schema_version` is present from the first commit so the file can migrate.
-
-## Open question — requires a ruling
-
-The Obsidian colour-coding in `EXECUTION.md` treats "constitutional crisis" as a
-peer of `convened`/`suspended`/`prorogued`. This ADR demotes it to a fault
-attribute. If a constitutional crisis is intended to *halt* the session as a
-distinct terminal state, CANON needs a sixth state — which is an amendment to
-`POLITIK-ARCHITECTURE.md` and therefore outside an ADR's authority.
+- The Obsidian sync script colours by `state`, and red on
+  `suspension.cause == "CONSTITUTIONAL_CRISIS"`.
