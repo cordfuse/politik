@@ -41,25 +41,26 @@ recorded **and** nothing blocks it.
 [x] Finalize broadcast envelope format            — POLITIK-ARCHITECTURE.md
 [x] Finalize session repo structure               — POLITIK-ARCHITECTURE.md
 [x] Transport hook: git-based default (zero infrastructure, reference transport; Crosstalk is one such implementation), NATS an opt-in latency upgrade (Tailscale + NATS for multi-machine) — libp2p rejected (over-built for known permissioned assemblies). See ADR-0001.
-[~] Finalize CHARTER.md spec                      — ADR-0002 (Proposed), blocked on ruling #1
-[~] Finalize STATE.json schema                    — ADR-0003 (Proposed), blocked on ruling #2
+[x] Finalize CHARTER.md spec                      — ADR-0002 (Accepted)
+[x] Finalize STATE.json schema                    — ADR-0003 (Accepted)
 [~] Finalize SCM provider interface spec          — 10 methods named; return types unspecified
-[~] Document all decisions in ADRs                — 0001 Accepted; 0002/0003 Proposed
+[x] Document all decisions in ADRs                — 0001, 0002, 0003 Accepted
 [ ] Draft arXiv preprint — unified paper (framework + experiment)
 ```
 
-**Two rulings block the lock.** Both require amending `POLITIK-ARCHITECTURE.md`,
-which no agent may modify without explicit human instruction:
+**Both rulings are settled. `POLITIK-ARCHITECTURE.md` was not amended.**
 
-1. **`mode` / `record_mode` key collision.** `protocol.mode` and
-   `protocol.record_mode` have fixed enums in POLITIK-ARCHITECTURE.md.
-   RUNTIME.md § Single-Player Sessions reuses both key names under `session:`
-   with values (`solo`, `full`) that are in neither enum. Two namespaces, or a
-   conflict? See ADR-0002.
-2. **Is `CONSTITUTIONAL_CRISIS` a state or a fault?** CANON lists five states and
-   it is not among them; EXECUTION § Obsidian colour-codes it as a peer of the
-   real states. ADR-0003 treats it as a fault attribute. If it must halt the
-   session as a terminal state, CANON needs a sixth state. See ADR-0003.
+1. **`mode` / `record_mode`** are protocol-level keys only. The `session:` block
+   never legitimately owned them — `quorum: 1` already declares a solo session,
+   and the Hansard is required by default. Corrected in RUNTIME.md. See ADR-0002.
+2. **`CONSTITUTIONAL_CRISIS` is a cause of suspension**, not a sixth state and
+   not a free-standing fault. RUNTIME.md § Constitutional Capture already
+   specifies that it auto-suspends the session. CANON stays at five states. See
+   ADR-0003.
+
+**Remaining before Phase 2 code:** the SCM provider interface names ten methods
+but no return types. That is a signature exercise, not a governance decision, and
+can be settled in the scaffold itself.
 
 ### PHASE 2 — Reference Implementation (GitHub SCM)
 ```
@@ -232,7 +233,7 @@ Claude Code (Speaker)  ← both MCPs connected simultaneously
                            GitHub Hansard data to answer
 ```
 
-**The sync script:** A Politik CLI command (`politik sync-vault`) reads all repos in the tree and regenerates the Obsidian vault markdown. Not real-time — on-demand or scheduled. Adds frontmatter tags for STATE.json status so Obsidian's graph view can colour-code by state: green (convened), amber (suspended), grey (prorogued), red (constitutional crisis).
+**The sync script:** A Politik CLI command (`politik sync-vault`) reads all repos in the tree and regenerates the Obsidian vault markdown. Not real-time — on-demand or scheduled. Adds frontmatter tags for STATE.json status so Obsidian's graph view can colour-code by state: green (`CONVENED`), amber (`SUSPENDED`), grey (`PROROGUED`), red (`SUSPENDED` with `suspension.cause: CONSTITUTIONAL_CRISIS`). Constitutional crisis is a cause of suspension, not a state of its own — see ADR-0003.
 
 **Existing MCP options (all open source, as of 2025):**
 - `obsidian-mcp-tools` — Claude Desktop integration, semantic search, template execution
