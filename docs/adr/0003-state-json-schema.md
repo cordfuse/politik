@@ -66,6 +66,7 @@ When `state` is `SUSPENDED`, `suspension` is populated:
 | `SPEAKER_ORDER` | AUTHORITY | AUTHORITY |
 | `DISPUTED_EXIT` | any actor | Speaker ruling — `UPHELD` / `REVERSED` |
 | `CONSTITUTIONAL_CRISIS` | OBSERVER with `can_file`, or OPERATOR supermajority | human AUTHORITY above the node |
+| `DEADLOCK` | the engine, when a Division yields no valid outcome | AUTHORITY ruling; falls through to `CONSTITUTIONAL_CRISIS` if AUTHORITY is absent or is the subject (ADR-0004) |
 
 ### Mapping the legacy vocabularies
 
