@@ -7,7 +7,23 @@ Politik is a governed multi-agent framework built on git. This repository contai
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
-**Current status: SLOW BURN.** Architecture locked, DOI established. No scaffolding work — Crosstalk (`cordfuse/crosstalk`) is the active implementation priority. Politik implementation is a thousands-of-hours build. Do not propose scaffolding, code, or implementation work unless explicitly asked. Documentation and architecture cleanup only.
+**Current status: PHASE 1 — ARCHITECTURE LOCK.** The scaffolding gate was lifted
+by explicit human instruction; Crosstalk reached and passed alpha. Politik is no
+longer on slow burn.
+
+Phase 1 must close before Phase 2 code is written. Architecture decisions are
+recorded in [`docs/adr/`](docs/adr/). Two rulings block the lock — both are
+listed in `EXECUTION.md` § Phase 1, and both require amending
+`POLITIK-ARCHITECTURE.md`, which needs explicit human instruction (see Rule 1).
+
+**Implementation stack (decided):** Node + TypeScript, npm `@cordfuse/politik`,
+binary `politik`. Consistent with the namespace reserved in Phase 0 and the
+TypeScript SCM provider interface in POLITIK-ARCHITECTURE.md.
+
+**Politik does not depend on Crosstalk.** Crosstalk is *one* git-based transport
+implementation (POLITIK-ARCHITECTURE.md § Chamber Transport). No Politik
+specification names a Crosstalk version or API. The historical sequencing rule
+was about attention, not a build dependency.
 
 ---
 
