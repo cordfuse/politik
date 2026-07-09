@@ -39,6 +39,8 @@ session:
   escalation: enabled            # enabled | disabled (disabled => no_escalation)
   heartbeat_timeout_hours: 4     # no Hansard commit within window => STALE
   deadline: null                 # ISO-8601 wall-clock ceiling, or null
+  merge_strategy: merge_commit   # merge_commit (default) | squash | fast_forward
+  assent: AUTHORITY              # CANON role holding ASSENT; default AUTHORITY
 
   endurance:
     max_motions: null
@@ -106,7 +108,16 @@ than one role plainly needs a list.
    `SESSION_INVALID` committed to Hansard, naming the missing roles.
 4. `minimum_cast.AUTHORITY` may never be overridden to `0` — a session with no
    Speaker cannot proceed under any configuration.
-5. On pass: `STATE.json.state = CONVENED`.
+5. `merge_strategy: squash` is **rejected** when `protocol.record_mode` is
+   `distributed` — squash destroys per-commit attribution, which that record mode
+   guarantees. Permitted otherwise (ADR-0004, Ruling 1).
+6. `merge_strategy: fast_forward` is **rejected** unless `session.quorum` is `1` —
+   a fast-forward leaves no merge node, so the Hansard would carry no evidence a
+   Division occurred. At `quorum: 1` there is no Division to record (ADR-0004,
+   Ruling 2).
+7. `session.assent` must name a CANON role. Defaults to `AUTHORITY` (ADR-0004,
+   Ruling 3).
+8. On pass: `STATE.json.state = CONVENED`.
 
 ## Ruling — `mode` / `record_mode` key collision (resolved)
 
