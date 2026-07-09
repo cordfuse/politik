@@ -62,14 +62,28 @@ Add to the CANON verb table:
 the actor who may push the button — which is precisely the governance question a
 merge represents.
 
-**This also corrects an existing error.** PROTOCOLS.md:97 maps `DIVISION` →
-"Royal Assent" in the Parliamentary protocol. That is the wrong mapping: Royal
-Assent is not the vote, it is the enactment *after* the vote. Under this ADR:
+**Vocabulary note (corrected).** An earlier draft of this ADR claimed
+PROTOCOLS.md:97 mis-mapped `DIVISION` → "Royal Assent" in the Parliamentary
+protocol. That was wrong on two counts, and the claim is withdrawn:
 
-- `DIVISION` → "Division" (the vote)
-- `ASSENT` → "Royal Assent" (the enactment)
+- Line 97 belongs to the **Monarchy** protocol, not Parliamentary.
+- Parliamentary already maps `DIVISION` → "Division", which is correct.
+- Monarchy is Authoritarian-mode: there is no vote, and the Crown's assent *is*
+  the decision. `DIVISION` → "Royal Assent" is therefore defensible as written.
 
-The vocabulary was already correct. It was attached to the wrong primitive.
+What the protocols actually need is an `ASSENT` **term**, which no protocol has
+because no such primitive existed:
+
+- Parliamentary: `ASSENT` → "Royal Assent" (in Westminster practice, Royal Assent
+  is precisely the enactment following the Division — the term fits `ASSENT`, not
+  `DIVISION`).
+- Software Development: `ASSENT` → "Merge".
+
+This produces a term collision: "Royal Assent" would name `DIVISION` under
+Monarchy and `ASSENT` under Parliamentary. Protocols are independent translation
+manifests, so this is legal — a term may mean different things in different
+protocols. It is nonetheless confusing, and **Ruling 4 below asks whether to
+accept it.**
 
 **Preconditions.** `ASSENT` is invalid unless the Motion carried a Division, the
 session is `CONVENED`, and no `VETO` is outstanding. An `ASSENT` on an uncarried
@@ -157,6 +171,18 @@ it otherwise.
 Constitutional-mode protocol; Darwinist and Authoritarian protocols will want to
 move it.
 
+**Ruling 4 — Is the "Royal Assent" term collision acceptable?**
+
+Under Monarchy, "Royal Assent" names `DIVISION`. Under Parliamentary it would
+name `ASSENT`. Both are correct within their own protocol.
+
+*My recommendation:* **accept the collision.** Protocols are independent
+vocabulary manifests over CANON — that independence is the whole design. Forcing
+globally-unique industry terms across 35+ protocols would distort the vocabulary
+to serve the engine, which inverts the framework's stated direction of
+translation (CANON → industry vocabulary, never the reverse). The engine never
+reads these terms; only humans do, and always inside one protocol at a time.
+
 ---
 
 ## Consequences
@@ -171,7 +197,9 @@ move it.
   `EXPEL`, `DEMOTE`, `DISSOLVE`). Those are signature work, not governance, and
   are tracked separately.
 - **ADR-0003 extended.** `suspension.cause` gains `DEADLOCK`.
-- **PROTOCOLS.md corrections.** Line 97 (`DIVISION` → Royal Assent) and line 122
-  (`DEADLOCK` → Merge Conflict) are both wrong as written.
+- **PROTOCOLS.md changes.** Line 122 (`DEADLOCK` → Merge Conflict) is wrong as
+  written and becomes `CONFLICT` → Merge Conflict. Protocols additionally gain an
+  `ASSENT` term. Line 97 (Monarchy `DIVISION` → Royal Assent) is **correct** and
+  is left alone.
 - **No reverting.** A carried and assented Motion later found wrong still has no
   path back. `REVERT` is deliberately out of scope here; it deserves its own ADR.
