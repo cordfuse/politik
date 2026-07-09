@@ -2,7 +2,7 @@
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
-**Status:** Proposed
+**Status:** Accepted
 
 ---
 
@@ -108,25 +108,24 @@ than one role plainly needs a list.
    Speaker cannot proceed under any configuration.
 5. On pass: `STATE.json.state = CONVENED`.
 
-## Open question — requires a ruling
+## Ruling — `mode` / `record_mode` key collision (resolved)
 
-`ARCHITECTURE.md` defines `mode` and `record_mode` under a `protocol:` block:
+`POLITIK-ARCHITECTURE.md` defines `mode` and `record_mode` under a `protocol:`
+block with fixed enums. `RUNTIME.md` § Single-Player Sessions reused the **same
+key names** under a `session:` block with values (`solo`, `full`) present in
+neither enum.
 
-- `mode: constitutional | authoritarian | darwinist | ephemeral | immutable`
-- `record_mode: distributed | anchored | ephemeral`
+Git history settles the intent. The `protocol.mode` enum shipped in the original
+`v0.1.0-architecture` invention disclosure. `session: mode: solo` first appeared
+in the single commit that introduced RUNTIME.md — an illustrative YAML sketch,
+not a designed second namespace.
 
-`RUNTIME.md` § Single-Player Sessions uses the **same key names** under a
-`session:` block, with values that appear in neither enum:
+**Ruling: `mode` and `record_mode` are protocol-level keys only.** They are
+removed from the `session:` block. Nothing is lost:
 
-- `mode: solo`
-- `record_mode: full`
+- `mode: solo` is fully expressed by `session.quorum: 1`.
+- `record_mode: full` states the default — the Hansard is required in every
+  non-Ephemeral protocol, so there is nothing to opt into.
 
-These are either (a) two namespaces whose key names collide, or (b) a genuine
-conflict. This ADR deliberately omits `mode` and `record_mode` from the
-`session:` block pending a ruling, because resolving it would require amending
-`POLITIK-ARCHITECTURE.md` — the invention disclosure — which is out of scope for
-an ADR.
-
-Until ruled, a Charter carries protocol mode via `protocol:` only, and
-single-player sessions are expressed as `session.quorum: 1` (which is already
-sufficient and is the value RUNTIME leans on).
+`POLITIK-ARCHITECTURE.md` is unchanged; the correction was made in `RUNTIME.md`,
+which held the erroneous keys.
