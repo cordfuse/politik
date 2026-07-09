@@ -631,11 +631,15 @@ Valid single-agent use cases:
 
 ```yaml
 session:
-  quorum: 1
-  mode: solo
-  record_mode: full        # Hansard still required
+  quorum: 1                # this alone declares a single-player session
   escalation: enabled      # Speaker still reachable
 ```
+
+The Hansard is still required — recording is not optional in any non-Ephemeral
+protocol, so a single-player session needs no flag to opt into it.
+
+`mode` and `record_mode` belong to `protocol:` (see POLITIK-ARCHITECTURE.md
+§ Protocol Schema Format) and are **not** session-level keys. See ADR-0002.
 
 ### Minimum Cast — Enforced at Writ Drop
 
