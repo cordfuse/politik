@@ -1,0 +1,36 @@
+# Elimination Tournament (Single) — Darwinist protocol.
+#
+# Losers exit permanently; there are no second chances. Appeals exist as a
+# protest to the Director, so escalation stays enabled.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: elimination-tournament
+  version: 1.0.0
+  mode: darwinist
+  record_mode: anchored
+
+  roles:
+    AUTHORITY: Tournament Director
+    DELEGATE: Deputy Director
+    OPERATOR: Team Captain
+    MEMBER: Competitor
+    OBSERVER: Spectator
+
+  primitives:
+    SESSION: Tournament
+    PROCEEDING: Tournament
+    CHARTER: Tournament Rules
+    RECORD: Bracket
+    MOTION: Match
+    DIVISION: Match Result
+    ESCALATION: Protest / Appeal
+    SUSPENSION: Bye Round
+    QUORUM: Minimum Entrants
+    DEADLOCK: Tiebreaker Round
+    ASSENT: Result Certified
+    EXIT: Eliminated — bracket closes
+
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: true

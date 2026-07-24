@@ -1,0 +1,35 @@
+# Agile / Scrum — software development protocol.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: agile
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+
+  roles:
+    AUTHORITY: Scrum Master
+    DELEGATE: Tech Lead
+    OPERATOR: Senior Developer
+    MEMBER: Developer
+    OBSERVER: Stakeholder
+
+  primitives:
+    SESSION: Sprint
+    PROCEEDING: Sprint
+    CHARTER: Definition of Done
+    RECORD: Commit Log
+    MOTION: Pull Request
+    DIVISION: Code Review Vote
+    ESCALATION: Blocker
+    SUSPENSION: Sprint Close
+    QUORUM: Quorum
+    CONFLICT: Merge Conflict
+    DEADLOCK: Irreconcilable Review — Tech Lead rules
+    ASSENT: Merge
+    PROMOTE: Promoted to Tech Lead
+    EXIT: Offboarded
+
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false
