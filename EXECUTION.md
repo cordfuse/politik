@@ -333,18 +333,60 @@ the full translatable surface is visible in the file rather than discoverable
 only from documentation.
 
 ### PHASE 6 — Platform Testing
+
+`politik doctor` probes a host and reports whether a session can run there and
+with which agents. The matrix below is what that probe has actually returned —
+not a table of expectations. Unverified rows are marked as such and stay
+unticked; a checkbox nobody exercised is worse than an empty one, because it
+reads as evidence.
+
+**Verified**
+
 ```
-[ ] macOS bare metal — Claude Code OAuth
-[ ] macOS Docker — OAuth + DISPLAY
-[ ] Linux bare metal — Claude Code OAuth
-[ ] Linux Docker — OAuth + DISPLAY
-[ ] Windows Pro bare metal — OAuth
-[ ] WSL2 + Docker — API key
-[ ] Windows Home bare metal — OAuth, risk acknowledged
-[ ] VPS headless — API key, cost acknowledged
-[ ] Codespaces — API key, cost acknowledged
-[ ] Ollama local — zero cost, zero auth
+[x] Linux bare metal — OAuth        steve-cachyos, Node 26, 6 agents, ollama present
+[x] Linux Docker — API key          node:22-alpine + git, full lifecycle + 324 tests
+[x] Ollama local — zero auth        detected and reported by doctor
 ```
+
+Linux bare metal: `doctor` reports READY with six agents installed
+(claude-code, gemini-cli, opencode, qwen-code, codex-cli, antigravity); five of
+those were driven live in Phase 3.
+
+Linux Docker: `doctor` → `scaffold` → `validate` → `init` → `status` →
+`prorogue` all completed inside `node:22-alpine`, and the full test suite ran
+green in the container. `doctor` correctly reported NOT READY (exit 1) in a
+container *without* git, which is the check earning its keep.
+
+**Unverified — no host available**
+
+```
+[ ] macOS bare metal — OAuth              Steves-Air; SSH access revoked
+[ ] macOS Docker — OAuth + DISPLAY        same
+[ ] Windows Pro bare metal — OAuth        no Node/agent install on the Windows test host
+[ ] WSL2 + Docker — API key               STEVE-DESKTOP not reachable from this session
+[ ] Windows Home bare metal — OAuth       no host
+[ ] VPS headless — API key                none provisioned; cost acknowledged
+[ ] Codespaces — API key                  not provisioned; cost acknowledged
+```
+
+Each closes out by running `politik doctor` on the host and recording the
+output. No code change is expected — but Phase 3 found two spec errors that way,
+so "expected" is not "verified".
+
+**Two findings from containerised testing**
+
+1. **Unhandled `EPIPE`.** `politik status | head` crashed with a stack trace
+   when the reader closed the pipe early. Normal Unix pipeline behaviour, not an
+   error — the binary now exits quietly, as every other CLI does. Found by
+   piping output inside the container, not by any test.
+2. **`doctor` requires git, not merely prefers it.** A container with Node but
+   no git reports FAIL and exit 1. The repository *is* the session; without git
+   there is no substrate, so this is correctly fatal rather than a warning.
+
+**OAuth does not survive a headless container.** Agents whose local auth is
+OAuth cannot complete a browser login without a display, so `doctor` warns when
+it finds OAuth-default agents inside a container and points at API keys — the
+documented headless path (RUNTIME.md § Cloud / Headless).
 
 ### PHASE 7 — SCM Provider SDK
 ```
