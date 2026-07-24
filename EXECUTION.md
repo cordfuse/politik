@@ -112,17 +112,52 @@ created, escalation issue filed, suspension state committed, notification
 delivered, `openDiscussion` refused as designed.
 
 ### PHASE 3 — Agent Compatibility Layer
+
+Implemented in `src/agents.ts` (registry, invocation shapes, prompt injection)
+and `src/spawn.ts` (process lifecycle). The registry is a data table, not a class
+per agent — agents differ only in argv shape and auth story.
+
 ```
-[ ] Claude Code integration and test
-[ ] Gemini CLI integration and test
-[ ] OpenCode integration and test
-[ ] Qwen Code integration and test
-[ ] Codex CLI integration and test
-[ ] Aider integration and test
-[ ] Goose integration and test
-[ ] Document prompt injection format per agent
-[ ] Document headless invocation per agent
+[x] Claude Code integration and test    — PASS, live
+[x] Gemini CLI integration and test     — PASS, live (needs --skip-trust)
+[x] OpenCode integration and test       — PASS, live
+[x] Codex CLI integration and test      — PASS, live (exec subcommand, in a git repo)
+[x] Antigravity integration and test    — PASS, live (added; see note)
+[~] Qwen Code integration and test      — implemented; local auth unconfigured
+[ ] Aider integration and test          — not installed on this host
+[ ] Goose integration and test          — not installed on this host
+[x] Document prompt injection format per agent
+[x] Document headless invocation per agent
 ```
+
+**Live results.** Each agent was driven through `spawnAgent()` with a trivial
+prompt and had to return a specific token. Five passed. Qwen Code is blocked on
+local auth configuration (`No auth type is selected`) — a host setup matter, not
+a compatibility defect. Aider and Goose are not installed here and remain
+unverified; their registry entries follow the documented invocation but are
+untested.
+
+**Antigravity added.** `agy` supports `-p`/`--print` headless, is a
+Cordfuse-supported CLI, and was absent from the compatibility table. Verified
+live and added to both the table and the registry.
+
+**Two spec errors found by live testing**, both corrected in RUNTIME.md
+§ Politik Compatible:
+
+1. **Codex CLI was documented as `codex "..."`.** That form starts an
+   interactive TUI and fails headlessly with `stdin is not a terminal`. The
+   headless form is `codex exec "..."`. Codex additionally requires the working
+   directory to be a git repository — always true of a session repo, but not of
+   an arbitrary temp directory.
+2. **Gemini CLI refuses to run in an untrusted directory**, exiting 55. It needs
+   `--skip-trust`, now carried as a required headless arg rather than left to
+   the caller.
+
+**Prompt injection format.** One format for every agent: role and mandate,
+granted verbs, Standing Orders, Hansard excerpt (agents are stateless — the
+record is their context), the business at hand, then the rules of the floor.
+Deliberately uniform: per-agent prompt tuning would void the cross-protocol
+comparisons the research layer depends on.
 
 ### PHASE 4 — Parliamentary Protocol (reference protocol)
 ```

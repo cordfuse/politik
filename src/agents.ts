@@ -110,7 +110,9 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     auth_local: 'oauth',
     auth_headless: 'api_key',
     stdio_json: true,
-    notes: 'OpenAI, Rust-based. Bare `codex` is an interactive TUI; `exec` is headless.',
+    notes:
+      'OpenAI, Rust-based. Bare `codex` is an interactive TUI; `exec` is headless. ' +
+      'Requires cwd to be a git repo — always true of a session repo.',
   },
   {
     id: 'antigravity',
