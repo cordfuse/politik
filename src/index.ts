@@ -5,6 +5,8 @@
  */
 
 export * from './canon.ts';
+export * from './escalation.ts';
+export * from './quorum.ts';
 export * from './election.ts';
 export * from './envelope.ts';
 export * from './hansard.ts';
