@@ -6,6 +6,7 @@
 
 export * from './agents.ts';
 export * from './canon.ts';
+export * from './division.ts';
 export * from './doctor.ts';
 export * from './escalation.ts';
 export * from './protocol.ts';

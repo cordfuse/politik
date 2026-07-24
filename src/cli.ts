@@ -21,6 +21,10 @@ import { parliamentaryTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
+import {
+  callDivision, castVote, grantAssent, recordOutcome, tallyDivision,
+  type Vote,
+} from './division.ts';
 import { PROTOCOL_MODES, type ProtocolMode } from './protocol.ts';
 import { checkTermination, prorogue, type Trigger } from './prorogation.ts';
 import { parseEntries } from './hansard.ts';
@@ -50,6 +54,10 @@ Usage
   politik validate <charter.md> [--protocol <name>]
   politik init --charter <path> --speaker <handle> [--out <dir>] [--guid <id>]
   politik run --dir <dir> --agent <id> --actor <handle> --role <ROLE> --task <text>
+  politik division call --motion <id> --actor <h> --role <ROLE> [--reviewers a,b]
+  politik division vote --motion <id> --actor <h> --role <ROLE> --vote AYE|NO|ABSTAIN
+  politik division tally --motion <id>
+  politik assent --motion <id> --actor <h> --role AUTHORITY
   politik status [--dir <dir>]
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
 
@@ -61,6 +69,8 @@ Commands
   validate    Parse a CHARTER.md and run the Writ Drop rules. Writes nothing.
   init        Drop the Writ — create a session repo file set on disk.
   run         Seat an agent, give it the business, record what it did.
+  division    Call a Division, cast a vote, or tally the result.
+  assent      Enact a carried Motion. The Division decides; Assent enacts.
   status      Read STATE.json and summarise the proceeding.
   prorogue    Close a proceeding permanently and seal the Hansard.
 `;
@@ -319,6 +329,129 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
   return EXIT.OK;
 };
 
+
+/* -------------------------------------------------------------------------- */
+/* Division helpers                                                            */
+/* -------------------------------------------------------------------------- */
+
+const loadSession = async (dir: string) => {
+  const stateRaw = await readIfPresent(join(dir, 'STATE.json'));
+  const state = stateRaw === null ? null : parseState(stateRaw);
+  const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
+  const charterRaw = await readIfPresent(join(dir, 'CHARTER.md'));
+  const charter = charterRaw === null ? null : parseCharter(charterRaw);
+  return { state, hansard, charter: charter?.ok === true ? charter.charter : null };
+};
+
+const writeHansard = (dir: string, hansard: string) =>
+  writeFile(join(dir, 'HANSARD.md'), hansard, 'utf8');
+
+const nowStamp = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+/** `politik division call|vote|tally`. */
+const cmdDivision = async (argv: readonly string[]): Promise<number> => {
+  const [verb, ...rest] = argv;
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      dir: { type: 'string' }, motion: { type: 'string' }, actor: { type: 'string' },
+      role: { type: 'string' }, vote: { type: 'string' }, reviewers: { type: 'string' },
+    },
+  });
+
+  const dir = values.dir ?? '.';
+  const { state, hansard, charter } = await loadSession(dir);
+  if (state === null || charter === null) {
+    err(`division: ${dir} is not a session repo`);
+    return EXIT.USAGE;
+  }
+  if (values.motion === undefined) {
+    err('division: --motion is required');
+    return EXIT.USAGE;
+  }
+
+  try {
+    if (verb === 'call') {
+      if (values.actor === undefined) { err('division call: --actor is required'); return EXIT.USAGE; }
+      const result = callDivision({
+        motion: values.motion, at: nowStamp(), actor: values.actor,
+        role: (values.role ?? 'OPERATOR') as never,
+        reviewers: (values.reviewers ?? '').split(',').filter((r) => r.length > 0),
+        state,
+      }, hansard);
+      await writeHansard(dir, result.hansard);
+      out(`DIVISION CALLED on ${values.motion}`);
+      return EXIT.OK;
+    }
+
+    if (verb === 'vote') {
+      if (values.actor === undefined || values.vote === undefined) {
+        err('division vote: --actor and --vote are required'); return EXIT.USAGE;
+      }
+      const result = castVote({
+        motion: values.motion, at: nowStamp(), actor: values.actor,
+        role: (values.role ?? 'OPERATOR') as never,
+        vote: values.vote.toUpperCase() as Vote, state,
+      }, hansard);
+      await writeHansard(dir, result.hansard);
+      out(`VOTE RECORDED — ${values.actor}: ${values.vote.toUpperCase()}`);
+      return EXIT.OK;
+    }
+
+    if (verb === 'tally') {
+      const outcome = tallyDivision(hansard, values.motion, charter.session.quorum);
+      const result = recordOutcome(outcome, nowStamp(), values.actor ?? 'RECORD',
+        (values.role ?? 'OPERATOR') as never, hansard);
+      await writeHansard(dir, result.hansard);
+      out(outcome.carried ? 'MOTION CARRIED' : 'MOTION NOT CARRIED');
+      out(`  ayes ${outcome.ayes}  noes ${outcome.noes}  abstentions ${outcome.abstentions}`);
+      out(`  quorum ${outcome.quorum_met ? 'met' : 'NOT MET'}`);
+      out(`  ${outcome.reason}`);
+      return outcome.carried ? EXIT.OK : EXIT.REFUSED;
+    }
+
+    err(`division: unknown verb "${verb ?? ''}" — expected call | vote | tally`);
+    return EXIT.USAGE;
+  } catch (error) {
+    err(`division refused: ${error instanceof Error ? error.message : String(error)}`);
+    return EXIT.REFUSED;
+  }
+};
+
+/** `politik assent` — enact a carried Motion. */
+const cmdAssent = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: {
+      dir: { type: 'string' }, motion: { type: 'string' },
+      actor: { type: 'string' }, role: { type: 'string' },
+    },
+  });
+
+  const dir = values.dir ?? '.';
+  const { state, hansard, charter } = await loadSession(dir);
+  if (state === null || charter === null) { err(`assent: ${dir} is not a session repo`); return EXIT.USAGE; }
+  if (values.motion === undefined || values.actor === undefined) {
+    err('assent: --motion and --actor are required'); return EXIT.USAGE;
+  }
+
+  try {
+    const outcome = tallyDivision(hansard, values.motion, charter.session.quorum);
+    const result = grantAssent({
+      motion: values.motion, at: nowStamp(), actor: values.actor,
+      role: (values.role ?? 'AUTHORITY') as never,
+      assent_role: charter.session.assent, outcome, state,
+    }, hansard);
+    await writeHansard(dir, result.hansard);
+    await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
+    out(`ASSENT GRANTED — ${values.motion} is enacted`);
+    return EXIT.OK;
+  } catch (error) {
+    err(`assent refused: ${error instanceof Error ? error.message : String(error)}`);
+    return EXIT.REFUSED;
+  }
+};
+
 /** Run one turn of a session. */
 const cmdRun = async (argv: readonly string[]): Promise<number> => {
   const { values } = parseArgs({
@@ -488,6 +621,10 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdValidate(rest);
     case 'init':
       return cmdInit(rest);
+    case 'division':
+      return cmdDivision(rest);
+    case 'assent':
+      return cmdAssent(rest);
     case 'run':
       return cmdRun(rest);
     case 'status':
