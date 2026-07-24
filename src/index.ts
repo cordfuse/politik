@@ -4,6 +4,7 @@
  * Attribution: Steve Krisjanovs, Cordfuse
  */
 
+export * from './agents.ts';
 export * from './canon.ts';
 export * from './escalation.ts';
 export * from './prorogation.ts';
@@ -15,5 +16,6 @@ export * from './lockfs.ts';
 export * from './charter.ts';
 export * from './init.ts';
 export * from './scm.ts';
+export * from './spawn.ts';
 export * from './state.ts';
 export * from './providers/github.ts';
