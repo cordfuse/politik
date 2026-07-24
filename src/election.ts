@@ -122,10 +122,18 @@ export const standForElection = async (
     return { elected: true, holder };
   }
 
-  // Lock exists. It may belong to a live broadcaster, or to one that died.
-  const existing = await readHolder(options.fs, path);
+  // The lock exists. Three cases: a live broadcaster, one that died, or a
+  // lockfile we cannot read at all.
+  const existing = await inspectLock(options.fs, path);
 
-  if (existing !== null && isStale(existing, now, options.staleAfterMs ?? null)) {
+  const reclaimable =
+    // A lock nobody can parse must not strand the constituency permanently.
+    existing.kind === 'CORRUPT' ||
+    // The file vanished between our failed create and this read.
+    existing.kind === 'ABSENT' ||
+    (existing.kind === 'HELD' && isStale(existing.holder, now, options.staleAfterMs ?? null));
+
+  if (reclaimable) {
     // Broadcaster bow-out: reclaim. Remove then re-create exclusively, so a
     // third agent racing the same reclamation still loses to whoever wins the
     // atomic create.
@@ -133,10 +141,19 @@ export const standForElection = async (
     if (await options.fs.createExclusive(path, JSON.stringify(holder, null, 2))) {
       return { elected: true, holder };
     }
-    return { elected: false, reason: 'DEFERRED', holder: await readHolder(options.fs, path) };
+    const after = await inspectLock(options.fs, path);
+    return {
+      elected: false,
+      reason: 'DEFERRED',
+      holder: after.kind === 'HELD' ? after.holder : null,
+    };
   }
 
-  return { elected: false, reason: 'DEFERRED', holder: existing };
+  return {
+    elected: false,
+    reason: 'DEFERRED',
+    holder: existing.kind === 'HELD' ? existing.holder : null,
+  };
 };
 
 /**
@@ -171,18 +188,36 @@ export const currentHolder = async (
 /* Internals                                                                   */
 /* -------------------------------------------------------------------------- */
 
-const readHolder = async (fs: LockFs, path: string): Promise<LockHolder | null> => {
+/**
+ * The three distinguishable states of a lockfile.
+ *
+ * ABSENT and CORRUPT must not collapse into one "null holder" value: a caller
+ * that cannot tell them apart cannot tell "nobody holds this" from "somebody
+ * holds this and I cannot read who", and the second case would otherwise block
+ * the constituency permanently.
+ */
+type LockInspection =
+  | { readonly kind: 'HELD'; readonly holder: LockHolder }
+  | { readonly kind: 'ABSENT' }
+  | { readonly kind: 'CORRUPT' };
+
+const inspectLock = async (fs: LockFs, path: string): Promise<LockInspection> => {
   const raw = await fs.readFile(path);
-  if (raw === null) return null;
+  if (raw === null) return { kind: 'ABSENT' };
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return null;
-    return parsed as LockHolder;
+    if (typeof parsed !== 'object' || parsed === null) return { kind: 'CORRUPT' };
+    const holder = parsed as LockHolder;
+    if (typeof holder.agent !== 'string' || holder.agent === '') return { kind: 'CORRUPT' };
+    return { kind: 'HELD', holder };
   } catch {
-    // An unreadable lockfile is treated as absent rather than as a permanent
-    // block: a corrupt lock must not strand a constituency forever.
-    return null;
+    return { kind: 'CORRUPT' };
   }
+};
+
+const readHolder = async (fs: LockFs, path: string): Promise<LockHolder | null> => {
+  const inspection = await inspectLock(fs, path);
+  return inspection.kind === 'HELD' ? inspection.holder : null;
 };
 
 const isStale = (
