@@ -5,4 +5,5 @@
  */
 
 export * from './canon.ts';
+export * from './charter.ts';
 export * from './scm.ts';
