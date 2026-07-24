@@ -227,19 +227,38 @@ unread template.
 **Framing note:** Parliamentary is protocol #1, not a privileged mode.
 All protocols are equal. The framework is protocol-agnostic.
 
-**Shipped with framework (reference protocols):**
+**Shipped with framework (reference protocols):** all ten in `protocols/`,
+every one lint-clean.
+
 ```
-[ ] Parliamentary Democracy (reference protocol — ships first)
-[ ] Agile / Scrum
-[ ] Military Operation
-[ ] Criminal Trial / Legal
-[ ] Corporate / Board
-[ ] Battle Royale
-[ ] League Season (sports)
-[ ] Elimination Tournament — Single
-[ ] Peer Review (scientific research)
-[ ] Red Team / Blue Team Science
+[x] Parliamentary Democracy (reference protocol — ships first)  parliamentary.yml
+[x] Agile / Scrum                                               agile.yml
+[x] Military Operation                                          military.yml
+[x] Criminal Trial / Legal                                      legal.yml
+[x] Corporate / Board                                           corporate.yml
+[x] Battle Royale                                               battle-royale.yml
+[x] League Season (sports)                                      league-season.yml
+[x] Elimination Tournament — Single                             elimination-tournament.yml
+[x] Peer Review (scientific research)                           peer-review.yml
+[x] Red Team / Blue Team Science                                red-blue-team.yml
 ```
+
+All five modes are represented: constitutional (parliamentary, agile, legal,
+corporate, league-season, peer-review), authoritarian (military,
+red-blue-team), and darwinist (battle-royale, elimination-tournament). Ephemeral
+and immutable have no reference protocol yet — they appear in the community
+list.
+
+**Power inversions are declared, never inferred.** `legal.yml` gives the Jury
+(OBSERVER) a domain veto over the final Division; `peer-review.yml` lets a
+reviewer reject on methodology alone. Both contradict the trust hierarchy, which
+is exactly why CANON models them as `domain_veto` rather than deriving them.
+
+**One mapping conflict found in PROTOCOLS.md.** Red Team / Blue Team lists
+OPERATOR and MEMBER twice each, once per side (Red Team Lead / Blue Team Lead).
+A CANON role cannot map to two terms. Resolved by rendering both side-neutrally
+("Team Lead", "Team Agent") and carrying the side in each actor's
+`mandate_alignment` — mandate is an actor property, vocabulary is protocol-wide.
 
 **Ship shortly after (community-ready protocols):**
 ```
@@ -283,11 +302,35 @@ Game Theory:  Formal analytical structures (Zero-Sum, Cooperative,
 
 **Protocol SDK:**
 ```
-[ ] Protocol schema format specification
-[ ] Protocol validator (lints against CANON primitives)
-[ ] Protocol template generator
-[ ] Community contribution guide
+[x] Protocol schema format specification   — POLITIK-ARCHITECTURE.md + src/protocol.ts
+[x] Protocol validator (lints against CANON) — src/protocol-sdk.ts, politik protocol lint
+[x] Protocol template generator            — politik protocol new
+[x] Community contribution guide           — protocols/CONTRIBUTING.md
 ```
+
+**Loadable is not coherent.** `parseProtocol` answers "will this manifest
+load?"; the linter answers "is it coherent?" A manifest with `mode: darwinist`
+and `no_escalation: false` loads cleanly and then produces a session that accepts
+appeals a Darwinist protocol has no mechanism to resolve. The linter separates
+errors (unusable — a term CANON does not have, two roles sharing one label, an
+ephemeral record mode that still claims to record) from warnings (likely
+mistakes — non-semver version, unmapped role, flags inconsistent with the mode).
+
+**Warnings are not silently suppressed.** `red-blue-team.yml` ships with one:
+PROTOCOLS.md gives the Referee — who *is* AUTHORITY — a domain veto, which is
+mechanically redundant since AUTHORITY already holds VETO. The manifest keeps it
+to stay faithful to the published protocol, and a comment explains why the
+warning is expected. The linter found this in the framework's own library.
+
+**New CLI surface:**
+```
+politik protocol lint <manifest.yml>
+politik protocol new <name> [--mode <mode>] [--out <dir>]
+```
+
+The generated skeleton maps every CANON role, primitive and verb to itself, so
+the full translatable surface is visible in the file rather than discoverable
+only from documentation.
 
 ### PHASE 6 — Platform Testing
 ```
