@@ -218,26 +218,39 @@ describe('admin surface', () => {
   });
 });
 
-describe('discussions (GraphQL)', () => {
-  it('surfaces GraphQL errors rather than returning a bad ref', async () => {
-    const { fetch } = stubFetch([
-      { node_id: 'repo-node' },
-      { errors: [{ message: 'Discussions disabled' }] },
-    ]);
+describe('discussions — deferred to Phase 4', () => {
+  it('throws 501 rather than silently doing nothing', async () => {
+    const { fetch } = stubFetch([]);
     await assert.rejects(
-      () => provider(fetch).openDiscussion('t', 'b', 'cat-id'),
-      /Discussions disabled/,
+      () => provider(fetch).openDiscussion('t', 'b', 'general'),
+      (err: unknown) => {
+        assert.ok(err instanceof ScmError);
+        assert.equal(err.status, 501);
+        return true;
+      },
     );
   });
 
-  it('returns the discussion ref on success', async () => {
+  it('makes no network call', async () => {
+    const { fetch, calls } = stubFetch([]);
+    await provider(fetch).openDiscussion('t', 'b', 'general').catch(() => {});
+    assert.equal(calls.length, 0);
+  });
+
+  it('provider issues no GraphQL requests anywhere', async () => {
     const { fetch, calls } = stubFetch([
-      { node_id: 'repo-node' },
-      { data: { createDiscussion: { discussion: { id: 'd1', url: 'https://example/d1' } } } },
+      { object: { sha: 'h' } },
+      { tree: { sha: 't' } },
+      { sha: 'b1' },
+      { sha: 'nt' },
+      { sha: 'c', html_url: 'u' },
+      {},
+      { number: 1, html_url: 'u', id: 1 },
     ]);
-    const ref = await provider(fetch).openDiscussion('t', 'b', 'cat-id');
-    assert.equal(ref.id, 'd1');
-    assert.match(calls[1]?.url ?? '', /graphql$/);
+    const gh = provider(fetch);
+    await gh.commit('m', [{ path: 'a', content: '1' }]);
+    await gh.openIssue('t', 'b', []);
+    assert.ok(!calls.some((c) => c.url.includes('graphql')), 'GraphQL request issued');
   });
 });
 

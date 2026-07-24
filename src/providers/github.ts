@@ -3,8 +3,9 @@
  *
  * Implemented against the GitHub REST API with the platform `fetch`, rather
  * than an SDK: the interface is eleven methods, Node 20 ships fetch, and a
- * governance framework benefits from a shallow dependency tree. The one
- * exception is Discussions, which GitHub exposes only through GraphQL.
+ * governance framework benefits from a shallow dependency tree.
+ *
+ * REST only. `openDiscussion` is deliberately unimplemented — see the method.
  *
  * This module performs I/O. Everything above it (canon, charter, state, init)
  * stays pure, so a session can be validated and initialized with no network.
@@ -265,64 +266,24 @@ export class GitHubProvider implements ScmProvider {
   }
 
   /**
-   * Discussions are GraphQL-only on GitHub — there is no REST equivalent.
-   * Requires the repository to have Discussions enabled and the category to
-   * exist; the caller resolves category names to IDs out of band.
+   * Not implemented.
+   *
+   * GitHub exposes discussion creation only through GraphQL — there is no REST
+   * endpoint. Adopting it would put a second protocol, a second auth path, and
+   * a second failure mode inside an otherwise REST-only provider, and GraphQL
+   * requires a category *ID* where the interface specifies a category. Neither
+   * change is sanctioned by POLITIK-ARCHITECTURE.md.
+   *
+   * Nothing in Phase 2 exercises the debate floor; Discussions first matter in
+   * Phase 4. Deferred until then rather than bending the interface to a
+   * platform detail.
    */
-  async openDiscussion(title: string, body: string, category: string): Promise<Ref> {
-    const query = `
-      mutation($repositoryId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
-        createDiscussion(input: {
-          repositoryId: $repositoryId, categoryId: $categoryId,
-          title: $title, body: $body
-        }) { discussion { id url } }
-      }`;
-
-    const repo = await this.#request<{ node_id: string }>('GET', this.#repoPath);
-
-    const response = await this.#fetch(`${this.#apiBase}/graphql`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${this.#token}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        query,
-        variables: {
-          repositoryId: repo.node_id,
-          categoryId: category,
-          title,
-          body,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new ScmError(
-        `openDiscussion failed: ${response.status}`,
-        response.status,
-        'graphql',
-      );
-    }
-
-    const payload = (await response.json()) as {
-      data?: { createDiscussion?: { discussion?: { id: string; url: string } } };
-      errors?: { message: string }[];
-    };
-
-    if (payload.errors?.length) {
-      throw new ScmError(
-        `openDiscussion failed: ${payload.errors.map((e) => e.message).join('; ')}`,
-        200,
-        'graphql',
-      );
-    }
-
-    const discussion = payload.data?.createDiscussion?.discussion;
-    if (!discussion) {
-      throw new ScmError('openDiscussion returned no discussion', 200, 'graphql');
-    }
-    return { id: discussion.id, url: discussion.url };
+  async openDiscussion(_title: string, _body: string, _category: string): Promise<Ref> {
+    throw new ScmError(
+      'openDiscussion is not implemented for the GitHub provider — GitHub Discussions are GraphQL-only. Deferred to Phase 4.',
+      501,
+      'openDiscussion',
+    );
   }
 
   /* ---------------------------------------------------------------------- */
