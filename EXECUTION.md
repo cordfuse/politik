@@ -389,13 +389,43 @@ it finds OAuth-default agents inside a container and points at API keys — the
 documented headless path (RUNTIME.md § Cloud / Headless).
 
 ### PHASE 7 — SCM Provider SDK
+
+**Cordfuse ships and maintains the GitHub reference implementation only.** The
+three alternative providers are community contributions, as marked below and in
+POLITIK-ARCHITECTURE.md § SCM PROVIDER ABSTRACTION (`gitlab ← community
+contribution`). One provider maintained properly is worth more than four
+maintained thinly.
+
 ```
-[ ] Document SCM provider interface
-[ ] GitLab provider (community)
-[ ] Gitea provider (community)
-[ ] Forgejo provider (community)
-[ ] Provider contribution guide
+[x] Document SCM provider interface   — docs/SCM-PROVIDERS.md
+[x] Provider contribution guide       — docs/SCM-PROVIDERS.md § Contributing
+[ ] GitLab provider (community)       — not a Cordfuse deliverable
+[ ] Gitea provider (community)        — not a Cordfuse deliverable
+[ ] Forgejo provider (community)      — not a Cordfuse deliverable
 ```
+
+The Cordfuse scope of this phase is complete. The three unticked rows stay
+unticked until someone contributes them; they are not outstanding work on this
+side.
+
+**A provider is transport and platform mapping only.** It never decides whether
+a Motion carried, whether an actor may vote, or whether a session is suspended —
+those are settled before a provider method is called. `merge()` enacts a Motion;
+it does not check that the Motion carried, because that answer belongs in the
+Hansard. A provider making governance decisions has moved logic out of the
+record's reach, which defeats the framework.
+
+**Eight contracts** are documented: async everywhere, typed handles rather than
+bare strings, one commit per `commit()` call, unfavourable outcomes as results
+rather than exceptions, no credentials in error messages, loud failure on
+unimplementable methods, explicit role→permission mapping declared as a design
+decision, and documented merge-strategy approximations.
+
+**Injectable transport is a requirement, not a suggestion.** The reference
+provider takes `fetch` as a constructor option, which is what lets its twenty
+tests assert exact request shapes with no network and no token. A provider that
+hard-codes its client cannot be tested without credentials, and those tests
+never get run.
 
 ### PHASE 8 — Public Launch
 ```
