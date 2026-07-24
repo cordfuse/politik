@@ -20,6 +20,7 @@ import { parseState, serializeState } from './state.ts';
 import { parliamentaryTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
+import { runTurn } from './runner.ts';
 import { PROTOCOL_MODES, type ProtocolMode } from './protocol.ts';
 import { checkTermination, prorogue, type Trigger } from './prorogation.ts';
 import { parseEntries } from './hansard.ts';
@@ -48,6 +49,7 @@ Usage
   politik protocol new <name> [--mode <mode>] [--out <dir>]
   politik validate <charter.md> [--protocol <name>]
   politik init --charter <path> --speaker <handle> [--out <dir>] [--guid <id>]
+  politik run --dir <dir> --agent <id> --actor <handle> --role <ROLE> --task <text>
   politik status [--dir <dir>]
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
 
@@ -58,6 +60,7 @@ Commands
   protocol    Lint a protocol manifest, or generate a new one.
   validate    Parse a CHARTER.md and run the Writ Drop rules. Writes nothing.
   init        Drop the Writ — create a session repo file set on disk.
+  run         Seat an agent, give it the business, record what it did.
   status      Read STATE.json and summarise the proceeding.
   prorogue    Close a proceeding permanently and seal the Hansard.
 `;
@@ -316,6 +319,49 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
   return EXIT.OK;
 };
 
+/** Run one turn of a session. */
+const cmdRun = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: {
+      dir: { type: 'string' },
+      agent: { type: 'string' },
+      actor: { type: 'string' },
+      role: { type: 'string' },
+      task: { type: 'string' },
+      timeout: { type: 'string' },
+    },
+  });
+
+  if (values.agent === undefined || values.actor === undefined || values.task === undefined) {
+    err('run: --agent, --actor and --task are required');
+    return EXIT.USAGE;
+  }
+
+  const outcome = await runTurn({
+    dir: values.dir ?? '.',
+    agent_id: values.agent,
+    actor: values.actor,
+    role: (values.role ?? 'OPERATOR') as never,
+    task: values.task,
+    now: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    timeout_ms: values.timeout === undefined ? undefined : Number(values.timeout),
+  });
+
+  if (!outcome.ok) {
+    err(`TURN REFUSED — ${outcome.reason}`);
+    if (outcome.entry !== undefined) err('The failure is on the record.');
+    return EXIT.REFUSED;
+  }
+
+  out('TURN COMPLETE');
+  out(`  agent    ${outcome.result.agent}`);
+  out(`  elapsed  ${outcome.result.elapsed_ms}ms`);
+  out(`  files    ${outcome.files_touched.length > 0 ? outcome.files_touched.join(', ') : 'none'}`);
+  out('  recorded in HANSARD.md');
+  return EXIT.OK;
+};
+
 const cmdStatus = async (argv: readonly string[]): Promise<number> => {
   const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' } } });
   const dir = values.dir ?? '.';
@@ -442,6 +488,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdValidate(rest);
     case 'init':
       return cmdInit(rest);
+    case 'run':
+      return cmdRun(rest);
     case 'status':
       return cmdStatus(rest);
     case 'prorogue':

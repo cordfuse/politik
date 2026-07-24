@@ -427,6 +427,58 @@ tests assert exact request shapes with no network and no token. A provider that
 hard-codes its client cannot be tested without credentials, and those tests
 never get run.
 
+### PHASE 7.5 — Session Runner (the engine loop)
+
+**Not in the original plan, and its absence was the plan's most serious gap.**
+
+Phases 2–7 delivered components: Charter parser, validator, initializer, SCM
+provider, envelope parser, election mutex, Hansard writer, quorum, escalation,
+prorogation, agent registry, spawner, protocol layer, templates. Every one
+tested. Not one of them *runs a session* — and nothing in `src/` called
+`spawnAgent`, `composePrompt` or `standForElection` outside their own tests.
+
+Politik was a complete set of parts with no engine.
+
+```
+[x] Session runner — src/runner.ts
+[x] politik run    — CLI command
+[x] First live session — two Motions tabled by real agents
+```
+
+The loop: **broadcast → elect → compose → spawn → capture → record → settle.**
+Deliberately thin. Every decision it makes was already made somewhere pure and
+testable; the runner sequences and does I/O. A governance question answered here
+would be in the wrong place.
+
+**First live session (`live-001`, Parliamentary, quorum 2).** A real git
+session repo. Claude Code seated twice as OPERATOR — `minister-alpha` and
+`minister-bravo` — each tabling a Motion:
+
+- `motions/motion-001.md` — every Motion must state its Rollback Plan
+- `motions/motion-002.md` — Points of Order must cite the Standing Order invoked
+
+Both drafted in Parliamentary vocabulary, both committed by the agent itself,
+both recorded as attributed `MOTION_TABLED` entries in an append-only Hansard.
+The framework governed a session.
+
+**The live run found a bug nothing else could have.** Turn 1 recorded
+`Files touched: none` while the agent had in fact written *and committed* a
+Motion. Change detection used `git status --porcelain`, which is clean precisely
+*because* the agent committed — and the Standing Orders this framework ships
+tell agents "commit your result; uncommitted work does not exist". The runner's
+detection contradicted the framework's own instructions. Now diffs committed
+work (`HEAD` before/after) as well as the working tree.
+
+No unit test would have caught it: the assertion would have encoded the same
+wrong assumption. It took running the thing.
+
+**Refusals enforced:** unknown agent, not a session repo, session not CONVENED
+(naming the suspension cause), and a constituency the Charter does not seat. The
+runner reads `STATE.json` before acting like every other actor — a runner exempt
+from the session's own governance would be the one participant above it.
+
+---
+
 ### PHASE 8 — Public Launch
 ```
 [ ] All namespaces secured
