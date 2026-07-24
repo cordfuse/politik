@@ -170,16 +170,57 @@ Deliberately uniform: per-agent prompt tuning would void the cross-protocol
 comparisons the research layer depends on.
 
 ### PHASE 4 — Parliamentary Protocol (reference protocol)
+
 ```
-[ ] Implement CANON → Parliamentary vocabulary mapping
-[ ] CHARTER.md template (Parliamentary)
-[ ] Role templates (Speaker, Minister, Backbencher, Observer)
-[ ] Standing Orders template
-[ ] Hansard format spec
-[ ] GitHub label taxonomy
-[ ] GitHub Milestone workflow
-[ ] GitHub Projects Order Paper template
+[x] Implement CANON → Parliamentary vocabulary mapping — src/protocol.ts + protocols/parliamentary.yml
+[x] CHARTER.md template (Parliamentary)                — src/templates/parliamentary.ts
+[x] Role templates (Speaker, Minister, Backbencher, …) — one per CANON role, five in total
+[x] Standing Orders template                           — prose body of the Charter template
+[x] Hansard format spec                                — ADR-0005 (Accepted)
+[x] GitHub label taxonomy                              — LABEL_TAXONOMY, nine labels
+[x] GitHub Projects Order Paper template               — ORDER-PAPER.md
+[x] GitHub Milestone workflow                          — a Milestone is a sitting; see note
 ```
+
+**The protocol layer is translation, not behaviour.** A protocol maps CANON
+terms to an industry vocabulary for the interface and for humans. Nothing in a
+manifest changes engine behaviour except four declared flags — `no_escalation`,
+`no_record`, `immutable_charter`, and the `record_mode` that ADR-0002 rule 5
+tests against. A DIVISION is a DIVISION whether it renders as "Division" or
+"Sprint Review".
+
+**Record types stay in CANON.** A Parliamentary session records
+`POINT_OF_ORDER`, never "Point of Order" (ADR-0005 ruling 3). Translation is
+presentation; the record must stay machine-comparable across protocols, which is
+what makes the research layer possible at all.
+
+**Unmapped terms warn rather than fail.** A protocol that omits a term falls
+back to the CANON word, which is readable by design. Refusing to load an
+incomplete manifest would make authoring a protocol needlessly brittle.
+
+**Hansard format settled.** ADR-0005 ratifies the two choices Phase 2 had to
+make provisionally — entries at H2 under the document's H1 title, and an open
+record-type set — and adds five further rulings covering the heading format,
+mandatory attribution, single-line fields, mechanical append-only, and the
+principle that reading the record is never authoritative (git history is).
+`src/hansard.ts` needed no change.
+
+**Milestone workflow.** A Milestone is a sitting: the business intended for one
+continuous stretch of a proceeding, mapped in ORDER-PAPER.md. Closing it is part
+of prorogation — `prorogue()` returns `milestone_to_close` and the GitHub
+provider implements `closeMilestone()`. No separate automation is required.
+
+**Verified end to end** through the CLI: `scaffold` → `validate` → `init` →
+`status`. The scaffolded Charter passes Writ Drop validation against the
+Parliamentary protocol, including rule 5 — the template uses `merge_commit`
+because Parliamentary declares `record_mode: distributed`, under which squash is
+rejected. A test asserts this so the template and the validator cannot drift.
+
+**New CLI command:** `politik scaffold --out <dir> [--quorum <n>]` writes the
+Charter, Order Paper and role files for editing. Deliberately separate from
+`init`: scaffolding produces prose for a Speaker to read and edit, `init` drops
+the Writ and opens the session. Conflating them would convene a session on an
+unread template.
 
 ### PHASE 5 — Protocol Library
 

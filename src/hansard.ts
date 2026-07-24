@@ -7,24 +7,14 @@
  *
  * ## On the format
  *
- * The Hansard *format spec* is an open Phase 4 deliverable (EXECUTION.md
- * § PHASE 4). What exists today is a consistent record shape shown by the
- * worked examples in RUNTIME.md § SESSION_FAULT / FAULT_RESOLVED /
- * SESSION_FAULT_CRITICAL:
- *
- *     # SESSION_FAULT
- *
- *     **Actor:** OPERATOR-1
- *     **Fault type:** FAULT_INFRA
- *
- * a record-type heading followed by bold-label fields. This module implements
- * that shape and deliberately settles nothing further. Two choices below are
- * marked as such and must be revisited when Phase 4 fixes the spec:
- *
- *  1. Entries are appended at H2, not H1, because HANSARD.md already opens with
- *     a `# HANSARD` title and a file of sibling H1s reads as many documents.
- *  2. The record-type list is open, not a closed enum — the documents name
- *     several types without ever declaring the set complete.
+ * The format is fixed by ADR-0005. Entries are H2 under the document's H1 title
+ * (ruling 1), headed `## <ISO-8601 UTC> — <RECORD_TYPE>` (ruling 2). Record
+ * types are an open string set, always written in CANON and never translated
+ * into protocol vocabulary (ruling 3). Attribution is mandatory (ruling 4).
+ * Fields are single-line; prose goes in the body (ruling 5). Append-only is
+ * mechanical: a new document must contain the old one verbatim as a prefix
+ * (ruling 6). Reading back is best-effort and never authoritative — git history
+ * is (ruling 7).
  *
  * Attribution: Steve Krisjanovs, Cordfuse
  */
