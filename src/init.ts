@@ -134,6 +134,70 @@ const ledger = (charter: Charter): string =>
 /** Placeholder so the directory exists in git, which tracks files not dirs. */
 const keep = (purpose: string): string => `${purpose}\n`;
 
+/**
+ * Speaker notification workflow, per RUNTIME.md § Point of Order Workflow.
+ *
+ * Written into the session repo — this is the Clerk automation the escalation
+ * flow depends on: a push under `escalations/` emails the Speaker and tells
+ * them where to commit their ruling.
+ *
+ * The path filter deliberately excludes rulings. A ruling is the Speaker's
+ * answer; notifying them of their own reply would loop.
+ *
+ * Requires three repository secrets. Absent them the workflow fails loudly
+ * rather than silently dropping the notification — an escalation nobody hears
+ * is the failure mode this whole flow exists to prevent.
+ */
+const pointOfOrderWorkflow = (): string =>
+  `name: Point of Order — Speaker Notification
+
+# Requires repository secrets: MAIL_USERNAME, MAIL_PASSWORD, SPEAKER_EMAIL
+# See RUNTIME.md § POINT OF ORDER — ESCALATION FLOW
+
+on:
+  push:
+    paths:
+      - 'escalations/[0-9]*.md'
+
+jobs:
+  notify-speaker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read escalation
+        id: esc
+        run: |
+          FILE=$(ls escalations/[0-9]*.md | grep -v ruling | tail -1)
+          echo "path=\${FILE}" >> "$GITHUB_OUTPUT"
+          {
+            echo "content<<POLITIK_EOF"
+            cat "\${FILE}"
+            echo "POLITIK_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Email Speaker
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: \${{ secrets.MAIL_USERNAME }}
+          password: \${{ secrets.MAIL_PASSWORD }}
+          to: \${{ secrets.SPEAKER_EMAIL }}
+          from: Politik Clerk
+          subject: "Point of Order — \${{ github.repository }}"
+          body: |
+            A Point of Order has been raised.
+
+            \${{ steps.esc.outputs.content }}
+
+            Escalation: \${{ steps.esc.outputs.path }}
+            Session:    \${{ github.server_url }}/\${{ github.repository }}
+
+            Commit your ruling to: escalations/ruling-[n].md
+            Session is suspended pending your response.
+`;
+
 /* -------------------------------------------------------------------------- */
 /* Writ Drop                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -192,6 +256,7 @@ export const dropWrit = (input: WritDropInput): WritDropResult => {
     { path: 'actors/.gitkeep', content: keep('Actor profiles — who plays each role.') },
     { path: 'motions/.gitkeep', content: keep('Tabled business.') },
     { path: 'escalations/.gitkeep', content: keep('Points of Order and rulings.') },
+    { path: '.github/workflows/point-of-order.yml', content: pointOfOrderWorkflow() },
   ];
 
   if (charter.ledger.enabled) {

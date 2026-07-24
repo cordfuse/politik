@@ -1,6 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { parse as parseYaml } from 'yaml';
+
 import { dropWrit, type WritDropInput } from '../src/init.ts';
 import { parseState, validateState } from '../src/state.ts';
 
@@ -58,6 +60,27 @@ describe('Writ Drop — success', () => {
     for (const dir of ['roles', 'actors', 'motions', 'escalations']) {
       assert.ok(files.has(`${dir}/.gitkeep`), `missing ${dir}/`);
     }
+  });
+
+  it('installs the Speaker notification workflow', () => {
+    const workflow = files.get('.github/workflows/point-of-order.yml');
+    assert.ok(workflow, 'point-of-order workflow missing');
+    assert.match(workflow, /name: Point of Order/);
+    assert.match(workflow, /escalations\/\[0-9\]\*\.md/);
+    assert.match(workflow, /secrets\.SPEAKER_EMAIL/);
+  });
+
+  it('excludes rulings from the notification trigger', () => {
+    const workflow = files.get('.github/workflows/point-of-order.yml') ?? '';
+    assert.match(workflow, /grep -v ruling/);
+  });
+
+  it('generates workflow YAML that parses', () => {
+    const workflow = files.get('.github/workflows/point-of-order.yml') ?? '';
+    const parsed = parseYaml(workflow) as Record<string, unknown>;
+    assert.ok(parsed['jobs'], 'workflow has no jobs');
+    const jobs = parsed['jobs'] as Record<string, { steps: unknown[] }>;
+    assert.equal(jobs['notify-speaker']?.steps.length, 3);
   });
 
   it('commits the Charter verbatim', () => {
