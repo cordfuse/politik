@@ -1,0 +1,66 @@
+# Parliamentary Democracy — protocol #1, the reference protocol.
+#
+# Parliamentary is not a privileged mode. It is the first protocol shipped, and
+# every other industry vocabulary is equally a protocol on top of the same CANON
+# engine. Nothing in this file changes engine behaviour except the four declared
+# flags at the bottom.
+#
+# Install as `.politik/protocol.yml` in a session repo.
+#
+# Attribution: Steve Krisjanovs, Cordfuse
+
+protocol:
+  name: parliamentary
+  version: 1.0.0
+
+  # Constitutional: checks and balances, escalation paths, human override.
+  mode: constitutional
+
+  # Distributed: per-commit attribution is guaranteed, which is why a Charter
+  # under this protocol may not use merge_strategy: squash (ADR-0002 rule 5).
+  record_mode: distributed
+
+  roles:
+    AUTHORITY: Speaker
+    DELEGATE: Deputy Speaker
+    OPERATOR: Minister
+    MEMBER: Backbencher
+    OBSERVER: Gallery
+
+  primitives:
+    SESSION: Parliament
+    PROCEEDING: Parliament
+    CHARTER: Standing Orders
+    RECORD: Hansard
+    MOTION: Tabled Motion
+    DIVISION: Division
+    ESCALATION: Point of Order
+    SUSPENSION: Suspension
+    QUORUM: Quorum
+    CONFLICT: Merge Conflict
+    DEADLOCK: Deadlock
+
+    # Verbs
+    ASSENT: Royal Assent
+    VOTE: Cast a Vote
+    ESCALATE: Raise a Point of Order
+    PROMOTE: Elevate to the Front Bench
+    DEMOTE: Return to the Back Benches
+    SUSPEND: Suspend the Sitting
+    EXPEL: Expel from the House
+    VETO: Veto
+    SPAWN: Refer to Committee
+    DISSOLVE: Prorogue
+    EXIT: Resign from the House
+
+  # No role holds a domain veto under the reference protocol.
+  domain_veto: []
+
+  # Constitutional protocols permit appeals.
+  no_escalation: false
+
+  # The Hansard is required.
+  no_record: false
+
+  # Standing Orders may be amended mid-session by the Speaker.
+  immutable_charter: false
