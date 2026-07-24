@@ -33,6 +33,12 @@ protocol:
     ASSENT: Ruling Entered
     EXIT: Theory falsified — Red Team wins
 
+  # PROTOCOLS.md gives the Referee — who is AUTHORITY here — a DOMAIN_VETO
+  # ("can declare attack line out of scope"). The linter warns that this is
+  # redundant, because AUTHORITY already holds VETO as a constitutional power.
+  # The warning is correct and the mapping is kept anyway: it is faithful to the
+  # published protocol, and it documents *what* the Referee vetoes rather than
+  # leaving the scope ruling implicit.
   domain_veto:
     - AUTHORITY
   no_escalation: false

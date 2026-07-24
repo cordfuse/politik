@@ -18,6 +18,8 @@ import { parseCharter, validateCharter } from './charter.ts';
 import { dropWrit } from './init.ts';
 import { parseState, serializeState } from './state.ts';
 import { parliamentaryTemplates } from './templates/parliamentary.ts';
+import { generateProtocol, lintSource } from './protocol-sdk.ts';
+import { PROTOCOL_MODES, type ProtocolMode } from './protocol.ts';
 import { checkTermination, prorogue, type Trigger } from './prorogation.ts';
 import { parseEntries } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
@@ -40,6 +42,8 @@ const USAGE = `politik — governed multi-agent sessions on git
 Usage
   politik version
   politik scaffold --out <dir> [--protocol parliamentary] [--quorum <n>]
+  politik protocol lint <manifest.yml>
+  politik protocol new <name> [--mode <mode>] [--out <dir>]
   politik validate <charter.md> [--protocol <name>]
   politik init --charter <path> --speaker <handle> [--out <dir>] [--guid <id>]
   politik status [--dir <dir>]
@@ -48,6 +52,7 @@ Usage
 Commands
   version     Print the version.
   scaffold    Write a protocol's Charter, roles and Order Paper for editing.
+  protocol    Lint a protocol manifest, or generate a new one.
   validate    Parse a CHARTER.md and run the Writ Drop rules. Writes nothing.
   init        Drop the Writ — create a session repo file set on disk.
   status      Read STATE.json and summarise the proceeding.
@@ -126,6 +131,69 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
   out('');
   out(`Edit the Standing Orders, then: politik init --charter ${join(dir, 'CHARTER.md')} --speaker <handle>`);
   return EXIT.OK;
+};
+
+/** `politik protocol lint <file>` / `politik protocol new <name>`. */
+const cmdProtocol = async (argv: readonly string[]): Promise<number> => {
+  const [verb, ...rest] = argv;
+
+  if (verb === 'lint') {
+    const path = rest[0];
+    if (path === undefined) {
+      err('protocol lint: a manifest path is required');
+      return EXIT.USAGE;
+    }
+    const source = await readIfPresent(path);
+    if (source === null) {
+      err(`protocol lint: cannot read ${path}`);
+      return EXIT.USAGE;
+    }
+
+    const result = lintSource(source);
+    for (const finding of result.findings) {
+      const line = `  ${finding.severity === 'error' ? '[ERROR]' : '[WARN] '} ${finding.field}: ${finding.message}`;
+      if (finding.severity === 'error') err(line);
+      else out(line);
+    }
+
+    if (!result.ok) {
+      err('PROTOCOL INVALID');
+      return EXIT.REFUSED;
+    }
+    out(`PROTOCOL VALID${result.findings.length > 0 ? ` (${result.findings.length} warning(s))` : ''}`);
+    return EXIT.OK;
+  }
+
+  if (verb === 'new') {
+    const { values, positionals } = parseArgs({
+      args: rest,
+      options: { mode: { type: 'string' }, out: { type: 'string' } },
+      allowPositionals: true,
+    });
+    const name = positionals[0];
+    if (name === undefined) {
+      err('protocol new: a protocol name is required');
+      return EXIT.USAGE;
+    }
+    const mode = (values.mode ?? 'constitutional') as ProtocolMode;
+    if (!(PROTOCOL_MODES as readonly string[]).includes(mode)) {
+      err(`protocol new: --mode must be one of ${PROTOCOL_MODES.join(' | ')}`);
+      return EXIT.USAGE;
+    }
+
+    const manifest = generateProtocol({ name, mode });
+    if (values.out === undefined) {
+      out(manifest);
+    } else {
+      await writeFiles(values.out, [{ path: `${name}.yml`, content: manifest }]);
+      out(`GENERATED ${join(values.out, `${name}.yml`)}`);
+      out(`  politik protocol lint ${join(values.out, `${name}.yml`)}`);
+    }
+    return EXIT.OK;
+  }
+
+  err(`protocol: unknown verb "${verb ?? ''}" — expected lint | new`);
+  return EXIT.USAGE;
 };
 
 const cmdValidate = async (argv: readonly string[]): Promise<number> => {
@@ -348,6 +416,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return EXIT.OK;
     case 'scaffold':
       return cmdScaffold(rest);
+    case 'protocol':
+      return cmdProtocol(rest);
     case 'validate':
       return cmdValidate(rest);
     case 'init':
