@@ -107,6 +107,16 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     notes: 'OpenAI, Rust-based.',
   },
   {
+    id: 'antigravity',
+    label: 'Antigravity',
+    command: 'agy',
+    prompt: { kind: 'flag', flag: '-p' },
+    auth_local: 'oauth',
+    auth_headless: 'api_key',
+    stdio_json: false,
+    notes: 'Google. -p/--print for headless.',
+  },
+  {
     id: 'aider',
     label: 'Aider',
     command: 'aider',

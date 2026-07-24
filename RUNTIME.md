@@ -235,6 +235,7 @@ Politik inherits both the problem and the solution.
 | OpenCode | `opencode run "..."` | OAuth ✅ | API key | 75+ providers, Ollama |
 | Qwen Code | `qwen -p "..."` | OAuth ✅ | API key | stream-json, Apache 2.0 |
 | Codex CLI | `codex "..."` | OAuth ✅ | API key | OpenAI, Rust-based |
+| Antigravity | `agy -p "..."` | OAuth ✅ | API key | Google, `-p`/`--print` |
 | Aider | `aider --message "..."` | API key | API key | Strong git integration |
 | Goose | `goose run "..."` | API key | API key | MCP-native, Block |
 | Cline CLI | `cline "..."` | API key | API key | CLI 2.0 headless |

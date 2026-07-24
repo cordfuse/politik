@@ -26,6 +26,7 @@ describe('registry', () => {
       'opencode',
       'qwen-code',
       'codex-cli',
+      'antigravity',
       'aider',
       'goose',
     ]) {
