@@ -45,9 +45,9 @@ The engine speaks in canonical terms. Protocols translate them to domain vocabul
 
 **Roles:** `AUTHORITY` (human only) · `DELEGATE` · `OPERATOR` · `MEMBER` · `OBSERVER`
 
-**Primitives:** `SESSION` · `PROCEEDING` · `CHARTER` · `RECORD` · `MOTION` · `DIVISION` · `ESCALATION` · `SUSPENSION` · `QUORUM` · `DEADLOCK`
+**Primitives:** `SESSION` · `PROCEEDING` · `CHARTER` · `RECORD` · `MOTION` · `DIVISION` · `ESCALATION` · `SUSPENSION` · `QUORUM` · `CONFLICT` · `DEADLOCK`
 
-**Verbs:** `READ` · `WRITE` · `VOTE` · `ESCALATE` · `PROMOTE` · `DEMOTE` · `HIRE` · `FIRE` · `SUSPEND` · `EXPEL` · `VETO` · `SPAWN` · `DISSOLVE` · `EXIT`
+**Verbs:** `READ` · `WRITE` · `VOTE` · `ASSENT` · `ESCALATE` · `PROMOTE` · `DEMOTE` · `HIRE` · `FIRE` · `SUSPEND` · `EXPEL` · `VETO` · `SPAWN` · `DISSOLVE` · `EXIT`
 
 **States:** `CONVENED` · `SUSPENDED` · `PROROGUED` · `STALE` · `INVALID`
 
