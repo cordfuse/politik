@@ -19,16 +19,23 @@ GitHub Actions workflow triggers on path match
     ↓
 Speaker receives email notification
     ↓
-Session pauses (STATE.json → paused: true)
+Session suspends (STATE.json → state: SUSPENDED,
+                  suspension.cause: POINT_OF_ORDER)
     ↓
 Speaker reviews, commits ruling.md
     ↓
 GitHub Actions detects ruling commit
     ↓
-Session resumes (STATE.json → paused: false)
+Session resumes (STATE.json → state: CONVENED, suspension: null)
     ↓
 Ruling recorded permanently in Hansard
 ```
+
+> **Vocabulary note.** Earlier drafts of this flow wrote the pause as
+> `paused: true` / `paused: false`. ADR-0003 retired that field: `STATE.json`
+> carries one CANON-valued `state`, and the reason is carried separately in
+> `suspension.cause`. A pause and a stale heartbeat are different states, not
+> two values of one boolean.
 
 ### Point of Order Workflow
 ```yaml
