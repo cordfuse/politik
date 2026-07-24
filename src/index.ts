@@ -9,3 +9,4 @@ export * from './charter.ts';
 export * from './init.ts';
 export * from './scm.ts';
 export * from './state.ts';
+export * from './providers/github.ts';
