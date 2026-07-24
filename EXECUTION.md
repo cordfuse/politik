@@ -131,11 +131,21 @@ per agent — agents differ only in argv shape and auth story.
 ```
 
 **Live results.** Each agent was driven through `spawnAgent()` with a trivial
-prompt and had to return a specific token. Five passed. Qwen Code is blocked on
-local auth configuration (`No auth type is selected`) — a host setup matter, not
-a compatibility defect. Aider and Goose are not installed here and remain
-unverified; their registry entries follow the documented invocation but are
-untested.
+prompt and had to return a specific token. Five passed.
+
+**Backlog — three agents unverified.** Their registry entries follow the
+documented invocation and are shipped, but none has been exercised live. Each
+is a host-setup task, not a framework defect:
+
+| Agent | Blocker | To verify |
+|---|---|---|
+| Qwen Code | `No auth type is selected` | configure an auth type, then re-run the live check |
+| Aider | not installed on this host | install, then re-run |
+| Goose | not installed on this host | install, then re-run |
+
+Phase 3 is otherwise complete. These three close out by re-running the same live
+check once their host prerequisites are met — no code change is expected, but
+the codex and gemini findings below are exactly why "expected" is not "verified".
 
 **Antigravity added.** `agy` supports `-p`/`--print` headless, is a
 Cordfuse-supported CLI, and was absent from the compatibility table. Verified
