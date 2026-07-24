@@ -43,7 +43,7 @@ recorded **and** nothing blocks it.
 [x] Transport hook: git-based default (zero infrastructure, reference transport; Crosstalk is one such implementation), NATS an opt-in latency upgrade (Tailscale + NATS for multi-machine) — libp2p rejected (over-built for known permissioned assemblies). See ADR-0001.
 [x] Finalize CHARTER.md spec                      — ADR-0002 (Accepted)
 [x] Finalize STATE.json schema                    — ADR-0003 (Accepted)
-[~] Finalize SCM provider interface spec          — 10 methods named; return types unspecified
+[x] Finalize SCM provider interface spec          — return types settled in src/scm.ts
 [x] Document all decisions in ADRs                — 0001, 0002, 0003 Accepted
 [ ] Draft arXiv preprint — unified paper (framework + experiment)
 ```
@@ -58,24 +58,58 @@ recorded **and** nothing blocks it.
    specifies that it auto-suspends the session. CANON stays at five states. See
    ADR-0003.
 
-**Remaining before Phase 2 code:** the SCM provider interface names ten methods
-but no return types. That is a signature exercise, not a governance decision, and
-can be settled in the scaffold itself.
+**Settled in the scaffold.** The SCM provider interface named its methods but no
+return types — a signature exercise rather than a governance decision. Return
+types are now fixed in `src/scm.ts`, where every call is async and every mutation
+returns a typed handle so the Hansard writer has something attributable to
+record.
+
+*Correction:* this section previously said the interface names *ten* methods.
+`POLITIK-ARCHITECTURE.md` § SCM PROVIDER ABSTRACTION lists **eleven**. The
+architecture document is authoritative and the implementation follows it.
 
 ### PHASE 2 — Reference Implementation (GitHub SCM)
+
+Stack: Node + TypeScript, npm `@cordfuse/politik`, binary `politik`. Tests run
+on `node:test` via tsx. Everything except the SCM provider and the CLI is pure —
+no I/O, no clock, no randomness.
+
 ```
-[ ] Scaffold cordfuse/politik private repo
-[ ] Implement CHARTER.md parser and validator
-[ ] Implement session repo initializer (Writ Drop)
-[ ] Implement GitHub SCM provider
-[ ] Implement broadcast envelope parser
-[ ] Implement first-actor-per-constituency election
-[ ] Implement Hansard commit writer
-[ ] Implement Point of Order workflow
-[ ] Implement Speaker email notification
-[ ] Implement quorum check
-[ ] Implement prorogation workflow
+[x] Scaffold cordfuse/politik private repo        — package.json, tsconfig, CI-ready
+[x] Implement CHARTER.md parser and validator     — src/charter.ts (ADR-0002 rules 1-8)
+[x] Implement session repo initializer (Writ Drop)— src/init.ts
+[x] Implement GitHub SCM provider                 — src/providers/github.ts (see note)
+[x] Implement broadcast envelope parser           — src/envelope.ts
+[x] Implement first-actor-per-constituency election— src/election.ts + src/lockfs.ts
+[x] Implement Hansard commit writer               — src/hansard.ts
+[x] Implement Point of Order workflow             — src/escalation.ts
+[x] Implement Speaker email notification          — provider notify() + session workflow
+[x] Implement quorum check                        — src/quorum.ts
+[x] Implement prorogation workflow                — src/prorogation.ts
 ```
+
+**Note — `openDiscussion` is deferred to Phase 4.** GitHub exposes discussion
+creation only through GraphQL, and its category *ID* requirement conflicts with
+the `category` parameter in the interface. Adopting it would put a second
+protocol and a second auth path inside an otherwise REST-only provider. Nothing
+in Phase 2 exercises the debate floor. The method throws a 501 rather than
+silently succeeding.
+
+**Note — Speaker notification has two delivery paths.** `ScmProvider.notify()`
+opens a labelled issue @-mentioning the actor, which GitHub turns into email via
+the recipient's own notification settings. Separately, the session repo
+initializer installs `.github/workflows/point-of-order.yml` (RUNTIME.md § Point
+of Order Workflow) for direct SMTP delivery on push to `escalations/`. The
+workflow's path filter excludes rulings — a ruling is the Speaker's own reply,
+and notifying them of it would loop. It requires three repository secrets
+(`MAIL_USERNAME`, `MAIL_PASSWORD`, `SPEAKER_EMAIL`) and fails loudly without
+them, because an escalation nobody hears is the exact failure this flow exists
+to prevent.
+
+**Verified live.** The provider was exercised against a real GitHub repository:
+Writ Drop committed as a single commit (blobs → tree → commit → ref), label
+created, escalation issue filed, suspension state committed, notification
+delivered, `openDiscussion` refused as designed.
 
 ### PHASE 3 — Agent Compatibility Layer
 ```

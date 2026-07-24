@@ -3,21 +3,26 @@
 
 ## What This Repo Is
 
-Politik is a governed multi-agent framework built on git. This repository contains the architecture specification and invention disclosure for the framework. It is pre-scaffold — no runtime code yet, markdown only.
+Politik is a governed multi-agent framework built on git. This repository
+contains the architecture specification and invention disclosure for the
+framework, plus the Phase 2 reference implementation.
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
-**Current status: PHASE 1 — ARCHITECTURE LOCK.** The scaffolding gate was lifted
-by explicit human instruction; Crosstalk reached and passed alpha. Politik is no
-longer on slow burn.
+**Current status: PHASE 2 — REFERENCE IMPLEMENTATION COMPLETE.** All eleven
+Phase 2 items are implemented, on branch `feat/phase-2-scaffold`. Phase 1 closed
+earlier; the scaffolding gate was lifted by explicit human instruction.
 
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/). ADR-0001
-(transport), ADR-0002 (CHARTER.md schema) and ADR-0003 (STATE.json schema) are
-all **Accepted**. `POLITIK-ARCHITECTURE.md` was not amended to reach the lock.
+(transport), ADR-0002 (CHARTER.md schema), ADR-0003 (STATE.json schema) and
+ADR-0004 (motion enactment) are all **Accepted**. `POLITIK-ARCHITECTURE.md` was
+amended only by ADR-0004, which added the `ASSENT` verb and the `CONFLICT`
+primitive.
 
-Phase 1 is closed but for the arXiv preprint. The SCM provider interface names
-ten methods without return types — a signature exercise, to be settled in the
-scaffold. **Phase 2 (reference implementation) is clear to start.**
+The SCM provider interface return types — the one item Phase 1 deferred to the
+scaffold — are settled in `src/scm.ts`.
+
+Phase 1's only remaining item is the arXiv preprint.
 
 **Implementation stack (decided):** Node + TypeScript, npm `@cordfuse/politik`,
 binary `politik`. Consistent with the namespace reserved in Phase 0 and the
@@ -37,8 +42,8 @@ was about attention, not a build dependency.
 The engine speaks in canonical terms. Protocols translate them to industry vocabulary.
 
 - **Roles:** AUTHORITY (human only), DELEGATE, OPERATOR, MEMBER, OBSERVER
-- **Primitives:** SESSION, PROCEEDING, CHARTER, RECORD, MOTION, DIVISION, ESCALATION, SUSPENSION, QUORUM, DEADLOCK
-- **Verbs:** READ, WRITE, VOTE, ESCALATE, PROMOTE, DEMOTE, HIRE, FIRE, SUSPEND, EXPEL, VETO, SPAWN, DISSOLVE, EXIT
+- **Primitives:** SESSION, PROCEEDING, CHARTER, RECORD, MOTION, DIVISION, ESCALATION, SUSPENSION, QUORUM, CONFLICT, DEADLOCK
+- **Verbs:** READ, WRITE, VOTE, ASSENT, ESCALATE, PROMOTE, DEMOTE, HIRE, FIRE, SUSPEND, EXPEL, VETO, SPAWN, DISSOLVE, EXIT
 - **States:** CONVENED, SUSPENDED, PROROGUED, STALE, INVALID
 
 ### Protocols
@@ -59,6 +64,27 @@ The git repository IS the Politik session — charter, record, state, and invite
 - **RESEARCH.md** — Human Flaw thesis, game theory analytical layer, publication strategy.
 - **EXECUTION.md** — Phases 0–11, Politik Tree hierarchical architecture.
 - **README.md** — Public-facing brief description with DOI.
+
+### The implementation
+
+- **`src/canon.ts`** — CANON encoded as types and frozen constants. Single
+  source of truth in code; drift from the architecture is a compile error.
+- **`src/charter.ts`** — CHARTER.md parser and Writ Drop validator (ADR-0002).
+- **`src/state.ts`** — STATE.json schema and invariants (ADR-0003).
+- **`src/init.ts`** — session repo initializer. Produces files; writes none.
+- **`src/envelope.ts`** — broadcast envelope parser and eligibility check.
+- **`src/election.ts`** / **`src/lockfs.ts`** — first-actor-per-constituency
+  mutex. Local scope only; the Hansard commit is the global arbiter.
+- **`src/hansard.ts`** — append-only record writer.
+- **`src/quorum.ts`** — runtime quorum, with the degraded-session override.
+- **`src/escalation.ts`** — Point of Order: file, suspend, rule, resume.
+- **`src/prorogation.ts`** — termination conditions and the seal.
+- **`src/providers/github.ts`** — reference SCM provider. REST only.
+- **`src/cli.ts`** / **`bin/politik.js`** — the `politik` binary.
+
+Everything except the provider and the CLI is pure — no I/O, no clock, no
+randomness. Timestamps and GUIDs are always caller-supplied, which is what makes
+the governance logic testable and deterministic.
 
 ---
 

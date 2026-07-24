@@ -17,7 +17,7 @@
 
 ## STATUS
 - **Visibility:** Public · DOI: 10.5281/zenodo.19490359
-- **Stage:** Architecture locked — pre-scaffold
+- **Stage:** Architecture locked — reference implementation in progress
 
 ---
 
@@ -673,4 +673,4 @@ IDE-first agents (Cursor, Windsurf, GitHub Copilot Workspace) cannot be spawned 
 ---
 
 *Attribution: Steve Krisjanovs, Cordfuse*  
-*Status: Architecture locked — pre-scaffold*
+*Status: Architecture locked — reference implementation in progress*
