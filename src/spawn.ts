@@ -148,8 +148,11 @@ export const isAvailable = async (
   spawnFn: typeof nodeSpawn = nodeSpawn,
 ): Promise<boolean> =>
   new Promise((resolve) => {
-    const probe = spawnFn('command', ['-v', agent.command], {
-      shell: '/bin/sh',
+    // `which` directly rather than `sh -c command -v`: passing args alongside
+    // shell:true concatenates instead of escaping them (Node DEP0190), which is
+    // an injection surface for no benefit.
+    const probe = spawnFn('which', [agent.command], {
+      shell: false,
       stdio: 'ignore',
     });
     probe.on('close', (code) => resolve(code === 0));

@@ -62,11 +62,12 @@ describe('registry', () => {
 describe('invocation shapes', () => {
   const expected: Record<string, string[]> = {
     'claude-code': ['-p', 'PROMPT'],
-    'gemini-cli': ['-p', 'PROMPT'],
+
     'qwen-code': ['-p', 'PROMPT'],
     'opencode': ['run', 'PROMPT'],
     'goose': ['run', 'PROMPT'],
-    'codex-cli': ['PROMPT'],
+    'codex-cli': ['exec', 'PROMPT'],
+    'gemini-cli': ['--skip-trust', '-p', 'PROMPT'],
     'aider': ['--message', 'PROMPT'],
   };
 

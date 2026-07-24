@@ -231,10 +231,10 @@ Politik inherits both the problem and the solution.
 | Agent | Command | Auth (local) | Auth (headless) | Notes |
 |---|---|---|---|---|
 | Claude Code | `claude -p "..."` | OAuth ✅ | API key | Primary target |
-| Gemini CLI | `gemini -p "..."` | OAuth ✅ | API key | 1M context, free tier |
+| Gemini CLI | `gemini --skip-trust -p "..."` | OAuth ✅ | API key | 1M context. Refuses an untrusted directory without `--skip-trust` |
 | OpenCode | `opencode run "..."` | OAuth ✅ | API key | 75+ providers, Ollama |
 | Qwen Code | `qwen -p "..."` | OAuth ✅ | API key | stream-json, Apache 2.0 |
-| Codex CLI | `codex "..."` | OAuth ✅ | API key | OpenAI, Rust-based |
+| Codex CLI | `codex exec "..."` | OAuth ✅ | API key | OpenAI, Rust-based. Bare `codex` is an interactive TUI |
 | Antigravity | `agy -p "..."` | OAuth ✅ | API key | Google, `-p`/`--print` |
 | Aider | `aider --message "..."` | API key | API key | Strong git integration |
 | Goose | `goose run "..."` | API key | API key | MCP-native, Block |

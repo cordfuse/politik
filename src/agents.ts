@@ -38,6 +38,11 @@ export interface AgentSpec {
   readonly label: string;
   readonly command: string;
   readonly prompt: PromptStyle;
+  /**
+   * Args this agent requires to run non-interactively at all — not user
+   * preferences. Always injected before the prompt.
+   */
+  readonly headless_args?: readonly string[];
   /** Auth available when running on a developer machine. */
   readonly auth_local: AuthMode;
   /** Auth available when running headless (CI, VPS, container). */
@@ -71,10 +76,11 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     label: 'Gemini CLI',
     command: 'gemini',
     prompt: { kind: 'flag', flag: '-p' },
+    headless_args: ['--skip-trust'],
     auth_local: 'oauth',
     auth_headless: 'api_key',
     stdio_json: false,
-    notes: '1M context.',
+    notes: '1M context. Refuses an untrusted directory without --skip-trust.',
   },
   {
     id: 'opencode',
@@ -100,11 +106,11 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     id: 'codex-cli',
     label: 'Codex CLI',
     command: 'codex',
-    prompt: { kind: 'positional' },
+    prompt: { kind: 'subcommand', subcommand: 'exec' },
     auth_local: 'oauth',
     auth_headless: 'api_key',
     stdio_json: true,
-    notes: 'OpenAI, Rust-based.',
+    notes: 'OpenAI, Rust-based. Bare `codex` is an interactive TUI; `exec` is headless.',
   },
   {
     id: 'antigravity',
@@ -163,16 +169,20 @@ export const buildInvocation = (
   prompt: string,
   extraArgs: readonly string[] = [],
 ): Invocation => {
+  // Required headless args come first: without them the agent will not run
+  // non-interactively at all, so a caller must not be able to displace them.
+  const args = [...(agent.headless_args ?? []), ...extraArgs];
+
   switch (agent.prompt.kind) {
     case 'flag':
-      return { command: agent.command, args: [...extraArgs, agent.prompt.flag, prompt] };
+      return { command: agent.command, args: [...args, agent.prompt.flag, prompt] };
     case 'subcommand':
       return {
         command: agent.command,
-        args: [agent.prompt.subcommand, ...extraArgs, prompt],
+        args: [agent.prompt.subcommand, ...args, prompt],
       };
     case 'positional':
-      return { command: agent.command, args: [...extraArgs, prompt] };
+      return { command: agent.command, args: [...args, prompt] };
   }
 };
 
