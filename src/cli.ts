@@ -8,8 +8,10 @@
  * Attribution: Steve Krisjanovs, Cordfuse
  */
 
+import { readFileSync } from 'node:fs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { parseCharter, validateCharter } from './charter.ts';
@@ -19,7 +21,18 @@ import { checkTermination, prorogue, type Trigger } from './prorogation.ts';
 import { parseEntries } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
 
-const VERSION = '0.2.0';
+/**
+ * Read from package.json rather than hardcoded. A duplicated version string
+ * goes stale the first time someone bumps one copy and not the other — which is
+ * exactly what happened at 0.3.0.
+ */
+const VERSION: string = (() => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const pkg: unknown = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8'));
+  return typeof pkg === 'object' && pkg !== null && 'version' in pkg
+    ? String((pkg as { version: unknown }).version)
+    : 'unknown';
+})();
 
 const USAGE = `politik — governed multi-agent sessions on git
 

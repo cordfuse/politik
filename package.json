@@ -1,6 +1,6 @@
 {
   "name": "@cordfuse/politik",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Politik — a governed multi-agent framework built on git. The SCM repository is the session: charter, record, state, and invite in one.",
   "type": "module",
   "license": "MIT",
