@@ -6,6 +6,7 @@
 
 export * from './canon.ts';
 export * from './envelope.ts';
+export * from './hansard.ts';
 export * from './charter.ts';
 export * from './init.ts';
 export * from './scm.ts';
