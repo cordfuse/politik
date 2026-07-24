@@ -19,6 +19,7 @@ import { dropWrit } from './init.ts';
 import { parseState, serializeState } from './state.ts';
 import { parliamentaryTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
+import { diagnose } from './doctor.ts';
 import { PROTOCOL_MODES, type ProtocolMode } from './protocol.ts';
 import { checkTermination, prorogue, type Trigger } from './prorogation.ts';
 import { parseEntries } from './hansard.ts';
@@ -42,6 +43,7 @@ const USAGE = `politik — governed multi-agent sessions on git
 Usage
   politik version
   politik scaffold --out <dir> [--protocol parliamentary] [--quorum <n>]
+  politik doctor
   politik protocol lint <manifest.yml>
   politik protocol new <name> [--mode <mode>] [--out <dir>]
   politik validate <charter.md> [--protocol <name>]
@@ -52,6 +54,7 @@ Usage
 Commands
   version     Print the version.
   scaffold    Write a protocol's Charter, roles and Order Paper for editing.
+  doctor      Probe this host: can it run a session, and with which agents?
   protocol    Lint a protocol manifest, or generate a new one.
   validate    Parse a CHARTER.md and run the Writ Drop rules. Writes nothing.
   init        Drop the Writ — create a session repo file set on disk.
@@ -131,6 +134,21 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
   out('');
   out(`Edit the Standing Orders, then: politik init --charter ${join(dir, 'CHARTER.md')} --speaker <handle>`);
   return EXIT.OK;
+};
+
+/** Probe the host and report whether a session can run here. */
+const cmdDoctor = async (): Promise<number> => {
+  const diagnosis = await diagnose();
+  out(`platform  ${diagnosis.platform}`);
+  out('');
+  for (const check of diagnosis.checks) {
+    const badge =
+      check.status === 'ok' ? '[ OK ]' : check.status === 'warn' ? '[WARN]' : '[FAIL]';
+    out(`${badge} ${check.name.padEnd(10)} ${check.detail}`);
+  }
+  out('');
+  out(diagnosis.ready ? 'READY — this host can run a Politik session' : 'NOT READY');
+  return diagnosis.ready ? EXIT.OK : EXIT.REFUSED;
 };
 
 /** `politik protocol lint <file>` / `politik protocol new <name>`. */
@@ -416,6 +434,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return EXIT.OK;
     case 'scaffold':
       return cmdScaffold(rest);
+    case 'doctor':
+      return cmdDoctor();
     case 'protocol':
       return cmdProtocol(rest);
     case 'validate':
