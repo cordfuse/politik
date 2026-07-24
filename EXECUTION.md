@@ -83,7 +83,7 @@ no I/O, no clock, no randomness.
 [x] Implement first-actor-per-constituency election— src/election.ts + src/lockfs.ts
 [x] Implement Hansard commit writer               — src/hansard.ts
 [x] Implement Point of Order workflow             — src/escalation.ts
-[~] Implement Speaker email notification          — provider-side only; see note
+[x] Implement Speaker email notification          — provider notify() + session workflow
 [x] Implement quorum check                        — src/quorum.ts
 [x] Implement prorogation workflow                — src/prorogation.ts
 ```
@@ -95,13 +95,16 @@ protocol and a second auth path inside an otherwise REST-only provider. Nothing
 in Phase 2 exercises the debate floor. The method throws a 501 rather than
 silently succeeding.
 
-**Note — Speaker notification is partial.** `ScmProvider.notify()` is
-implemented (a labelled issue @-mentioning the actor, which GitHub turns into
-email via the recipient's own notification settings), and `fileEscalation()`
-returns the notification body. The `.github/workflows/point-of-order.yml`
-workflow specified in RUNTIME.md § Point of Order Workflow — SMTP delivery on
-push to `escalations/` — is **not** yet written. That is the remaining work on
-this item.
+**Note — Speaker notification has two delivery paths.** `ScmProvider.notify()`
+opens a labelled issue @-mentioning the actor, which GitHub turns into email via
+the recipient's own notification settings. Separately, the session repo
+initializer installs `.github/workflows/point-of-order.yml` (RUNTIME.md § Point
+of Order Workflow) for direct SMTP delivery on push to `escalations/`. The
+workflow's path filter excludes rulings — a ruling is the Speaker's own reply,
+and notifying them of it would loop. It requires three repository secrets
+(`MAIL_USERNAME`, `MAIL_PASSWORD`, `SPEAKER_EMAIL`) and fails loudly without
+them, because an escalation nobody hears is the exact failure this flow exists
+to prevent.
 
 **Verified live.** The provider was exercised against a real GitHub repository:
 Writ Drop committed as a single commit (blobs → tree → commit → ref), label
