@@ -17,6 +17,7 @@ import { parseArgs } from 'node:util';
 import { parseCharter, validateCharter } from './charter.ts';
 import { dropWrit } from './init.ts';
 import { parseState, serializeState } from './state.ts';
+import { parliamentaryTemplates } from './templates/parliamentary.ts';
 import { checkTermination, prorogue, type Trigger } from './prorogation.ts';
 import { parseEntries } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
@@ -38,6 +39,7 @@ const USAGE = `politik — governed multi-agent sessions on git
 
 Usage
   politik version
+  politik scaffold --out <dir> [--protocol parliamentary] [--quorum <n>]
   politik validate <charter.md> [--protocol <name>]
   politik init --charter <path> --speaker <handle> [--out <dir>] [--guid <id>]
   politik status [--dir <dir>]
@@ -45,6 +47,7 @@ Usage
 
 Commands
   version     Print the version.
+  scaffold    Write a protocol's Charter, roles and Order Paper for editing.
   validate    Parse a CHARTER.md and run the Writ Drop rules. Writes nothing.
   init        Drop the Writ — create a session repo file set on disk.
   status      Read STATE.json and summarise the proceeding.
@@ -84,6 +87,46 @@ const readIfPresent = async (path: string): Promise<string | null> => {
 /* -------------------------------------------------------------------------- */
 /* Commands                                                                    */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Scaffold a protocol's editable documents.
+ *
+ * Deliberately separate from `init`: scaffolding produces prose for a Speaker to
+ * edit, while `init` drops the Writ and opens the session. Conflating them would
+ * mean a session convened on an unread template.
+ */
+const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: {
+      out: { type: 'string' },
+      protocol: { type: 'string' },
+      quorum: { type: 'string' },
+    },
+  });
+
+  const protocol = values.protocol ?? 'parliamentary';
+  if (protocol !== 'parliamentary') {
+    err(`scaffold: unknown protocol "${protocol}" — only parliamentary ships today`);
+    return EXIT.USAGE;
+  }
+
+  const quorum = values.quorum === undefined ? undefined : Number(values.quorum);
+  if (quorum !== undefined && (!Number.isInteger(quorum) || quorum < 1)) {
+    err('scaffold: --quorum must be an integer >= 1');
+    return EXIT.USAGE;
+  }
+
+  const dir = values.out ?? '.';
+  const files = parliamentaryTemplates(quorum === undefined ? {} : { quorum });
+  await writeFiles(dir, files);
+
+  out(`SCAFFOLDED ${protocol}`);
+  for (const file of files) out(`  ${file.path}`);
+  out('');
+  out(`Edit the Standing Orders, then: politik init --charter ${join(dir, 'CHARTER.md')} --speaker <handle>`);
+  return EXIT.OK;
+};
 
 const cmdValidate = async (argv: readonly string[]): Promise<number> => {
   const { values, positionals } = parseArgs({
@@ -303,6 +346,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
     case '--version':
       out(VERSION);
       return EXIT.OK;
+    case 'scaffold':
+      return cmdScaffold(rest);
     case 'validate':
       return cmdValidate(rest);
     case 'init':
