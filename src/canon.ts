@@ -108,16 +108,21 @@ export const STATES = [
 export type State = (typeof STATES)[number];
 
 /**
- * Why a proceeding was suspended. Carried alongside STATE_SUSPENDED.
- * DEADLOCK added per ADR-0004 Proposal 4; CONFLICT is explicitly *not* here —
- * it is mechanical and routine, never a suspension cause.
+ * Why a proceeding was suspended. Carried alongside SUSPENDED. Enum is fixed by
+ * ADR-0003 § Decision; DEADLOCK added per ADR-0004.
+ *
+ * Two deliberate absences:
+ *  - CONFLICT is mechanical and routine — never a suspension cause.
+ *  - Heartbeat expiry is its own CANON state (STALE), not a suspension cause,
+ *    so that "a human paused it" stays distinguishable from "the agents went
+ *    quiet".
  */
 export const SUSPENSION_CAUSES = [
-  'MANUAL',
-  'STALE_HEARTBEAT',
-  'QUORUM_LOST',
-  'DEADLOCK',
+  'POINT_OF_ORDER',
+  'SPEAKER_ORDER',
+  'DISPUTED_EXIT',
   'CONSTITUTIONAL_CRISIS',
+  'DEADLOCK',
 ] as const;
 
 export type SuspensionCause = (typeof SUSPENSION_CAUSES)[number];

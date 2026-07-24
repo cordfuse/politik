@@ -51,6 +51,21 @@ describe('ADR conformance', () => {
     assert.ok((PRIMITIVES as readonly string[]).includes('CONFLICT'));
   });
 
+  it('carries exactly the ADR-0003 suspension causes', () => {
+    assert.deepEqual([...SUSPENSION_CAUSES], [
+      'POINT_OF_ORDER',
+      'SPEAKER_ORDER',
+      'DISPUTED_EXIT',
+      'CONSTITUTIONAL_CRISIS',
+      'DEADLOCK',
+    ]);
+  });
+
+  it('heartbeat expiry is a state, not a suspension cause', () => {
+    assert.ok((STATES as readonly string[]).includes('STATE_STALE'));
+    assert.ok(!(SUSPENSION_CAUSES as readonly string[]).includes('STALE_HEARTBEAT'));
+  });
+
   it('carries the three merge strategies (ADR-0002)', () => {
     assert.deepEqual([...MERGE_STRATEGIES], [
       'merge_commit',
