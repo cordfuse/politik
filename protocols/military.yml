@@ -1,0 +1,36 @@
+# Military Operation — authoritarian protocol.
+#
+# No DIVISION: the CO decides. Escalation exists but routes back up the chain
+# rather than to a peer vote, so `no_escalation` stays false.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: military
+  version: 1.0.0
+  mode: authoritarian
+  record_mode: anchored
+
+  roles:
+    AUTHORITY: Commanding Officer
+    DELEGATE: Executive Officer
+    OPERATOR: Field Commander
+    MEMBER: Enlisted
+    OBSERVER: Intelligence Liaison
+
+  primitives:
+    SESSION: Operation
+    PROCEEDING: Operation
+    CHARTER: Rules of Engagement
+    RECORD: After Action Report
+    MOTION: Order
+    DIVISION: None — CO decides
+    ESCALATION: Challenge Up Chain
+    SUSPENSION: Stand Down
+    QUORUM: Minimum Force
+    DEADLOCK: Comms Blackout
+    ASSENT: Order Confirmed
+    EXIT: Relieved of Duty
+
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

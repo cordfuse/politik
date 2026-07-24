@@ -1,0 +1,39 @@
+# Peer Review — constitutional protocol for scientific research.
+#
+# The Statistical Reviewer holds a DOMAIN_VETO: methodology alone can reject a
+# submission, regardless of the Division. Reviewer identities are sealed by the
+# Charter (`operator_identity: anonymous`), which is what makes honest
+# assessment the equilibrium.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: peer-review
+  version: 1.0.0
+  mode: constitutional
+  record_mode: anchored
+
+  roles:
+    AUTHORITY: Editor / Programme Chair
+    DELEGATE: Associate Editor
+    OPERATOR: Reviewer
+    MEMBER: Author
+    OBSERVER: Scientific Community
+
+  primitives:
+    SESSION: Review Cycle
+    PROCEEDING: Review Cycle
+    CHARTER: Review Criteria
+    RECORD: Decision Log
+    MOTION: Submission
+    DIVISION: Accept / Reject / Major Revision
+    ESCALATION: Appeal to Editor-in-Chief
+    SUSPENSION: Decision Issued
+    QUORUM: Minimum Reviewers
+    DEADLOCK: Split Decision — additional reviewer assigned
+    ASSENT: Decision Issued
+    EXIT: Withdrawn / Desk Rejected
+
+  domain_veto:
+    - OPERATOR
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

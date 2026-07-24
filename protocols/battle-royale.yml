@@ -1,0 +1,36 @@
+# Battle Royale — Darwinist protocol.
+#
+# Pure statute. No Division, no appeals: `no_escalation: true`. The Host still
+# drops the Writ and pre-bakes the rules — CANON requires a human AUTHORITY —
+# but takes no part once the match convenes.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: battle-royale
+  version: 1.0.0
+  mode: darwinist
+  record_mode: anchored
+
+  roles:
+    AUTHORITY: Host — pre-session only
+    DELEGATE: Server Admin
+    OPERATOR: Squad Lead
+    MEMBER: Player
+    OBSERVER: Spectator
+
+  primitives:
+    SESSION: Match
+    PROCEEDING: Match
+    CHARTER: Zone Rules
+    RECORD: Kill Feed
+    MOTION: Engagement
+    DIVISION: None — no appeals
+    ESCALATION: None — no appeals
+    SUSPENSION: Zone Collapse
+    QUORUM: Players Remaining
+    DEADLOCK: Final Circle
+    EXIT: Eliminated
+
+  domain_veto: []
+  no_escalation: true
+  no_record: false
+  immutable_charter: true

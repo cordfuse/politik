@@ -8,6 +8,7 @@ export * from './agents.ts';
 export * from './canon.ts';
 export * from './escalation.ts';
 export * from './protocol.ts';
+export * from './protocol-sdk.ts';
 export * from './prorogation.ts';
 export * from './templates/parliamentary.ts';
 export * from './quorum.ts';

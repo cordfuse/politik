@@ -1,0 +1,38 @@
+# Criminal Trial — constitutional protocol with a DOMAIN_VETO inversion.
+#
+# The Jury is OBSERVER by trust tier yet holds the final Division. That is the
+# power inversion CANON models as DOMAIN_VETO: declared in the Charter, never
+# inferred.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: legal
+  version: 1.0.0
+  mode: constitutional
+  record_mode: anchored
+
+  roles:
+    AUTHORITY: Judge
+    DELEGATE: Clerk of the Court
+    OPERATOR: Lead Counsel
+    MEMBER: Associate / Paralegal
+    OBSERVER: Jury
+
+  primitives:
+    SESSION: Trial
+    PROCEEDING: Trial
+    CHARTER: Rules of Evidence
+    RECORD: Court Transcript
+    MOTION: Motion / Objection
+    DIVISION: Verdict
+    ESCALATION: Objection
+    SUSPENSION: Adjournment
+    QUORUM: Quorum
+    DEADLOCK: Mistrial
+    ASSENT: Judgment Entered
+    EXIT: Struck from Record
+
+  domain_veto:
+    - OBSERVER
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

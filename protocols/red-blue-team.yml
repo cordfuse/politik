@@ -1,0 +1,46 @@
+# Red Team / Blue Team Science — adversarial protocol.
+#
+# Note on the mapping: PROTOCOLS.md lists OPERATOR and MEMBER twice each, once
+# per side (Red Team Lead / Blue Team Lead, Red Team Agent / Blue Team Agent).
+# A CANON role cannot map to two terms, so each renders side-neutrally here and
+# the side is carried by the actor's mandate_alignment in the Charter, not by
+# the vocabulary. Mandate is an actor property; vocabulary is protocol-wide.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: red-blue-team
+  version: 1.0.0
+  mode: authoritarian
+  record_mode: anchored
+
+  roles:
+    AUTHORITY: Scientific Referee
+    DELEGATE: Senior Referee
+    OPERATOR: Team Lead
+    MEMBER: Team Agent
+    OBSERVER: Scientific Community
+
+  primitives:
+    SESSION: Adversarial Review
+    PROCEEDING: Adversarial Review
+    CHARTER: Rules of Engagement
+    RECORD: Attack / Defence Log
+    MOTION: Attack Vector / Defence Response
+    DIVISION: Referee Ruling
+    ESCALATION: Disputed Ruling — senior referee
+    SUSPENSION: Review Complete
+    QUORUM: Minimum Teams
+    DEADLOCK: Inconclusive — further experimentation required
+    ASSENT: Ruling Entered
+    EXIT: Theory falsified — Red Team wins
+
+  # PROTOCOLS.md gives the Referee — who is AUTHORITY here — a DOMAIN_VETO
+  # ("can declare attack line out of scope"). The linter warns that this is
+  # redundant, because AUTHORITY already holds VETO as a constitutional power.
+  # The warning is correct and the mapping is kept anyway: it is faithful to the
+  # published protocol, and it documents *what* the Referee vetoes rather than
+  # leaving the scope ruling implicit.
+  domain_veto:
+    - AUTHORITY
+  no_escalation: false
+  no_record: false
+  immutable_charter: true

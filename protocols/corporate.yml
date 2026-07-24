@@ -1,0 +1,35 @@
+# Corporate / Board — constitutional protocol with a shareholder veto.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: corporate
+  version: 1.0.0
+  mode: constitutional
+  record_mode: anchored
+
+  roles:
+    AUTHORITY: CEO / Chair
+    DELEGATE: COO
+    OPERATOR: VP / Director
+    MEMBER: Manager
+    OBSERVER: Shareholder
+
+  primitives:
+    SESSION: Board Meeting
+    PROCEEDING: Quarter
+    CHARTER: Corporate Policy
+    RECORD: Minutes
+    MOTION: Proposal
+    DIVISION: Board Vote
+    ESCALATION: Escalation to Legal
+    SUSPENSION: End of Quarter
+    QUORUM: Quorum
+    DEADLOCK: Board Deadlock
+    ASSENT: Resolution Adopted
+    PROMOTE: Promoted to VP
+    EXIT: Resigned / Terminated
+
+  domain_veto:
+    - OBSERVER
+  no_escalation: false
+  no_record: false
+  immutable_charter: false
