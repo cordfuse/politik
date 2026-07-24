@@ -21,6 +21,7 @@ import {
   type CharterIssue,
   type ProtocolContext,
 } from './charter.ts';
+import { RECORD_TYPES, appendEntry } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
 import { createState, serializeState, type SessionStateFile } from './state.ts';
 
@@ -76,46 +77,44 @@ const writ = (input: WritDropInput, charter: Charter | null, guid: string): stri
   return `${lines.join('\n')}\n`;
 };
 
+const HANSARD_PREAMBLE = [
+  '# HANSARD',
+  '',
+  'Append-only attributed record of this proceeding. The RECORD agent writes;',
+  'no actor edits an entry once committed.',
+  '',
+  '---',
+  '',
+].join('\n');
+
 const hansard = (input: WritDropInput, guid: string): string =>
-  [
-    '# HANSARD',
-    '',
-    'Append-only attributed record of this proceeding. The RECORD agent writes;',
-    'no actor edits an entry once committed.',
-    '',
-    '---',
-    '',
-    `## ${input.now} — WRIT_DROP`,
-    '',
-    `**Actor:** ${input.speaker} (AUTHORITY)`,
-    '',
-    `Writ dropped. Session ${guid} convened under the attached Charter.`,
-    '',
-  ].join('\n') + '\n';
+  appendEntry(HANSARD_PREAMBLE, {
+    type: RECORD_TYPES.WRIT_DROP,
+    at: input.now,
+    actor: input.speaker,
+    role: 'AUTHORITY',
+    body: `Writ dropped. Session ${guid} convened under the attached Charter.`,
+  });
 
 const invalidHansard = (
   input: WritDropInput,
   guid: string,
   issues: readonly CharterIssue[],
 ): string =>
-  [
-    '# HANSARD',
-    '',
-    'Append-only attributed record of this proceeding.',
-    '',
-    '---',
-    '',
-    `## ${input.now} — SESSION_INVALID`,
-    '',
-    `**Actor:** ${input.speaker} (AUTHORITY)`,
-    '',
-    `Writ Drop failed validation. Session ${guid} never opened.`,
-    '',
-    ...issues.map((i) =>
-      `- \`${i.field}\` — ${i.message}${i.rule === undefined ? '' : ` (ADR-0002 rule ${i.rule})`}`,
-    ),
-    '',
-  ].join('\n') + '\n';
+  appendEntry(HANSARD_PREAMBLE, {
+    type: RECORD_TYPES.SESSION_INVALID,
+    at: input.now,
+    actor: input.speaker,
+    role: 'AUTHORITY',
+    body: [
+      `Writ Drop failed validation. Session ${guid} never opened.`,
+      '',
+      ...issues.map(
+        (i) =>
+          `- \`${i.field}\` — ${i.message}${i.rule === undefined ? '' : ` (ADR-0002 rule ${i.rule})`}`,
+      ),
+    ].join('\n'),
+  });
 
 const ledger = (charter: Charter): string =>
   [
