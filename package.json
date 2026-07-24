@@ -1,0 +1,48 @@
+{
+  "name": "@cordfuse/politik",
+  "version": "0.2.0",
+  "description": "Politik — a governed multi-agent framework built on git. The SCM repository is the session: charter, record, state, and invite in one.",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/cordfuse/politik",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cordfuse/politik.git"
+  },
+  "bin": {
+    "politik": "./bin/politik.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "POLITIK-ARCHITECTURE.md",
+    "PROTOCOLS.md",
+    "RUNTIME.md"
+  ],
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "tsx": "^4.20.0",
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "governance",
+    "multi-agent",
+    "git",
+    "politik",
+    "cordfuse"
+  ]
+}
