@@ -14,6 +14,8 @@
  */
 
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 export interface CommitResult {
   readonly committed: boolean;
@@ -64,7 +66,18 @@ export const commitRecord = async (
     return { committed: false, sha: null, reason: 'not a git repository' };
   }
 
-  const add = await git(dir, ['add', '--', ...paths], spawnFn);
+  // `git add` fails outright if any pathspec matches nothing, which would mean
+  // a session that has not yet written STATE.json commits nothing at all.
+  // Filter to what exists so one absent file cannot suppress the whole record.
+  const present: string[] = [];
+  for (const path of paths) {
+    if (existsSync(join(dir, path))) present.push(path);
+  }
+  if (present.length === 0) {
+    return { committed: false, sha: null, reason: 'no record files present' };
+  }
+
+  const add = await git(dir, ['add', '--', ...present], spawnFn);
   if (add.code !== 0) {
     return { committed: false, sha: null, reason: 'nothing to stage' };
   }
