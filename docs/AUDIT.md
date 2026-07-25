@@ -7,8 +7,33 @@
 A systematic scan of every markdown document against the implementation. Every
 finding below was verified directly against source, not inferred.
 
-**This is the resume point.** Work stopped here; nothing in this document has
-been fixed.
+## STATUS — all findings closed, 2026-07-25
+
+Every code finding below is **fixed**; the documentation drift is **corrected**.
+This document is retained as the record of what was wrong and why, not as an
+open worklist.
+
+| Finding | Outcome |
+|---|---|
+| SCM provider dead code | Fixed — Assent merges a real PR (`c6b48c91`) |
+| Transport unwired | Fixed — `broadcast` publishes, `run --claim` receives |
+| #1 ASSENT never enacts | Fixed with the provider wiring |
+| #2 `RecordMode` split | Fixed — `charter.ts` re-exports the protocol type |
+| #3 AUTHORITY-is-human unenforced | Fixed — constituencies carry `agent`; a machine Speaker fails Writ Drop |
+| #4 `quorum.present` wrong | Fixed — carried forward untouched by a turn |
+| #5 rule 3 counts slots | **Rejected** — Writ Drop precedes seating; see below |
+| #6 unreachable suspension causes | Fixed — all five constructible |
+| Documentation drift | Corrected — CLAUDE.md, README, EXECUTION, manifests, dangling refs |
+
+**On #5.** The audit read ADR-0002 rule 3 ("check *assigned* constituencies") as
+meaning seated actors. It cannot: Writ Drop runs before the session opens, so no
+actor has been seated, and that reading would make the rule uncheckable at the
+only moment it runs. The code was right. A subagent finding that did not survive
+verification — which is why they get verified.
+
+---
+
+*Original findings follow, as recorded before any fix.*
 
 ---
 

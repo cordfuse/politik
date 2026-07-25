@@ -12,7 +12,7 @@
  * numbers is worse than no ledger, because it is trusted.
  *
  * Append-only, like the Hansard: `LEDGER.md → Clerk appends after every motion,
- * never edited` (POLITIK-ARCHITECTURE.md § FILE OWNERSHIP).
+ * never edited` (POLITIK-ARCHITECTURE.md § File Sovereignty Rules).
  *
  * Attribution: Steve Krisjanovs, Cordfuse
  */

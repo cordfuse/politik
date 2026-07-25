@@ -35,23 +35,23 @@ protocol:
     MOTION: Tabled Motion
     DIVISION: Division
     ESCALATION: Point of Order
-    SUSPENSION: Suspension
+    SUSPENSION: Adjournment
     QUORUM: Quorum
-    CONFLICT: Merge Conflict
-    DEADLOCK: Deadlock
+    CONFLICT: Competing Amendments
+    DEADLOCK: Hung Parliament
 
     # Verbs
     ASSENT: Royal Assent
     VOTE: Cast a Vote
     ESCALATE: Raise a Point of Order
-    PROMOTE: Elevate to the Front Bench
-    DEMOTE: Return to the Back Benches
+    PROMOTE: Appointed to Cabinet
+    DEMOTE: Returned to Backbench
     SUSPEND: Suspend the Sitting
     EXPEL: Expel from the House
     VETO: Veto
     SPAWN: Refer to Committee
-    DISSOLVE: Prorogue
-    EXIT: Resign from the House
+    DISSOLVE: Prorogation
+    EXIT: Resigned from the House
 
   # No role holds a domain veto under the reference protocol.
   domain_veto: []

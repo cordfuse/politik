@@ -9,20 +9,23 @@ framework, plus the Phase 2 reference implementation.
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
-**Current status: PHASE 2 — REFERENCE IMPLEMENTATION COMPLETE.** All eleven
-Phase 2 items are implemented, on branch `feat/phase-2-scaffold`. Phase 1 closed
-earlier; the scaffolding gate was lifted by explicit human instruction.
+**Current status: PHASES 2–7 COMPLETE, on `main`.** The framework runs, governs,
+and has been exercised live — Motions tabled by real agents, carried by Division,
+enacted by Assent onto a real pull request, and a simulated constitutional
+collapse. 32 modules, 542 tests.
 
-Architecture decisions are recorded in [`docs/adr/`](docs/adr/). ADR-0001
-(transport), ADR-0002 (CHARTER.md schema), ADR-0003 (STATE.json schema) and
-ADR-0004 (motion enactment) are all **Accepted**. `POLITIK-ARCHITECTURE.md` was
-amended only by ADR-0004, which added the `ASSENT` verb and the `CONFLICT`
-primitive.
+Architecture decisions are in [`docs/adr/`](docs/adr/). ADR-0001 (transport),
+ADR-0002 (CHARTER.md schema), ADR-0003 (STATE.json schema), ADR-0004 (motion
+enactment) and ADR-0005 (Hansard format) are all **Accepted**.
+`POLITIK-ARCHITECTURE.md` was amended only by ADR-0004, which added the `ASSENT`
+verb and the `CONFLICT` primitive.
 
-The SCM provider interface return types — the one item Phase 1 deferred to the
-scaffold — are settled in `src/scm.ts`.
+**Read [`docs/AUDIT.md`](docs/AUDIT.md) before trusting any capability claim in
+the other documents.** It records a full source-vs-docs scan. Every code finding
+is now closed; the remaining entries are documentation history.
 
-Phase 1's only remaining item is the arXiv preprint.
+Phase 1's only remaining item is the arXiv preprint. Phase 8 (public launch) has
+not started.
 
 **Implementation stack (decided):** Node + TypeScript, npm `@cordfuse/politik`,
 binary `politik`. Consistent with the namespace reserved in Phase 0 and the
@@ -65,26 +68,65 @@ The git repository IS the Politik session — charter, record, state, and invite
 - **EXECUTION.md** — Phases 0–11, Politik Tree hierarchical architecture.
 - **README.md** — Public-facing brief description with DOI.
 
-### The implementation
+### The implementation — 32 modules
 
-- **`src/canon.ts`** — CANON encoded as types and frozen constants. Single
-  source of truth in code; drift from the architecture is a compile error.
-- **`src/charter.ts`** — CHARTER.md parser and Writ Drop validator (ADR-0002).
-- **`src/state.ts`** — STATE.json schema and invariants (ADR-0003).
-- **`src/init.ts`** — session repo initializer. Produces files; writes none.
-- **`src/envelope.ts`** — broadcast envelope parser and eligibility check.
-- **`src/election.ts`** / **`src/lockfs.ts`** — first-actor-per-constituency
-  mutex. Local scope only; the Hansard commit is the global arbiter.
-- **`src/hansard.ts`** — append-only record writer.
-- **`src/quorum.ts`** — runtime quorum, with the degraded-session override.
-- **`src/escalation.ts`** — Point of Order: file, suspend, rule, resume.
-- **`src/prorogation.ts`** — termination conditions and the seal.
-- **`src/providers/github.ts`** — reference SCM provider. REST only.
-- **`src/cli.ts`** / **`bin/politik.js`** — the `politik` binary.
+**Governance core** (pure: no I/O, no clock, no randomness — timestamps and
+GUIDs are always caller-supplied, which is what makes the logic deterministic
+and testable without a network):
 
-Everything except the provider and the CLI is pure — no I/O, no clock, no
-randomness. Timestamps and GUIDs are always caller-supplied, which is what makes
-the governance logic testable and deterministic.
+- **`canon.ts`** — CANON as types and frozen constants; drift is a compile error
+- **`charter.ts`** — CHARTER.md parser + Writ Drop validator (ADR-0002)
+- **`state.ts`** — STATE.json schema and invariants (ADR-0003)
+- **`init.ts`** — session repo initializer; produces files, writes none
+- **`hansard.ts`** — append-only record writer (ADR-0005)
+- **`division.ts`** — Division, votes, tally, Assent, deadlock (ADR-0004)
+- **`quorum.ts`** — runtime quorum + degraded-session override
+- **`escalation.ts`** — Point of Order: file, suspend, rule, resume
+- **`crisis.ts`** — constitutional capture, witness council, external review
+- **`actors.ts`** — HIRE/PROMOTE/DEMOTE/EXIT/VETO/SPAWN, Speaker order, disputed exit
+- **`capability.ts`** — the five actor dimensions; gates seating
+- **`heartbeat.ts`** — staleness, STATE_SNAPSHOT, resume
+- **`prorogation.ts`** — termination conditions and the seal
+- **`envelope.ts`** — broadcast envelope parser + eligibility
+- **`tree.ts`** — Charter inheritance, cascade, quarantine, scope moves
+- **`protocol.ts`** / **`protocol-sdk.ts`** — vocabulary translation, lint, generate
+- **`ledger.ts`** — measured cost per act; never an estimate dressed as one
+- **`templates/parliamentary.ts`** — protocol #1 templates and label taxonomy
+
+**I/O and integration** (everything that touches the world lives here):
+
+- **`runner.ts`** — the turn: elect → compose → spawn → capture → record
+- **`agents.ts`** / **`spawn.ts`** — agent registry and process lifecycle
+- **`election.ts`** / **`lockfs.ts`** — first-actor mutex; local scope only,
+  the Hansard commit is the global arbiter
+- **`git.ts`** — commits the record; uncommitted work does not exist
+- **`transport.ts`** — chamber bus; never authoritative
+- **`projection.ts`** — projects acts onto an SCM when one is configured
+- **`scm.ts`** — the `ScmProvider` interface every provider implements
+- **`providers/github.ts`** — reference SCM provider, REST only
+- **`doctor.ts`** — host capability probe
+- **`cli.ts`** / **`bin/politik.js`** — the `politik` binary
+- **`index.ts`** — public entry point; re-exports every module above
+
+### The CLI
+
+`version` · `doctor` · `scaffold` · `protocol lint|new` · `validate` · `init` ·
+`status` · `run` · `broadcast` · `motion link` · `division call|vote|tally` ·
+`assent` · `escalate` · `rule` · `crisis file|check|review` ·
+`actor hire|promote|demote|exit|veto|spawn|list` · `heartbeat` · `snapshot` ·
+`resume` · `ledger` · `prorogue`
+
+### Local and hosted sessions
+
+A session is a git repository — that is mandatory. An **SCM provider is
+optional**: pass `--repo owner/name` with `GH_TOKEN` and governance acts are
+additionally projected onto the platform (Motion → pull request, Division →
+review request, Escalation → issue, Assent → merge). Without one the session is
+complete and correct locally.
+
+A projection failure never invalidates a governance act. The Hansard is the
+record; if a Motion carried and the merge failed, the Motion still carried and
+the gap is recorded.
 
 ---
 

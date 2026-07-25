@@ -61,7 +61,11 @@ describe('the shipped Parliamentary protocol', () => {
     assert.equal(term(protocol, 'RECORD'), 'Hansard');
     assert.equal(term(protocol, 'ESCALATION'), 'Point of Order');
     assert.equal(term(protocol, 'ASSENT'), 'Royal Assent');
-    assert.equal(term(protocol, 'CONFLICT'), 'Merge Conflict');
+    // Parliamentary vocabulary, per PROTOCOLS.md — "Merge Conflict" is the
+    // Agile term and was previously miscopied into this manifest.
+    assert.equal(term(protocol, 'CONFLICT'), 'Competing Amendments');
+    assert.equal(term(protocol, 'DEADLOCK'), 'Hung Parliament');
+    assert.equal(term(protocol, 'SUSPENSION'), 'Adjournment');
   });
 
   it('permits escalation, keeps a record, allows amendment', () => {
