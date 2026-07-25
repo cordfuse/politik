@@ -23,6 +23,7 @@ import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
 import { commitRecord } from './git.ts';
 import { checkCostCeiling, totals } from './ledger.ts';
+import { checkHeartbeat, lastSnapshot, markStale, resume, snapshot } from './heartbeat.ts';
 import { commitRuling, fileEscalation, type RulingOutcome } from './escalation.ts';
 import {
   demote, exitActor, hire, promote, seats, spawnChild, veto, vetoOutstanding,
@@ -76,6 +77,9 @@ Usage
   politik rule --seq <n> --actor <h> --outcome UPHELD|REVERSED|NOTED --body <text>
   politik actor hire|promote|demote|exit|veto|spawn ... (see below)
   politik actor list
+  politik heartbeat [--dir <dir>] [--suspend]
+  politik snapshot [--dir <dir>] [--completed a,b] [--in-flight a] [--pending a]
+  politik resume --actor <handle> [--dir <dir>]
   politik ledger [--dir <dir>]
   politik status [--dir <dir>]
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
@@ -94,6 +98,9 @@ Commands
   escalate    Raise a Point of Order. Suspends the sitting.
   rule        Rule on a Point of Order as AUTHORITY. Resumes the sitting.
   actor       Seat, move or remove actors; exercise a veto; refer to committee.
+  heartbeat   Has the proceeding gone quiet? --suspend marks it STALE.
+  snapshot    Commit a STATE_SNAPSHOT so a new agent can continue the work.
+  resume      Resume a STALE proceeding.
   ledger      Total the session's measured cost.
   status      Read STATE.json and summarise the proceeding.
   prorogue    Close a proceeding permanently and seal the Hansard.
@@ -593,6 +600,102 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
 
 
 
+
+/** `politik heartbeat` — is the proceeding still beating? */
+const cmdHeartbeat = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: { dir: { type: 'string' }, suspend: { type: 'boolean' } },
+  });
+  const dir = values.dir ?? '.';
+  const { state, hansard, charter } = await loadSession(dir);
+  if (state === null || charter === null) { err(`heartbeat: ${dir} is not a session repo`); return EXIT.USAGE; }
+
+  const check = checkHeartbeat(hansard, charter.session.heartbeat_timeout_hours, nowStamp());
+  out(check.stale ? 'STALE' : 'beating');
+  out(`  last beat  ${check.last_beat ?? 'none'}`);
+  out(`  ${check.reason}`);
+
+  if (check.stale && values.suspend === true) {
+    try {
+      const result = markStale(check, nowStamp(), state, hansard);
+      await writeHansard(dir, result.hansard);
+      await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
+      out('  session marked STALE — resumable, nothing lost');
+      await recordAndCommit(dir, 'SESSION_STALE — heartbeat window elapsed');
+    } catch (error) {
+      err(`heartbeat: ${error instanceof Error ? error.message : String(error)}`);
+      return EXIT.REFUSED;
+    }
+  }
+  return check.stale ? EXIT.REFUSED : EXIT.OK;
+};
+
+const list = (v: string | undefined): string[] =>
+  (v ?? '').split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+
+/** `politik snapshot` — checkpoint the proceeding. */
+const cmdSnapshot = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: {
+      dir: { type: 'string' }, completed: { type: 'string' },
+      'in-flight': { type: 'string' }, pending: { type: 'string' },
+      blocked: { type: 'string' },
+    },
+  });
+  const dir = values.dir ?? '.';
+  const { state, hansard, charter } = await loadSession(dir);
+  if (state === null || charter === null) { err(`snapshot: ${dir} is not a session repo`); return EXIT.USAGE; }
+
+  const ledgerDoc = (await readIfPresent(join(dir, charter.ledger.path))) ?? '';
+  const spent = totals(ledgerDoc);
+
+  const result = snapshot({
+    completed: list(values.completed),
+    in_flight: list(values['in-flight']),
+    pending: list(values.pending),
+    blocked: list(values.blocked),
+    cost_usd: spent.cost_usd,
+    max_cost_usd: charter.session.endurance.max_cost_usd,
+    motions: spent.rows,
+    max_motions: charter.session.endurance.max_motions,
+  }, nowStamp(), state, hansard);
+
+  await writeHansard(dir, result.hansard);
+  out('STATE_SNAPSHOT committed');
+  out(`  spent $${spent.cost_usd.toFixed(4)} over ${spent.rows} act(s)`);
+  await recordAndCommit(dir, 'STATE_SNAPSHOT');
+  return EXIT.OK;
+};
+
+/** `politik resume` — bring a STALE proceeding back. */
+const cmdResume = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: { dir: { type: 'string' }, actor: { type: 'string' } },
+  });
+  const dir = values.dir ?? '.';
+  if (values.actor === undefined) { err('resume: --actor is required'); return EXIT.USAGE; }
+
+  const { state, hansard } = await loadSession(dir);
+  if (state === null) { err(`resume: ${dir} is not a session repo`); return EXIT.USAGE; }
+
+  try {
+    const result = resume(nowStamp(), values.actor, state, hansard);
+    await writeHansard(dir, result.hansard);
+    await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
+    out('RESUMED — the sitting continues');
+    const snap = lastSnapshot(result.hansard);
+    out(snap === null ? '  no snapshot; agents resume from the Hansard' : '  agents resume from the last STATE_SNAPSHOT');
+    await recordAndCommit(dir, 'SESSION_RESUMED');
+    return EXIT.OK;
+  } catch (error) {
+    err(`resume refused: ${error instanceof Error ? error.message : String(error)}`);
+    return EXIT.REFUSED;
+  }
+};
+
 /** `politik actor <verb>` — the actor lifecycle verbs. */
 const cmdActor = async (argv: readonly string[]): Promise<number> => {
   const [verb, ...rest] = argv;
@@ -987,6 +1090,12 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdDivision(rest);
     case 'assent':
       return cmdAssent(rest);
+    case 'heartbeat':
+      return cmdHeartbeat(rest);
+    case 'snapshot':
+      return cmdSnapshot(rest);
+    case 'resume':
+      return cmdResume(rest);
     case 'actor':
       return cmdActor(rest);
     case 'escalate':
