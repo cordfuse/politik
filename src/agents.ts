@@ -49,6 +49,11 @@ export interface AgentSpec {
   readonly auth_headless: AuthMode;
   /** Supports structured JSON over stdio. */
   readonly stdio_json: boolean;
+  /**
+   * Args that make the agent emit structured output carrying usage data.
+   * Without these the LEDGER can record elapsed time but not tokens or cost.
+   */
+  readonly json_args?: readonly string[];
   readonly notes: string;
 }
 
@@ -69,7 +74,8 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     auth_local: 'oauth',
     auth_headless: 'api_key',
     stdio_json: true,
-    notes: 'Primary target.',
+    json_args: ['--output-format', 'json'],
+    notes: 'Primary target. --output-format json reports exact tokens and cost.',
   },
   {
     id: 'gemini-cli',

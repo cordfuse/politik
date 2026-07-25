@@ -22,6 +22,7 @@ import {
   type ProtocolContext,
 } from './charter.ts';
 import { RECORD_TYPES, appendEntry } from './hansard.ts';
+import { LEDGER_HEADER } from './ledger.ts';
 import type { FileWrite } from './scm.ts';
 import { createState, serializeState, type SessionStateFile } from './state.ts';
 
@@ -126,8 +127,7 @@ const ledger = (charter: Charter): string =>
     `- **Cost ceiling:** ${charter.session.endurance.max_cost_usd ?? 'none declared'}`,
     `- **Motion ceiling:** ${charter.session.endurance.max_motions ?? 'none declared'}`,
     '',
-    '| Timestamp | Actor | Motion | Tokens | Cost (USD) |',
-    '|---|---|---|---|---|',
+    LEDGER_HEADER,
     '',
   ].join('\n') + '\n';
 
