@@ -15,10 +15,14 @@
   "files": [
     "bin/",
     "src/",
+    "protocols/",
+    "docs/adr/",
     "README.md",
     "POLITIK-ARCHITECTURE.md",
     "PROTOCOLS.md",
-    "RUNTIME.md"
+    "RUNTIME.md",
+    "EXECUTION.md",
+    "RESEARCH.md"
   ],
   "scripts": {
     "build": "tsc --noEmit",
