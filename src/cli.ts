@@ -595,12 +595,24 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
       const result = fileCrisis({
         at: nowStamp(), actor: values.actor, role: (values.role ?? 'OPERATOR') as never,
         grounds: values.grounds, against: values.against, state,
+        witness: charter.governance.witness_council.enabled
+          ? { ...charter.governance.witness_council, can_file: 'CONSTITUTIONAL_CRISIS' as const }
+          : null,
       }, hansard);
       await writeHansard(dir, result.hansard);
       out(`CRISIS FILED by ${values.actor} against ${values.against}`);
       await recordAndCommit(dir, `CONSTITUTIONAL_CRISIS_FILED — ${values.actor}`);
 
-      const check = checkCapture(result.hansard, operators);
+      // The Charter's own declaration, not a hardcoded default. Until these
+      // were parsed, a Speaker could declare a Witness Council and get nothing.
+      const check = checkCapture(
+        result.hansard,
+        operators,
+        charter.governance.witness_council.enabled
+          ? { ...charter.governance.witness_council, can_file: 'CONSTITUTIONAL_CRISIS' as const }
+          : null,
+        { ...charter.governance.consensus_suspension, resume_requires: 'external_review' as const },
+      );
       out(`  ${check.reason}`);
       if (check.triggered) {
         const suspended = suspendForCrisis(check, nowStamp(), state, result.hansard);
@@ -615,7 +627,14 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
     }
 
     if (verb === 'check') {
-      const check = checkCapture(hansard, operators);
+      const check = checkCapture(
+        hansard,
+        operators,
+        charter.governance.witness_council.enabled
+          ? { ...charter.governance.witness_council, can_file: 'CONSTITUTIONAL_CRISIS' as const }
+          : null,
+        { ...charter.governance.consensus_suspension, resume_requires: 'external_review' as const },
+      );
       out(check.triggered ? 'CAPTURE DECLARED' : 'no capture declared');
       out(`  filings   ${check.filed} of ${check.operators} OPERATOR actors`);
       out(`  threshold ${check.required}`);
@@ -672,7 +691,7 @@ const cmdHeartbeat = async (argv: readonly string[]): Promise<number> => {
       const result = markStale(check, nowStamp(), state, hansard);
       await writeHansard(dir, result.hansard);
       await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
-      out('  session marked STALE — resumable, nothing lost');
+      out(`  session marked STALE — resumable, nothing lost (stale_action: ${charter.session.stale_action})`);
       await recordAndCommit(dir, 'SESSION_STALE — heartbeat window elapsed');
     } catch (error) {
       err(`heartbeat: ${error instanceof Error ? error.message : String(error)}`);
@@ -1070,8 +1089,11 @@ const cmdLedger = async (argv: readonly string[]): Promise<number> => {
   const ceiling = checkCostCeiling(
     document,
     charter?.session.endurance.max_cost_usd ?? null,
-    null,
+    charter?.session.endurance.cost_warning_usd ?? null,
   );
+  if (ceiling.warning) {
+    out(`WARNING — $${ceiling.spent.toFixed(4)} spent, warning line $${(charter?.session.endurance.cost_warning_usd ?? 0).toFixed(2)}`);
+  }
   if (ceiling.exceeded) {
     err('COST CEILING EXCEEDED — the session should suspend');
     return EXIT.REFUSED;

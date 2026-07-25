@@ -146,6 +146,67 @@ describe('parse — defaults', () => {
   });
 });
 
+describe('governance keys — documented YAML that was inert', () => {
+  it('parses a Witness Council', () => {
+    const charter = parseOk(REFERENCE.replace('domain_veto: []', `domain_veto: []
+
+governance:
+  witness_council:
+    enabled: true
+    roles: [OBSERVER]`));
+    assert.ok(charter.governance.witness_council.enabled);
+    assert.deepEqual([...charter.governance.witness_council.roles], ['OBSERVER']);
+  });
+
+  it('treats an enabled council with no roles as disabled', () => {
+    // A council nobody sits on cannot file; reporting it enabled would promise
+    // a mechanism that cannot fire.
+    const charter = parseOk(REFERENCE.replace('domain_veto: []', `domain_veto: []
+
+governance:
+  witness_council:
+    enabled: true
+    roles: []`));
+    assert.ok(!charter.governance.witness_council.enabled);
+  });
+
+  it('defaults consensus suspension on, at 0.75', () => {
+    const charter = parseOk(REFERENCE);
+    assert.ok(charter.governance.consensus_suspension.enabled);
+    assert.equal(charter.governance.consensus_suspension.threshold, 0.75);
+  });
+
+  it('honours a declared threshold and rejects an impossible one', () => {
+    const ok = parseOk(REFERENCE.replace('domain_veto: []', 'domain_veto: []\n\ngovernance:\n  consensus_suspension:\n    threshold: 1.0'));
+    assert.equal(ok.governance.consensus_suspension.threshold, 1);
+    const bad = parseOk(REFERENCE.replace('domain_veto: []', 'domain_veto: []\n\ngovernance:\n  consensus_suspension:\n    threshold: 5'));
+    assert.equal(bad.governance.consensus_suspension.threshold, 0.75);
+  });
+
+  it('parses stale_action and checkpoint_interval_hours', () => {
+    const charter = parseOk(REFERENCE.replace('  quorum: 2', '  quorum: 2\n  stale_action: dissolve\n  checkpoint_interval_hours: 8'));
+    assert.equal(charter.session.stale_action, 'dissolve');
+    assert.equal(charter.session.checkpoint_interval_hours, 8);
+  });
+
+  it('defaults stale_action to suspend — silence is not a decision to end anything', () => {
+    assert.equal(parseOk(REFERENCE).session.stale_action, 'suspend');
+  });
+
+  it('reads cost_warning_usd from either documented location', () => {
+    const nested = parseOk(REFERENCE.replace('    max_cost_usd: null', '    max_cost_usd: 5\n    cost_warning_usd: 4'));
+    assert.equal(nested.session.endurance.cost_warning_usd, 4);
+    const flat = parseOk(REFERENCE.replace('  quorum: 2', '  quorum: 2\n  cost_warning_usd: 3'));
+    assert.equal(flat.session.endurance.cost_warning_usd, 3);
+  });
+
+  it('parses deadline_action, defaulting to escalate', () => {
+    assert.equal(parseOk(REFERENCE).session.endurance.deadline_action, 'escalate');
+    const d = parseOk(REFERENCE.replace('  quorum: 2', '  quorum: 2\n  deadline_action: dissolve'));
+    assert.equal(d.session.endurance.deadline_action, 'dissolve');
+  });
+});
+
 describe('rule 2 — protocol resolution', () => {
   it('fails when the charter names an unresolved protocol', () => {
     const charter = parseOk(REFERENCE);

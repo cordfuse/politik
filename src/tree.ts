@@ -135,7 +135,16 @@ export const resolveInheritance = (parent: Charter, child: Charter): ResolvedCha
         quorum,
         escalation,
         heartbeat_timeout_hours: heartbeat,
-        endurance: { max_cost_usd: maxCost, max_motions: maxMotions },
+        endurance: {
+          max_cost_usd: maxCost,
+          max_motions: maxMotions,
+          // A warning line only means something below its ceiling.
+          cost_warning_usd: tighterCeiling(
+            parent.session.endurance.cost_warning_usd,
+            child.session.endurance.cost_warning_usd,
+          ),
+          deadline_action: child.session.endurance.deadline_action,
+        },
       },
       minimum_cast: minimumCast,
       domain_veto: domainVeto,

@@ -65,6 +65,17 @@ minimum_cast:                    # enforced at Writ Drop; hard fail
 
 domain_veto: []
 
+governance:
+  # Constitutional-capture mitigations. A supermajority of OPERATOR actors can
+  # suspend the session against AUTHORITY; a designated witness can do it alone,
+  # which is what covers the case where the bench itself has been captured.
+  consensus_suspension:
+    enabled: true
+    threshold: 0.75           # fraction of OPERATOR actors who must concur
+  witness_council:
+    enabled: false            # set true and name roles to seat constitutional witnesses
+    roles: []
+
 constituencies:
   - role: AUTHORITY              # Speaker — human, always
     slots: 1
