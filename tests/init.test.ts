@@ -83,6 +83,35 @@ describe('Writ Drop — success', () => {
     assert.equal(jobs['notify-speaker']?.steps.length, 3);
   });
 
+  it('installs the scheduled heartbeat workflow', () => {
+    const wf = files.get('.github/workflows/heartbeat.yml');
+    assert.ok(wf, 'heartbeat workflow missing');
+    assert.match(wf, /cron: '0 \* \* \* \*'/);
+    assert.match(wf, /contents: write/);
+  });
+
+  it('installs the ruling workflow, matching only rulings', () => {
+    const wf = files.get('.github/workflows/ruling.yml');
+    assert.ok(wf, 'ruling workflow missing');
+    // Matching all of escalations/ would fire on the escalation that caused
+    // the suspension and resume a session nobody had ruled on.
+    assert.match(wf, /escalations\/ruling-\*\.md/);
+    assert.ok(!/paths:\s*\n\s*- 'escalations\/\*/.test(wf));
+  });
+
+  it('resumes only a Point of Order — never a crisis or a Speaker order', () => {
+    const wf = files.get('.github/workflows/ruling.yml') ?? '';
+    assert.match(wf, /CAUSE" = "POINT_OF_ORDER"/);
+  });
+
+  it('generates scheduled workflow YAML that parses', () => {
+    for (const name of ['heartbeat.yml', 'ruling.yml']) {
+      const parsed = parseYaml(files.get(`.github/workflows/${name}`) ?? '') as Record<string, unknown>;
+      assert.ok(parsed['jobs'], `${name} has no jobs`);
+      assert.ok(parsed['permissions'], `${name} declares no permissions`);
+    }
+  });
+
   it('commits the Charter verbatim', () => {
     assert.equal(files.get('CHARTER.md'), CHARTER);
   });

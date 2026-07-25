@@ -198,6 +198,133 @@ jobs:
             Session is suspended pending your response.
 `;
 
+
+/**
+ * Heartbeat workflow — scheduled staleness detection.
+ *
+ * RUNTIME.md § Session Heartbeat: an hourly job checks the last Hansard commit
+ * and suspends the proceeding if nothing has happened within
+ * `heartbeat_timeout_hours`.
+ *
+ * Runs `politik` via npx rather than assuming an install: a GitHub runner is a
+ * fresh machine, and a session repo carries no toolchain of its own.
+ *
+ * Writes back to the repo when it suspends, which is why it needs
+ * `contents: write` — a heartbeat that could detect staleness but not record it
+ * would be a monitor, not a mechanism.
+ */
+const heartbeatWorkflow = (): string =>
+  `name: Heartbeat — staleness detection
+
+# NOTE — these jobs run \`npx --yes @cordfuse/politik\`, which requires the
+# package to be published to npm. Until it is, they will fail on the runner.
+# The governance they automate all works from the CLI in the meantime:
+#   staleness -> politik heartbeat --suspend
+#   rulings   -> politik rule
+
+# A proceeding that goes quiet is not the same as one that was paused. This job
+# marks it STALE, which is resumable and loses nothing (\`politik resume\`).
+
+on:
+  schedule:
+    - cron: '0 * * * *'      # hourly, per RUNTIME.md § Session Heartbeat
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # the heartbeat is the last Hansard commit
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check the heartbeat
+        id: beat
+        run: npx --yes @cordfuse/politik heartbeat --dir . --suspend || true
+
+      - name: Commit a suspension, if one was recorded
+        run: |
+          if [ -n "$(git status --porcelain HANSARD.md STATE.json)" ]; then
+            git config user.name  'Politik Clerk'
+            git config user.email 'clerk@politik.local'
+            git add HANSARD.md STATE.json
+            git commit -m 'SESSION_STALE — heartbeat window elapsed'
+            git push
+          else
+            echo 'still beating; nothing to record'
+          fi
+`;
+
+/**
+ * Ruling workflow — resume on a committed ruling.
+ *
+ * RUNTIME.md § Point of Order: "GitHub Actions detects ruling commit → session
+ * resumes". A Speaker who commits \`escalations/ruling-NNN.md\` directly, rather
+ * than through the CLI, should not also have to remember to resume the sitting.
+ *
+ * The path filter matches only rulings. Matching the whole \`escalations/\`
+ * directory would fire on the escalation that caused the suspension and resume
+ * a session nobody had ruled on.
+ */
+const rulingWorkflow = (): string =>
+  `name: Ruling — resume the sitting
+
+# NOTE — these jobs run \`npx --yes @cordfuse/politik\`, which requires the
+# package to be published to npm. Until it is, they will fail on the runner.
+# The governance they automate all works from the CLI in the meantime:
+#   staleness -> politik heartbeat --suspend
+#   rulings   -> politik rule
+
+on:
+  push:
+    paths:
+      - 'escalations/ruling-*.md'
+
+permissions:
+  contents: write
+
+jobs:
+  resume:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resume, if the session is suspended for a Point of Order
+        run: |
+          STATE=$(node -e "console.log(JSON.parse(require('fs').readFileSync('STATE.json','utf8')).state)")
+          CAUSE=$(node -e "const s=JSON.parse(require('fs').readFileSync('STATE.json','utf8'));console.log(s.suspension?.cause ?? '')")
+
+          # Only a Point of Order resumes this way. A constitutional crisis
+          # requires external review, and a Speaker order is the Speaker's to
+          # lift — resuming around either would route past the governance that
+          # stopped the session.
+          if [ "$STATE" = "SUSPENDED" ] && [ "$CAUSE" = "POINT_OF_ORDER" ]; then
+            npx --yes @cordfuse/politik rule \\
+              --dir . --actor "$GITHUB_ACTOR" --role AUTHORITY \\
+              --outcome NOTED \\
+              --body "Ruling committed to the repository. Recorded by the Clerk workflow."
+
+            git config user.name  'Politik Clerk'
+            git config user.email 'clerk@politik.local'
+            git add HANSARD.md STATE.json escalations/
+            git commit -m 'RULING — sitting resumes' || true
+            git push
+          else
+            echo "state=$STATE cause=$CAUSE — nothing to resume"
+          fi
+`;
+
 /* -------------------------------------------------------------------------- */
 /* Writ Drop                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -257,6 +384,8 @@ export const dropWrit = (input: WritDropInput): WritDropResult => {
     { path: 'motions/.gitkeep', content: keep('Tabled business.') },
     { path: 'escalations/.gitkeep', content: keep('Points of Order and rulings.') },
     { path: '.github/workflows/point-of-order.yml', content: pointOfOrderWorkflow() },
+    { path: '.github/workflows/heartbeat.yml', content: heartbeatWorkflow() },
+    { path: '.github/workflows/ruling.yml', content: rulingWorkflow() },
   ];
 
   if (charter.ledger.enabled) {
