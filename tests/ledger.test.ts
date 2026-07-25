@@ -64,6 +64,80 @@ describe('parsing agent usage', () => {
   });
 });
 
+/** Real shapes captured from each CLI, trimmed. */
+const GEMINI_JSON = JSON.stringify({
+  session_id: 's',
+  response: 'Records matter.',
+  stats: {
+    models: {
+      'gemini-3.1-flash-lite': {
+        tokens: { input: 2759, candidates: 30, total: 2929, cached: 12 },
+      },
+    },
+  },
+});
+
+const OPENCODE_JSONL = [
+  '{"type":"step_start","part":{"type":"step-start"}}',
+  '{"type":"text","part":{"text":"Records matter."}}',
+  '{"type":"step_finish","part":{"tokens":{"input":3,"output":4,"cache":{"read":8860,"write":2}},"cost":0.002727,"modelID":"claude-sonnet-5"}}',
+].join('\n');
+
+const CODEX_JSONL = [
+  '{"type":"item.completed","item":{"text":"Records matter."}}',
+  '{"type":"turn.completed","usage":{"input_tokens":12360,"cached_input_tokens":3456,"output_tokens":5}}',
+].join('\n');
+
+describe('parsing other agents', () => {
+  it('reads gemini tokens and model, with cost honestly unmeasured', () => {
+    const usage = parseUsage('gemini-cli', GEMINI_JSON);
+    assert.ok(usage);
+    assert.equal(usage.input_tokens, 2759);
+    assert.equal(usage.output_tokens, 30);
+    assert.equal(usage.cache_read_tokens, 12);
+    assert.equal(usage.model, 'gemini-3.1-flash-lite');
+    // The vendor reports no spend. Deriving a price from a rate card would be
+    // an estimate dressed as a measurement.
+    assert.equal(usage.cost_usd, null);
+  });
+
+  it('reads qwen with the same shape', () => {
+    assert.equal(parseUsage('qwen-code', GEMINI_JSON)?.input_tokens, 2759);
+  });
+
+  it('reads opencode tokens and cost from JSONL events', () => {
+    const usage = parseUsage('opencode', OPENCODE_JSONL);
+    assert.ok(usage);
+    assert.equal(usage.cache_read_tokens, 8860);
+    assert.equal(usage.cost_usd, 0.002727);
+    assert.equal(usage.model, 'claude-sonnet-5');
+  });
+
+  it('reads codex usage from the turn.completed event', () => {
+    const usage = parseUsage('codex-cli', CODEX_JSONL);
+    assert.ok(usage);
+    assert.equal(usage.input_tokens, 12360);
+    assert.equal(usage.cache_read_tokens, 3456);
+    assert.equal(usage.cost_usd, null);
+  });
+
+  it('extracts the answer, not the envelope', () => {
+    assert.equal(parseResultText('gemini-cli', GEMINI_JSON), 'Records matter.');
+    assert.equal(parseResultText('opencode', OPENCODE_JSONL), 'Records matter.');
+    assert.equal(parseResultText('codex-cli', CODEX_JSONL), 'Records matter.');
+  });
+
+  it('still returns null for an agent with no known shape', () => {
+    assert.equal(parseUsage('goose', OPENCODE_JSONL), null);
+    assert.equal(parseUsage('aider', GEMINI_JSON), null);
+  });
+
+  it('returns null rather than a zero reading when events carry no usage', () => {
+    assert.equal(parseUsage('opencode', '{"type":"text","part":{"text":"hi"}}'), null);
+    assert.equal(parseUsage('codex-cli', '{"type":"item.started"}'), null);
+  });
+});
+
 describe('rendering rows', () => {
   it('records measured cost', () => {
     const row = renderRow(
