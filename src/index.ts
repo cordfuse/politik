@@ -30,5 +30,6 @@ export * from './ledger.ts';
 export * from './scm.ts';
 export * from './spawn.ts';
 export * from './state.ts';
+export * from './transport.ts';
 export * from './tree.ts';
 export * from './providers/github.ts';
