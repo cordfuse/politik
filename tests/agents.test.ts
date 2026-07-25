@@ -142,9 +142,17 @@ describe('prompt injection format', () => {
     assert.match(prompt, /Review motion-003/);
   });
 
-  it('states the containment and append-only rules', () => {
+  it('states the containment rule', () => {
     assert.match(prompt, /Do not traverse above the working directory/);
-    assert.match(prompt, /append-only/);
+  });
+
+  it('forbids writing the record at all, not merely editing it', () => {
+    // A live agent read "do not edit the Hansard, it is append-only" as
+    // permission to append, and committed its own entry. The rule must leave
+    // no such reading available.
+    assert.match(prompt, /Do not write to HANSARD\.md, STATE\.json or LEDGER\.md at all/);
+    assert.match(prompt, /not even\s+to append/);
+    assert.match(prompt, /RECORD agent owns them exclusively/);
   });
 
   it('omits the record section when there is no Hansard yet', () => {
