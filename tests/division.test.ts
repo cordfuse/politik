@@ -194,6 +194,26 @@ describe('tallying', () => {
     assert.match(outcome.reason, /degraded/);
   });
 
+  it('records the quorum threshold in force, not merely that it was met', () => {
+    const outcome = tallyDivision(
+      withVotes([{ actor: 'a', vote: 'AYE' }, { actor: 'b', vote: 'AYE' }]),
+      'motion-001',
+      2,
+    );
+    assert.equal(outcome.quorum_required, 2);
+    const result = recordOutcome(outcome, AT, 'speaker', 'AUTHORITY', BASE);
+    // A Division entry must be auditable on its own terms: a reader should not
+    // have to recover the Charter as it stood to know what "met" meant.
+    assert.equal(result.entry.fields?.['Quorum'], 'met (2 required)');
+  });
+
+  it('records the threshold even when quorum failed', () => {
+    const outcome = tallyDivision(withVotes([{ actor: 'a', vote: 'AYE' }]), 'motion-001', 3);
+    assert.equal(outcome.quorum_required, 3);
+    const result = recordOutcome(outcome, AT, 'speaker', 'AUTHORITY', BASE);
+    assert.equal(result.entry.fields?.['Quorum'], 'NOT MET (3 required)');
+  });
+
   it('records the outcome as a typed entry', () => {
     const outcome = tallyDivision(
       withVotes([{ actor: 'a', vote: 'AYE' }, { actor: 'b', vote: 'AYE' }]),

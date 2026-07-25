@@ -158,6 +158,18 @@ export interface DivisionOutcome {
   readonly carried: boolean;
   /** Quorum is counted on votes cast, abstentions excluded. */
   readonly quorum_met: boolean;
+  /**
+   * The quorum threshold in force when this Division was tallied.
+   *
+   * Recorded so a Division entry is auditable on its own terms. Without it,
+   * "quorum met" only means something to a reader willing to recover the
+   * Charter as it stood at that commit — and a record that requires
+   * cross-referencing to interpret is doing less work than a record should.
+   *
+   * Enacted by motion-001 of session clean-001, which observed that the
+   * validity of a carried Motion was "unverifiable after the fact".
+   */
+  readonly quorum_required: number;
   readonly reason: string;
 }
 
@@ -197,6 +209,7 @@ export const tallyDivision = (
       abstentions,
       carried: false,
       quorum_met: false,
+      quorum_required: quorumRequired,
       reason: quorum.reason ?? 'quorum not met',
     };
   }
@@ -206,6 +219,7 @@ export const tallyDivision = (
       motion, ayes, noes, abstentions,
       carried: true,
       quorum_met: true,
+      quorum_required: quorumRequired,
       reason: `carried ${ayes} to ${noes}${quorum.degraded ? ' (degraded quorum)' : ''}`,
     };
   }
@@ -214,6 +228,7 @@ export const tallyDivision = (
     motion, ayes, noes, abstentions,
     carried: false,
     quorum_met: true,
+    quorum_required: quorumRequired,
     reason: ayes === noes ? `tied ${ayes} all — no majority, DEADLOCK` : `rejected ${ayes} to ${noes}`,
   };
 };
@@ -236,7 +251,7 @@ export const recordOutcome = (
       Ayes: String(outcome.ayes),
       Noes: String(outcome.noes),
       Abstentions: String(outcome.abstentions),
-      Quorum: outcome.quorum_met ? 'met' : 'NOT MET',
+      Quorum: `${outcome.quorum_met ? 'met' : 'NOT MET'} (${outcome.quorum_required} required)`,
       Outcome: outcome.reason,
     },
   };
