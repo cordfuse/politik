@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { runTurn } from '../src/runner.ts';
+import { parseEnvelope, type Envelope } from '../src/envelope.ts';
 import { dropWrit } from '../src/init.ts';
 import { charterTemplate } from '../src/templates/parliamentary.ts';
 import { parseEntries } from '../src/hansard.ts';
@@ -109,6 +110,66 @@ describe('refusals', () => {
       });
       assert.ok(!outcome.ok);
       assert.match(outcome.reason, /seats no DELEGATE/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+/** A spawn double: git answers plausibly, the agent "runs". */
+const fakeSpawnShared = ((command: string, args: readonly string[]) => {
+  const listeners: Record<string, ((...a: unknown[]) => void)[]> = {};
+  const stdoutListeners: ((c: Buffer) => void)[] = [];
+  const child = {
+    stdout: { on: (_e: string, fn: (c: Buffer) => void) => stdoutListeners.push(fn) },
+    stderr: { on: () => undefined },
+    kill: () => undefined,
+    on: (event: string, fn: (...a: unknown[]) => void) => {
+      (listeners[event] ??= []).push(fn);
+      return child;
+    },
+  };
+  queueMicrotask(() => {
+    const output = command === 'git' && args[0] === 'rev-parse' ? 'abc123'
+      : command === 'git' ? '' : 'agent output';
+    for (const fn of stdoutListeners) fn(Buffer.from(output));
+    for (const fn of listeners['close'] ?? []) fn(0);
+  });
+  return child as never;
+}) as never;
+
+describe('received broadcasts', () => {
+  const envelope = (target = 'OPERATOR', slots = 2, guid = 'run-test'): Envelope => {
+    const result = parseEnvelope(
+      `# [${guid}]\n## target-actor: ${target}\n## slots-remaining: ${slots}\n## protocol: parliamentary\n## prompt: |\n  Business from the bus.\n`,
+    );
+    assert.ok(result.ok);
+    return result.envelope;
+  };
+
+  it('refuses a broadcast targeting another constituency', async () => {
+    const dir = await session();
+    try {
+      const outcome = await runTurn({
+        dir, agent_id: 'claude-code', actor: 'a', role: 'OPERATOR',
+        task: 'x', now: NOW, envelope: envelope('MEMBER'),
+      });
+      assert.ok(!outcome.ok);
+      assert.match(outcome.reason, /broadcast targets MEMBER/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts a broadcast for this constituency', async () => {
+    const dir = await session();
+    try {
+      const outcome = await runTurn({
+        dir, agent_id: 'claude-code', actor: 'a', role: 'OPERATOR',
+        task: 'ignored', now: NOW, envelope: envelope('OPERATOR'),
+        spawnFn: fakeSpawnShared,
+      });
+      assert.ok(outcome.ok, JSON.stringify(outcome));
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
