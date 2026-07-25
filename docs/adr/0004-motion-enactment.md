@@ -197,8 +197,10 @@ reads these terms; only humans do, and always inside one protocol at a time.
 
 - **CANON changes.** One new verb (`ASSENT`), one new primitive (`CONFLICT`).
   `POLITIK-ARCHITECTURE.md` — the invention disclosure — must be amended. Per
-  repo Rule 1 this requires explicit human instruction, which is why this ADR is
-  Proposed and not Accepted.
+  repo Rule 1 that required explicit human instruction, which was given: the
+  amendment landed and this ADR moved to Accepted. (This paragraph previously
+  still read "which is why this ADR is Proposed and not Accepted",
+  contradicting the status header.)
 - **SCM interface grows.** `scm.merge(pr, strategy)` is required. The interface
   also still lacks `createBranch`, `removeCollaborator`, `updatePermission`, and
   tag/release methods — all needed by verbs CANON already defines (`FIRE`,

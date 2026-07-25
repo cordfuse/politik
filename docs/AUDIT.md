@@ -7,11 +7,14 @@
 A systematic scan of every markdown document against the implementation. Every
 finding below was verified directly against source, not inferred.
 
-## STATUS — all findings closed, 2026-07-25
+## STATUS — 2026-07-25
 
-Every code finding below is **fixed**; the documentation drift is **corrected**.
-This document is retained as the record of what was wrong and why, not as an
-open worklist.
+**Closed:** both integration gaps, all eight real bugs (one rejected with
+reasons), and the documentation drift.
+
+**Still open:** the *Missing — specified, no implementation* section below. Those
+are unbuilt features, not defects — the docs specify them and the code does not
+have them. They remain the backlog.
 
 | Finding | Outcome |
 |---|---|
@@ -23,7 +26,10 @@ open worklist.
 | #4 `quorum.present` wrong | Fixed — carried forward untouched by a turn |
 | #5 rule 3 counts slots | **Rejected** — Writ Drop precedes seating; see below |
 | #6 unreachable suspension causes | Fixed — all five constructible |
+| #7 ADR-0004 self-contradiction | Fixed — stale "Proposed" consequence removed |
+| #8 ADR-0002 rule 7 unenforceable | Open — noted below; coercion at parse still masks it |
 | Documentation drift | Corrected — CLAUDE.md, README, EXECUTION, manifests, dangling refs |
+| **Missing features** | **Open — see that section; this is the backlog** |
 
 **On #5.** The audit read ADR-0002 rule 3 ("check *assigned* constituencies") as
 meaning seated actors. It cannot: Writ Drop runs before the session opens, so no
