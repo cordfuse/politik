@@ -22,6 +22,7 @@ import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
 import { GitTransport } from './transport.ts';
+import { conflictEntry, detectConflicts, openConflicts, resolveConflict } from './conflict.ts';
 import { parseEnvelope, isEligible, type Envelope } from './envelope.ts';
 import { commitRecord } from './git.ts';
 import {
@@ -86,6 +87,8 @@ Usage
   politik heartbeat [--dir <dir>] [--suspend]
   politik snapshot [--dir <dir>] [--completed a,b] [--in-flight a] [--pending a]
   politik resume --actor <handle> [--dir <dir>]
+  politik conflict check [--dir <dir>]
+  politik conflict resolve --motions a,b --actor <h> --role <ROLE> --resolution <t>
   politik broadcast --target <ROLE> --slots <n> --task <text> [--dir <dir>]
   politik motion link --motion <id> --pr <n> [--url <u>]
   politik ledger [--dir <dir>]
@@ -109,6 +112,7 @@ Commands
   heartbeat   Has the proceeding gone quiet? --suspend marks it STALE.
   snapshot    Commit a STATE_SNAPSHOT so a new agent can continue the work.
   resume      Resume a STALE proceeding.
+  conflict    Find or resolve Motions touching the same files. Routine, not a fault.
   broadcast   Put business on the bus for peers to claim.
   motion      Bind a Motion to a pull request so Assent can enact it.
   ledger      Total the session's measured cost.
@@ -954,6 +958,89 @@ const cmdRule = async (argv: readonly string[]): Promise<number> => {
 };
 
 
+
+/**
+ * `politik conflict` — routine, not a governance event.
+ *
+ * Nothing here suspends the session or reaches for AUTHORITY: a merge conflict
+ * is ordinary concurrent work, and treating it as a fault would train actors to
+ * escalate things two Ministers can settle themselves.
+ */
+const cmdConflict = async (argv: readonly string[]): Promise<number> => {
+  const [verb, ...rest] = argv;
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      dir: { type: 'string' }, motions: { type: 'string' }, actor: { type: 'string' },
+      role: { type: 'string' }, resolution: { type: 'string' }, verbs: { type: 'string' },
+    },
+  });
+
+  const dir = values.dir ?? '.';
+  const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
+
+  if (verb === 'check') {
+    // Motions are files under motions/; a conflict is an overlap in what the
+    // Motions themselves touch, read from the record.
+    const touched = new Map<string, string[]>();
+    for (const entry of parseEntries(hansard)) {
+      const files = entry.fields['Files touched'];
+      const motion = entry.fields['Motion'] ?? entry.fields['Files touched'];
+      if (files === undefined || files === 'none' || motion === undefined) continue;
+      touched.set(motion, files.split(',').map((f) => f.trim()).filter((f) => f.length > 0));
+    }
+
+    const conflicts = detectConflicts(
+      [...touched.entries()].map(([motion, files]) => ({ motion, files })),
+    );
+
+    if (conflicts.length === 0) {
+      out('no conflicts');
+    } else {
+      for (const c of conflicts) {
+        out(`CONFLICT ${c.motions.join(' <-> ')}`);
+        out(`  files ${c.files.join(', ')}`);
+        await writeHansard(dir, appendEntry(hansard, conflictEntry(c, nowStamp(), 'RECORD', 'OPERATOR')));
+      }
+      await recordAndCommit(dir, `CONFLICT — ${conflicts.length} detected`);
+    }
+
+    const open = openConflicts(hansard);
+    if (open.length > 0) out(`  ${open.length} unresolved`);
+    // A conflict is not a failure, so this never exits non-zero.
+    return EXIT.OK;
+  }
+
+  if (verb === 'resolve') {
+    if (values.motions === undefined || values.actor === undefined || values.resolution === undefined) {
+      err('conflict resolve: --motions, --actor and --resolution are required');
+      return EXIT.USAGE;
+    }
+    try {
+      const result = resolveConflict({
+        at: nowStamp(),
+        actor: values.actor,
+        role: (values.role ?? 'OPERATOR') as never,
+        verbs: (values.verbs ?? 'READ,WRITE').split(',').map((v) => v.trim()) as never,
+        motions: values.motions.split(',').map((m) => m.trim()).filter((m) => m.length > 0),
+        resolution: values.resolution,
+      }, hansard);
+
+      await writeHansard(dir, result.hansard);
+      out(`CONFLICT RESOLVED — ${values.motions}`);
+      out('  no Speaker intervention required');
+      await recordAndCommit(dir, `CONFLICT_RESOLVED — ${values.motions}`);
+      return EXIT.OK;
+    } catch (error) {
+      err(`conflict refused: ${error instanceof Error ? error.message : String(error)}`);
+      return EXIT.REFUSED;
+    }
+  }
+
+  err(`conflict: unknown verb "${verb ?? ''}" — expected check | resolve`);
+  return EXIT.USAGE;
+};
+
 /**
  * `politik broadcast` — put business on the bus.
  *
@@ -1322,6 +1409,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdEscalate(rest);
     case 'rule':
       return cmdRule(rest);
+    case 'conflict':
+      return cmdConflict(rest);
     case 'broadcast':
       return cmdBroadcast(rest);
     case 'motion':
