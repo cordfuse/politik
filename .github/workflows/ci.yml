@@ -1,0 +1,103 @@
+name: CI
+
+# Tests on this repo were run by hand for its entire history. On a public repo
+# that is not verification — a contributor's PR, or a maintainer's own merge,
+# could break everything silently.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20 is the floor package.json declares; 22 is what CI would default to.
+        node: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+
+      # The published tarball shipped no protocol manifests for the whole of
+      # Phase 5. Assert the library is actually in the package rather than
+      # trusting the files list to stay correct.
+      - name: The package must contain the protocol library
+        run: |
+          npm pack --dry-run --json > /tmp/pack.json
+          node -e "
+            const files = require('/tmp/pack.json')[0].files.map(f => f.path);
+            const protocols = files.filter(f => f.startsWith('protocols/') && f.endsWith('.yml'));
+            if (protocols.length < 10) {
+              console.error('FAIL: package ships ' + protocols.length + ' protocol manifests, expected 10');
+              process.exit(1);
+            }
+            if (!files.includes('bin/politik.js')) {
+              console.error('FAIL: package ships no binary');
+              process.exit(1);
+            }
+            console.log('OK: ' + protocols.length + ' protocols + binary in the package');
+          "
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+
+      # A stranger's first five minutes: install the tarball somewhere that has
+      # never seen this repo, then convene and govern a session.
+      - name: Clean-room install and govern a session
+        run: |
+          set -e
+          npm pack
+          mkdir -p /tmp/clean && cd /tmp/clean
+          npm init -y >/dev/null
+          npm install "$GITHUB_WORKSPACE"/cordfuse-politik-*.tgz
+          export PATH="/tmp/clean/node_modules/.bin:$PATH"
+
+          git init -q session && cd session
+          git config user.email ci@example.com && git config user.name CI
+
+          politik doctor || true
+          politik scaffold --out . --quorum 2
+          politik validate CHARTER.md
+          politik init --charter CHARTER.md --speaker ci --out . --guid ci-001
+          git add -A && git commit -q -m "WRIT_DROP"
+
+          politik division call --motion motion-001 --actor ci --role AUTHORITY
+          politik division vote --motion motion-001 --actor a --role OPERATOR --vote AYE
+          politik division vote --motion motion-001 --actor b --role OPERATOR --vote AYE
+          politik division tally --motion motion-001 --actor ci --role AUTHORITY
+          politik assent --motion motion-001 --actor ci --role AUTHORITY
+          politik status --dir .
+
+          # The protocol library must be reachable from an installed package.
+          politik protocol lint /tmp/clean/node_modules/@cordfuse/politik/protocols/parliamentary.yml
