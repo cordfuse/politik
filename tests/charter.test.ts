@@ -176,6 +176,33 @@ describe('rule 3 — minimum_cast shortfall', () => {
   });
 });
 
+describe('the one hard constitutional rule — AUTHORITY is human', () => {
+  it('refuses a Charter seating an agent as Speaker', () => {
+    const charter = mutated(
+      '  - role: AUTHORITY\n    slots: 1',
+      '  - role: AUTHORITY\n    slots: 1\n    agent: claude-code',
+    );
+    const result = validateCharter(charter);
+    assert.ok(!result.valid);
+    assert.match(
+      result.issues.find((i) => i.field.includes('agent'))?.message ?? '',
+      /AUTHORITY is always human/,
+    );
+  });
+
+  it('permits an agent in any other seat', () => {
+    const charter = mutated(
+      '  - role: OPERATOR\n    slots: 3',
+      '  - role: OPERATOR\n    slots: 3\n    agent: claude-code',
+    );
+    assert.ok(validateCharter(charter).valid);
+  });
+
+  it('permits a human Speaker — no agent declared', () => {
+    assert.ok(validateCharter(parseOk(REFERENCE)).valid);
+  });
+});
+
 describe('rule 4 — AUTHORITY floor', () => {
   it('rejects minimum_cast.AUTHORITY: 0', () => {
     const charter = mutated('  AUTHORITY: 1', '  AUTHORITY: 0');
@@ -196,11 +223,11 @@ describe('rule 5 — squash vs distributed record mode', () => {
     assert.ok(result.issues.some((i) => i.rule === 5));
   });
 
-  it('permits squash otherwise', () => {
+  it('permits squash under anchored — the mode 8 of 10 shipped protocols use', () => {
     const charter = mutated('merge_strategy: merge_commit', 'merge_strategy: squash');
     const result = validateCharter(charter, {
       name: 'parliamentary',
-      record_mode: 'centralised',
+      record_mode: 'anchored',
     });
     assert.ok(result.valid);
   });

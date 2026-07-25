@@ -14,6 +14,7 @@ import type { Constituency } from '../src/charter.ts';
 
 const seat = (over: Partial<Constituency> = {}): Constituency => ({
   role: 'OPERATOR',
+  agent: null,
   slots: 1,
   auto_demotion: false,
   hard_skills: { required: [], excluded: [] },

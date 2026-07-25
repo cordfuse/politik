@@ -366,12 +366,17 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     }
 
     // The slot is consumed by the Hansard commit, not by winning the lock.
-    const consumed = claimSlot(envelope);
+    claimSlot(envelope);
+
+    // Quorum is carried forward untouched. A turn is not a Division, and
+    // `present` counts actors eligible to vote — it was previously being
+    // overwritten with the leftover broadcast slot count, which is a different
+    // quantity entirely and made the figure meaningless.
     const nextState = createState({
       session_guid: state.session_guid,
       protocol: state.protocol,
       state: 'CONVENED',
-      quorum: { required: state.quorum.required, present: consumed.slots_remaining },
+      quorum: state.quorum,
       hansard_head: state.hansard_head,
       updated_at: options.now,
     });

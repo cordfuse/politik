@@ -20,6 +20,7 @@ import {
   type MergeStrategy,
   type Role,
 } from './canon.ts';
+import type { ProtocolRecordMode } from './protocol.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Schema                                                                      */
@@ -28,8 +29,16 @@ import {
 export type EscalationSetting = 'enabled' | 'disabled';
 export type LedgerVisibility = 'public' | 'private';
 
-/** Record mode of the resolved protocol. Only `distributed` constrains squash. */
-export type RecordMode = 'centralised' | 'distributed';
+/**
+ * Record mode of the resolved protocol.
+ *
+ * Re-exported from the protocol layer rather than redeclared. This module
+ * previously declared its own `'centralised' | 'distributed'` — a vocabulary
+ * that existed nowhere else, and which could not represent `anchored`, the mode
+ * 8 of the 10 shipped protocols declare. Rule 5 was therefore checking a value
+ * most real protocols could not express.
+ */
+export type RecordMode = ProtocolRecordMode;
 
 export interface Endurance {
   readonly max_motions: number | null;
@@ -65,6 +74,15 @@ export interface HardSkills {
 
 export interface Constituency {
   readonly role: Role;
+  /**
+   * Registry id of the agent seated here, when the seat is machine-filled.
+   *
+   * Absent means the seat is human-filled. This is the field that makes the
+   * AUTHORITY-is-human rule checkable at all: without somewhere for a Charter
+   * to declare a machine, the rule could not be enforced and was — for the
+   * whole of Phases 2-7 — a comment asserting a check that did not exist.
+   */
+  readonly agent: string | null;
   readonly slots: number;
   readonly auto_demotion: boolean;
   readonly hard_skills: HardSkills;
@@ -215,6 +233,7 @@ export const parseCharter = (source: string): ParseResult => {
       const model = isObject(entry['model']) ? entry['model'] : {};
       constituencies.push({
         role: (isRole(entry['role']) ? entry['role'] : 'MEMBER') as Role,
+        agent: asStringOrNull(entry['agent']),
         slots: typeof entry['slots'] === 'number' ? entry['slots'] : 1,
         auto_demotion: entry['auto_demotion'] === true,
         hard_skills: {
@@ -324,7 +343,30 @@ export const validateCharter = (
     });
   }
 
+  // The one hard constitutional rule (POLITIK-ARCHITECTURE.md § Roles):
+  // AUTHORITY is always human. A Charter declaring a machine as AUTHORITY is
+  // invalid and the session must never open.
+  //
+  // The rationale is accountability, not capability: a machine that captures a
+  // session cannot be held responsible for it, and every other safeguard in the
+  // framework assumes someone can be.
+  for (const [i, c] of charter.constituencies.entries()) {
+    if (c.role === 'AUTHORITY' && c.agent !== null) {
+      issues.push({
+        field: `constituencies[${i}].agent`,
+        message: `AUTHORITY is always human — this Charter seats the agent "${c.agent}" as Speaker`,
+      });
+    }
+  }
+
   // Rule 3 — declared constituencies must satisfy minimum_cast.
+  //
+  // ADR-0002 says "assigned constituencies", which reads ambiguously. It means
+  // the seats this Charter assigns, not actors sitting in them: Writ Drop runs
+  // *before* the session opens, so no actor has been seated yet and the other
+  // reading would make the rule uncheckable at the only moment it runs.
+  // Whether seats are actually filled is a runtime question, and quorum answers
+  // it at Division time.
   const slotsByRole = new Map<Role, number>();
   for (const c of charter.constituencies) {
     slotsByRole.set(c.role, (slotsByRole.get(c.role) ?? 0) + c.slots);
