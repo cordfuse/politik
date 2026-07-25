@@ -21,6 +21,7 @@ import { parliamentaryTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
+import { commitRecord } from './git.ts';
 import {
   callDivision, castVote, grantAssent, recordOutcome, tallyDivision,
   type Vote,
@@ -346,6 +347,23 @@ const loadSession = async (dir: string) => {
 const writeHansard = (dir: string, hansard: string) =>
   writeFile(join(dir, 'HANSARD.md'), hansard, 'utf8');
 
+/**
+ * Persist a governance act to the record.
+ *
+ * Writing the file is not enough: the Standing Orders this framework ships say
+ * uncommitted work does not exist, and that binds the engine as much as an
+ * actor. Reports what happened rather than failing silently — a session run
+ * outside git is legitimate, but the operator should know the record is not
+ * durable.
+ */
+const recordAndCommit = async (dir: string, message: string): Promise<void> => {
+  const result = await commitRecord(dir, message);
+  if (result.committed) out(`  recorded ${result.sha?.slice(0, 8) ?? ''}`);
+  else if (result.reason === 'not a git repository') {
+    out('  [WARN] not a git repository — the record is not durable');
+  }
+};
+
 const nowStamp = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 /** `politik division call|vote|tally`. */
@@ -381,6 +399,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       }, hansard);
       await writeHansard(dir, result.hansard);
       out(`DIVISION CALLED on ${values.motion}`);
+      await recordAndCommit(dir, `DIVISION_CALLED — ${values.motion}`);
       return EXIT.OK;
     }
 
@@ -395,6 +414,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       }, hansard);
       await writeHansard(dir, result.hansard);
       out(`VOTE RECORDED — ${values.actor}: ${values.vote.toUpperCase()}`);
+      await recordAndCommit(dir, `VOTE_CAST — ${values.actor} on ${values.motion}`);
       return EXIT.OK;
     }
 
@@ -407,6 +427,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       out(`  ayes ${outcome.ayes}  noes ${outcome.noes}  abstentions ${outcome.abstentions}`);
       out(`  quorum ${outcome.quorum_met ? 'met' : 'NOT MET'}`);
       out(`  ${outcome.reason}`);
+      await recordAndCommit(dir, `${outcome.carried ? 'MOTION_CARRIED' : 'MOTION_REJECTED'} — ${values.motion}`);
       return outcome.carried ? EXIT.OK : EXIT.REFUSED;
     }
 
@@ -445,6 +466,7 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
     await writeHansard(dir, result.hansard);
     await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
     out(`ASSENT GRANTED — ${values.motion} is enacted`);
+    await recordAndCommit(dir, `ASSENT_GRANTED — ${values.motion} enacted`);
     return EXIT.OK;
   } catch (error) {
     err(`assent refused: ${error instanceof Error ? error.message : String(error)}`);
@@ -492,6 +514,10 @@ const cmdRun = async (argv: readonly string[]): Promise<number> => {
   out(`  elapsed  ${outcome.result.elapsed_ms}ms`);
   out(`  files    ${outcome.files_touched.length > 0 ? outcome.files_touched.join(', ') : 'none'}`);
   out('  recorded in HANSARD.md');
+  await recordAndCommit(
+    values.dir ?? '.',
+    `${outcome.entry.type} — ${values.actor} (${values.role ?? 'OPERATOR'})`,
+  );
   return EXIT.OK;
 };
 

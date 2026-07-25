@@ -17,6 +17,7 @@ export * from './templates/parliamentary.ts';
 export * from './quorum.ts';
 export * from './election.ts';
 export * from './envelope.ts';
+export * from './git.ts';
 export * from './hansard.ts';
 export * from './lockfs.ts';
 export * from './charter.ts';
