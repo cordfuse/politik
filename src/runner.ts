@@ -63,6 +63,15 @@ export interface RunOptions {
   readonly lock_dir?: string;
   /** Injectable for tests. */
   readonly spawnFn?: typeof spawn;
+  /**
+   * A broadcast received from the bus.
+   *
+   * When absent the runner synthesizes an envelope from `task` — the direct
+   * invocation path. When present the session is genuinely broadcast-driven:
+   * the envelope came off the transport and carries the slot count the
+   * broadcaster published, not one this process invented.
+   */
+  readonly envelope?: Envelope;
 }
 
 export type RunOutcome =
@@ -196,6 +205,9 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     return { ok: false, reason: `Charter seats no ${options.role} constituency` };
   }
 
+  // A received broadcast is authoritative over anything this process would
+  // synthesize: it carries the slot count the broadcaster published, and
+  // inventing our own would let two peers disagree about how many seats remain.
   const envelopeSource = [
     `# [${state.session_guid}]`,
     `## target-actor: ${options.role}`,
@@ -226,11 +238,22 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     }
   }
 
-  const envelopeResult = parseEnvelope(envelopeSource);
-  if (!envelopeResult.ok) {
-    return { ok: false, reason: 'failed to build a valid broadcast envelope' };
+  let envelope: Envelope;
+  if (options.envelope !== undefined) {
+    envelope = options.envelope;
+    if (envelope.target_actor !== options.role) {
+      return {
+        ok: false,
+        reason: `broadcast targets ${envelope.target_actor}, this agent stands for ${options.role}`,
+      };
+    }
+  } else {
+    const envelopeResult = parseEnvelope(envelopeSource);
+    if (!envelopeResult.ok) {
+      return { ok: false, reason: 'failed to build a valid broadcast envelope' };
+    }
+    envelope = envelopeResult.envelope;
   }
-  const envelope: Envelope = envelopeResult.envelope;
 
   // Elect into the constituency. Local scope only — the Hansard commit is the
   // global arbiter, and this lock merely grants the right to attempt it.

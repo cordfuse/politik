@@ -21,6 +21,8 @@ import { parliamentaryTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
+import { GitTransport } from './transport.ts';
+import { parseEnvelope, isEligible, type Envelope } from './envelope.ts';
 import { commitRecord } from './git.ts';
 import {
   linkEntry, projectAssent, projectDivision, projectEscalation,
@@ -69,7 +71,7 @@ Usage
   politik protocol new <name> [--mode <mode>] [--out <dir>]
   politik validate <charter.md> [--protocol <name>]
   politik init --charter <path> --speaker <handle> [--out <dir>] [--guid <id>]
-  politik run --dir <dir> --agent <id> --actor <handle> --role <ROLE> --task <text>
+  politik run --agent <id> --actor <h> --role <ROLE> (--task <text> | --claim)
   politik division call --motion <id> --actor <h> --role <ROLE> [--reviewers a,b]
   politik division vote --motion <id> --actor <h> --role <ROLE> --vote AYE|NO|ABSTAIN
   politik division tally --motion <id>
@@ -84,6 +86,7 @@ Usage
   politik heartbeat [--dir <dir>] [--suspend]
   politik snapshot [--dir <dir>] [--completed a,b] [--in-flight a] [--pending a]
   politik resume --actor <handle> [--dir <dir>]
+  politik broadcast --target <ROLE> --slots <n> --task <text> [--dir <dir>]
   politik motion link --motion <id> --pr <n> [--url <u>]
   politik ledger [--dir <dir>]
   politik status [--dir <dir>]
@@ -106,6 +109,7 @@ Commands
   heartbeat   Has the proceeding gone quiet? --suspend marks it STALE.
   snapshot    Commit a STATE_SNAPSHOT so a new agent can continue the work.
   resume      Resume a STALE proceeding.
+  broadcast   Put business on the bus for peers to claim.
   motion      Bind a Motion to a pull request so Assent can enact it.
   ledger      Total the session's measured cost.
   status      Read STATE.json and summarise the proceeding.
@@ -930,6 +934,73 @@ const cmdRule = async (argv: readonly string[]): Promise<number> => {
   }
 };
 
+
+/**
+ * `politik broadcast` — put business on the bus.
+ *
+ * The chamber transport carries the ephemeral nudge; the Hansard remains the
+ * record. A broadcast nobody hears loses nothing, because a peer that hears
+ * nothing falls back to reading the repo.
+ */
+const cmdBroadcast = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: {
+      dir: { type: 'string' }, target: { type: 'string' },
+      slots: { type: 'string' }, task: { type: 'string' },
+    },
+  });
+
+  const dir = values.dir ?? '.';
+  const { state, charter } = await loadSession(dir);
+  if (state === null || charter === null) {
+    err(`broadcast: ${dir} is not a session repo`);
+    return EXIT.USAGE;
+  }
+  if (values.task === undefined) {
+    err('broadcast: --task is required');
+    return EXIT.USAGE;
+  }
+
+  const target = values.target ?? 'OPERATOR';
+  const declared = charter.constituencies
+    .filter((c) => c.role === target)
+    .reduce((n, c) => n + c.slots, 0);
+  const slots = values.slots === undefined ? declared : Number(values.slots);
+
+  if (!Number.isInteger(slots) || slots < 0) {
+    err('broadcast: --slots must be a non-negative integer');
+    return EXIT.USAGE;
+  }
+  if (declared === 0) {
+    err(`broadcast: the Charter seats no ${target} constituency`);
+    return EXIT.REFUSED;
+  }
+
+  const source = [
+    `# [${state.session_guid}]`,
+    `## target-actor: ${target}`,
+    `## slots-remaining: ${slots}`,
+    `## protocol: ${charter.protocol}`,
+    '## prompt: |',
+    ...values.task.split('\n').map((l) => `  ${l}`),
+    '',
+  ].join('\n');
+
+  const parsed = parseEnvelope(source);
+  if (!parsed.ok) {
+    err(`broadcast: ${parsed.issues.map((i) => i.message).join('; ')}`);
+    return EXIT.REFUSED;
+  }
+
+  const bus = new GitTransport({ dir });
+  const result = await bus.publish(parsed.envelope);
+  out('BROADCAST PUBLISHED');
+  out(`  target ${target}, ${slots} slot(s)`);
+  out(`  ${result.ref}`);
+  return EXIT.OK;
+};
+
 /**
  * `politik motion link` — bind a Motion to its platform object.
  *
@@ -1019,20 +1090,50 @@ const cmdRun = async (argv: readonly string[]): Promise<number> => {
       role: { type: 'string' },
       task: { type: 'string' },
       timeout: { type: 'string' },
+      claim: { type: 'boolean' },
     },
   });
 
-  if (values.agent === undefined || values.actor === undefined || values.task === undefined) {
-    err('run: --agent, --actor and --task are required');
+  const dir = values.dir ?? '.';
+  const role = (values.role ?? 'OPERATOR') as never;
+
+  // Claim mode: take business off the bus rather than inventing it. This is the
+  // path the Self-Organization Protocol describes — a peer acts because it
+  // heard a broadcast it is eligible for, not because someone typed a task.
+  let received: Envelope | undefined;
+  if (values.claim === true) {
+    const { state } = await loadSession(dir);
+    if (state === null) { err(`run: ${dir} is not a session repo`); return EXIT.USAGE; }
+
+    const bus = new GitTransport({ dir });
+    const waiting = await bus.poll(state.session_guid);
+    received = waiting.find((e) => isEligible(e, role));
+
+    if (received === undefined) {
+      out(waiting.length === 0
+        ? 'no broadcasts on the bus'
+        : `no broadcast this agent is eligible for (${waiting.length} waiting)`);
+      return EXIT.OK;
+    }
+    out(`CLAIMED a broadcast — ${received.target_actor}, ${received.slots_remaining} slot(s)`);
+  }
+
+  if (values.agent === undefined || values.actor === undefined) {
+    err('run: --agent and --actor are required');
+    return EXIT.USAGE;
+  }
+  if (received === undefined && values.task === undefined) {
+    err('run: --task is required (or use --claim to take one off the bus)');
     return EXIT.USAGE;
   }
 
   const outcome = await runTurn({
-    dir: values.dir ?? '.',
+    dir,
     agent_id: values.agent,
     actor: values.actor,
-    role: (values.role ?? 'OPERATOR') as never,
-    task: values.task,
+    role,
+    task: received?.prompt ?? values.task ?? '',
+    ...(received === undefined ? {} : { envelope: received }),
     now: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
     timeout_ms: values.timeout === undefined ? undefined : Number(values.timeout),
   });
@@ -1049,7 +1150,7 @@ const cmdRun = async (argv: readonly string[]): Promise<number> => {
   out(`  files    ${outcome.files_touched.length > 0 ? outcome.files_touched.join(', ') : 'none'}`);
   out('  recorded in HANSARD.md');
   await recordAndCommit(
-    values.dir ?? '.',
+    dir,
     `${outcome.entry.type} — ${values.actor} (${values.role ?? 'OPERATOR'})`,
   );
   return EXIT.OK;
@@ -1199,6 +1300,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdEscalate(rest);
     case 'rule':
       return cmdRule(rest);
+    case 'broadcast':
+      return cmdBroadcast(rest);
     case 'motion':
       return cmdMotion(rest);
     case 'ledger':
