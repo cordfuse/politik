@@ -65,6 +65,12 @@ minimum_cast:                    # enforced at Writ Drop; hard fail
 
 domain_veto: []
 
+fault_handling:
+  # PATH_A auto-recovery. A rate limit or a brief outage retries without waking
+  # the Speaker; anything a human must fix escalates immediately.
+  auto_retry_max: 3
+  auto_retry_delay_minutes: 5
+
 governance:
   # Constitutional-capture mitigations. A supermajority of OPERATOR actors can
   # suspend the session against AUTHORITY; a designated witness can do it alone,

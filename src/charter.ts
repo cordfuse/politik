@@ -129,6 +129,11 @@ export interface Charter {
   readonly minimum_cast: Readonly<Partial<Record<Role, number>>>;
   readonly domain_veto: readonly Role[];
   readonly governance: Governance;
+  /** PATH_A auto-recovery policy (RUNTIME.md § Three Resolution Paths). */
+  readonly fault_handling: {
+    readonly auto_retry_max: number;
+    readonly auto_retry_delay_minutes: number;
+  };
   readonly constituencies: readonly Constituency[];
   /** Unparsed Standing Orders prose. Carried, never interpreted. */
   readonly body: string;
@@ -332,6 +337,18 @@ export const parseCharter = (source: string): ParseResult => {
     },
     minimum_cast,
     domain_veto: asStringArray(raw['domain_veto']).filter(isRole),
+    fault_handling: (() => {
+      const f = isObject(raw['fault_handling']) ? raw['fault_handling'] : {};
+      const max = asNumberOrNull(f['auto_retry_max']);
+      const delay = asNumberOrNull(f['auto_retry_delay_minutes']);
+      return {
+        // RUNTIME.md's documented defaults. A Charter that says nothing gets
+        // retry rather than an immediate escalation, because a rate limit is
+        // not something to wake a Speaker for.
+        auto_retry_max: max !== null && max >= 0 ? max : 3,
+        auto_retry_delay_minutes: delay !== null && delay >= 0 ? delay : 5,
+      };
+    })(),
     governance: (() => {
       const g = isObject(raw['governance']) ? raw['governance'] : {};
       const witness = isObject(g['witness_council']) ? g['witness_council'] : {};
