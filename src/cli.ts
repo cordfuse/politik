@@ -22,6 +22,10 @@ import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
 import { commitRecord } from './git.ts';
+import {
+  linkEntry, projectAssent, projectDivision, projectEscalation,
+  projectionEntry, resolveProvider,
+} from './projection.ts';
 import { checkCostCeiling, totals } from './ledger.ts';
 import { checkHeartbeat, lastSnapshot, markStale, resume, snapshot } from './heartbeat.ts';
 import { commitRuling, fileEscalation, type RulingOutcome } from './escalation.ts';
@@ -39,7 +43,7 @@ import {
 } from './division.ts';
 import { PROTOCOL_MODES, type ProtocolMode } from './protocol.ts';
 import { checkTermination, prorogue, type Trigger } from './prorogation.ts';
-import { parseEntries } from './hansard.ts';
+import { appendEntry, parseEntries } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
 
 /**
@@ -80,6 +84,7 @@ Usage
   politik heartbeat [--dir <dir>] [--suspend]
   politik snapshot [--dir <dir>] [--completed a,b] [--in-flight a] [--pending a]
   politik resume --actor <handle> [--dir <dir>]
+  politik motion link --motion <id> --pr <n> [--url <u>]
   politik ledger [--dir <dir>]
   politik status [--dir <dir>]
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
@@ -101,6 +106,7 @@ Commands
   heartbeat   Has the proceeding gone quiet? --suspend marks it STALE.
   snapshot    Commit a STATE_SNAPSHOT so a new agent can continue the work.
   resume      Resume a STALE proceeding.
+  motion      Bind a Motion to a pull request so Assent can enact it.
   ledger      Total the session's measured cost.
   status      Read STATE.json and summarise the proceeding.
   prorogue    Close a proceeding permanently and seal the Hansard.
@@ -401,6 +407,29 @@ const recordAndCommit = async (dir: string, message: string): Promise<void> => {
 
 const nowStamp = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
+/** Provider flags shared by every command that can project. */
+const PROVIDER_OPTS = {
+  repo: { type: 'string' },
+  token: { type: 'string' },
+} as const;
+
+/**
+ * Report a projection and put it on the record.
+ *
+ * Both outcomes are recorded. A reader must be able to see that a Motion
+ * carried and its merge did not land — the gap between decision and effect is
+ * exactly what a governance record exists to expose.
+ */
+const reportProjection = async (
+  dir: string,
+  act: string,
+  result: { projected: boolean; detail: string; ref: string | null },
+  hansard: string,
+): Promise<void> => {
+  out(`  ${result.projected ? 'projected' : 'not projected'} — ${result.detail}`);
+  await writeHansard(dir, appendEntry(hansard, projectionEntry(act, result, nowStamp())));
+};
+
 /** `politik division call|vote|tally`. */
 const cmdDivision = async (argv: readonly string[]): Promise<number> => {
   const [verb, ...rest] = argv;
@@ -409,6 +438,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
     options: {
       dir: { type: 'string' }, motion: { type: 'string' }, actor: { type: 'string' },
       role: { type: 'string' }, vote: { type: 'string' }, reviewers: { type: 'string' },
+      ...PROVIDER_OPTS,
     },
   });
 
@@ -434,6 +464,12 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       }, hansard);
       await writeHansard(dir, result.hansard);
       out(`DIVISION CALLED on ${values.motion}`);
+
+      const { provider } = resolveProvider({ repo: values.repo, token: values.token });
+      const reviewers = (values.reviewers ?? '').split(',').filter((r) => r.length > 0);
+      const projected = await projectDivision(provider, result.hansard, values.motion, reviewers);
+      await reportProjection(dir, `DIVISION_CALLED ${values.motion}`, projected, result.hansard);
+
       await recordAndCommit(dir, `DIVISION_CALLED — ${values.motion}`);
       return EXIT.OK;
     }
@@ -481,6 +517,7 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
     options: {
       dir: { type: 'string' }, motion: { type: 'string' },
       actor: { type: 'string' }, role: { type: 'string' },
+      ...PROVIDER_OPTS,
     },
   });
 
@@ -502,6 +539,16 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
     await writeHansard(dir, result.hansard);
     await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
     out(`ASSENT GRANTED — ${values.motion} is enacted`);
+
+    // ADR-0004 defines ASSENT as merging the Motion. This is where the decision
+    // reaches the world; until it was wired, assent recorded a decision that
+    // changed nothing.
+    const { provider } = resolveProvider({ repo: values.repo, token: values.token });
+    const merged = await projectAssent(
+      provider, result.hansard, values.motion, charter.session.merge_strategy,
+    );
+    await reportProjection(dir, `ASSENT ${values.motion}`, merged, result.hansard);
+
     await recordAndCommit(dir, `ASSENT_GRANTED — ${values.motion} enacted`);
     return EXIT.OK;
   } catch (error) {
@@ -790,6 +837,7 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
     options: {
       dir: { type: 'string' }, actor: { type: 'string' }, role: { type: 'string' },
       title: { type: 'string' }, body: { type: 'string' }, seq: { type: 'string' },
+      ...PROVIDER_OPTS,
     },
   });
 
@@ -820,6 +868,12 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
   out(`  escalation  ${filed.escalation_path}`);
   out(`  ruling due  ${filed.ruling_path}`);
   out('  session is SUSPENDED pending a Speaker ruling');
+  const { provider } = resolveProvider({ repo: values.repo, token: values.token });
+  const opened = await projectEscalation(
+    provider, `POINT OF ORDER — ${values.title}`, filed.notification,
+  );
+  await reportProjection(dir, `ESCALATION ${values.title}`, opened, filed.hansard);
+
   await recordAndCommit(dir, `POINT_OF_ORDER — ${values.actor}: ${values.title}`);
 
   // The notification body is built here; delivery is the provider's job.
@@ -874,6 +928,49 @@ const cmdRule = async (argv: readonly string[]): Promise<number> => {
     err(`ruling refused: ${error instanceof Error ? error.message : String(error)}`);
     return EXIT.REFUSED;
   }
+};
+
+/**
+ * `politik motion link` — bind a Motion to its platform object.
+ *
+ * Without a link, Assent has no pull request to merge and degrades to a
+ * local-only record. Kept explicit rather than inferred: guessing which PR a
+ * Motion means would risk merging the wrong branch on the strength of a
+ * filename match.
+ */
+const cmdMotion = async (argv: readonly string[]): Promise<number> => {
+  const [verb, ...rest] = argv;
+  if (verb !== 'link') {
+    err(`motion: unknown verb "${verb ?? ''}" — expected link`);
+    return EXIT.USAGE;
+  }
+
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      dir: { type: 'string' }, motion: { type: 'string' },
+      pr: { type: 'string' }, url: { type: 'string' },
+    },
+  });
+
+  const dir = values.dir ?? '.';
+  if (values.motion === undefined || values.pr === undefined) {
+    err('motion link: --motion and --pr are required');
+    return EXIT.USAGE;
+  }
+  const pr = Number.parseInt(values.pr.replace(/^#/, ''), 10);
+  if (!Number.isInteger(pr) || pr < 1) {
+    err('motion link: --pr must be a positive integer');
+    return EXIT.USAGE;
+  }
+
+  const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
+  const updated = appendEntry(hansard, linkEntry(values.motion, pr, values.url ?? '', nowStamp()));
+  await writeHansard(dir, updated);
+
+  out(`LINKED ${values.motion} -> #${pr}`);
+  await recordAndCommit(dir, `MOTION_PROJECTED — ${values.motion} -> #${pr}`);
+  return EXIT.OK;
 };
 
 /** `politik ledger` — total the cost record. */
@@ -1102,6 +1199,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdEscalate(rest);
     case 'rule':
       return cmdRule(rest);
+    case 'motion':
+      return cmdMotion(rest);
     case 'ledger':
       return cmdLedger(rest);
     case 'run':
