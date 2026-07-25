@@ -55,6 +55,12 @@ const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v)
  */
 export const parseUsage = (agentId: string, stdout: string): Usage | null => {
   const trimmed = stdout.trim();
+  if (trimmed === '') return null;
+
+  // JSONL agents emit a stream of events; the usage arrives in one of them.
+  if (agentId === 'opencode') return parseOpencode(trimmed);
+  if (agentId === 'codex-cli') return parseCodex(trimmed);
+
   if (!trimmed.startsWith('{')) return null;
 
   let raw: unknown;
@@ -65,6 +71,26 @@ export const parseUsage = (agentId: string, stdout: string): Usage | null => {
   }
   if (typeof raw !== 'object' || raw === null) return null;
   const doc = raw as Record<string, unknown>;
+
+  // Gemini and Qwen share a CLI lineage and a stats shape: per-model token
+  // counts, no cost. Recording tokens with `cost_usd: null` is the honest
+  // result — the vendor does not report spend, and inventing a price from a
+  // rate card would be an estimate dressed as a measurement.
+  if (agentId === 'gemini-cli' || agentId === 'qwen-code') {
+    const stats = (doc['stats'] ?? {}) as Record<string, unknown>;
+    const models = (stats['models'] ?? {}) as Record<string, unknown>;
+    const name = Object.keys(models)[0];
+    if (name === undefined) return null;
+    const t = ((models[name] as Record<string, unknown>)['tokens'] ?? {}) as Record<string, unknown>;
+    return {
+      input_tokens: num(t['input']),
+      output_tokens: num(t['candidates']),
+      cache_read_tokens: num(t['cached']),
+      cache_creation_tokens: 0,
+      cost_usd: null,
+      model: name,
+    };
+  }
 
   if (agentId === 'claude-code') {
     const usage = (doc['usage'] ?? {}) as Record<string, unknown>;
@@ -82,14 +108,105 @@ export const parseUsage = (agentId: string, stdout: string): Usage | null => {
   return null;
 };
 
+/**
+ * OpenCode emits JSONL events; usage rides on the ones carrying `tokens`.
+ * Later events win — the last report of a turn is its total.
+ */
+const parseOpencode = (stdout: string): Usage | null => {
+  let tokens: Record<string, unknown> | null = null;
+  let cost: number | null = null;
+  let model: string | null = null;
+
+  for (const line of stdout.split('\n')) {
+    const t = line.trim();
+    if (!t.startsWith('{')) continue;
+    let doc: Record<string, unknown>;
+    try {
+      doc = JSON.parse(t) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    for (const scope of [doc, (doc['part'] ?? {}) as Record<string, unknown>]) {
+      if (typeof scope['tokens'] === 'object' && scope['tokens'] !== null) {
+        tokens = scope['tokens'] as Record<string, unknown>;
+      }
+      if (typeof scope['cost'] === 'number') cost = scope['cost'];
+      if (typeof scope['modelID'] === 'string') model = scope['modelID'];
+    }
+  }
+
+  if (tokens === null) return null;
+  const cache = (tokens['cache'] ?? {}) as Record<string, unknown>;
+  return {
+    input_tokens: num(tokens['input']),
+    output_tokens: num(tokens['output']),
+    cache_read_tokens: num(cache['read']),
+    cache_creation_tokens: num(cache['write']),
+    cost_usd: cost,
+    model,
+  };
+};
+
+/** Codex emits JSONL; `turn.completed` carries the usage. */
+const parseCodex = (stdout: string): Usage | null => {
+  for (const line of stdout.split('\n').reverse()) {
+    const t = line.trim();
+    if (!t.startsWith('{')) continue;
+    let doc: Record<string, unknown>;
+    try {
+      doc = JSON.parse(t) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const usage = doc['usage'];
+    if (typeof usage !== 'object' || usage === null) continue;
+    const u = usage as Record<string, unknown>;
+    return {
+      input_tokens: num(u['input_tokens']),
+      output_tokens: num(u['output_tokens']),
+      cache_read_tokens: num(u['cached_input_tokens']),
+      cache_creation_tokens: 0,
+      cost_usd: null,
+      model: null,
+    };
+  }
+  return null;
+};
+
 /** The agent's actual answer, pulled out of structured output. */
 export const parseResultText = (agentId: string, stdout: string): string | null => {
   const trimmed = stdout.trim();
+  if (trimmed === '') return null;
+
+  // JSONL agents: the answer is assembled from text events rather than carried
+  // in one field.
+  if (agentId === 'opencode' || agentId === 'codex-cli') {
+    const parts: string[] = [];
+    for (const line of trimmed.split('\n')) {
+      const t = line.trim();
+      if (!t.startsWith('{')) continue;
+      try {
+        const doc = JSON.parse(t) as Record<string, unknown>;
+        const part = (doc['part'] ?? {}) as Record<string, unknown>;
+        if (doc['type'] === 'text' && typeof part['text'] === 'string') parts.push(part['text']);
+        const item = (doc['item'] ?? {}) as Record<string, unknown>;
+        if (typeof item['text'] === 'string') parts.push(item['text']);
+      } catch {
+        continue;
+      }
+    }
+    return parts.length > 0 ? parts.join('').trim() : null;
+  }
+
   if (!trimmed.startsWith('{')) return null;
   try {
     const doc = JSON.parse(trimmed) as Record<string, unknown>;
     if (agentId === 'claude-code' && typeof doc['result'] === 'string') {
       return doc['result'];
+    }
+    // Gemini and Qwen carry the answer in `response`.
+    if ((agentId === 'gemini-cli' || agentId === 'qwen-code') && typeof doc['response'] === 'string') {
+      return doc['response'];
     }
   } catch {
     return null;

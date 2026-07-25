@@ -133,6 +133,24 @@ per agent — agents differ only in argv shape and auth story.
 **Live results.** Each agent was driven through `spawnAgent()` with a trivial
 prompt and had to return a specific token. Five passed.
 
+**Cost measurement — four of eight agents report usage.** The LEDGER was
+`unmeasured` for everything but Claude Code until the adapters were probed
+directly:
+
+| Agent | Tokens | Cost | Model |
+|---|---|---|---|
+| Claude Code | yes | yes | yes |
+| OpenCode | yes | yes | yes |
+| Gemini CLI | yes | — | yes |
+| Codex CLI | yes | — | — |
+| Qwen Code | yes (same shape as Gemini) | — | yes |
+| Antigravity | — | — | — |
+| Aider, Goose | not installed | — | — |
+
+Where a vendor does not report spend the row records `unmeasured`, never a
+figure derived from a rate card. An estimate dressed as a measurement is the one
+failure this ledger exists to avoid.
+
 **Backlog — three agents unverified.** Their registry entries follow the
 documented invocation and are shipped, but none has been exercised live. Each
 is a host-setup task, not a framework defect:
