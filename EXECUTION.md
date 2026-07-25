@@ -479,6 +479,34 @@ from the session's own governance would be the one participant above it.
 
 ---
 
+---
+
+## RESUME HERE — 2026-07-25
+
+Work stopped after a full audit of every markdown document against the
+implementation. **Findings are in [`docs/AUDIT.md`](docs/AUDIT.md); nothing in it
+has been fixed.**
+
+The two findings that matter most, both verified against source:
+
+1. **The SCM provider is dead code at runtime.** Eleven methods, 21 passing
+   tests, live-verified against a real repo — and no module in `src/` ever
+   instantiates it or calls it. Politik runs on local markdown plus git commits,
+   so the README's "Pull Request = Motion, PR Review = Division" mapping
+   describes a provider the runtime never touches.
+2. **The transport is equally unwired.** `runTurn` synthesizes the envelope from
+   CLI arguments; no process has ever received a broadcast.
+
+Next action: wire the provider into the governance path — `assent` should merge,
+`division call` should request review, `escalate` should open an issue. That one
+change fixes the `ASSENT`-never-enacts bug, makes the core README claim true, and
+turns 21 passing tests into a working integration.
+
+**Do not start Phase 8 until that is done.** Announcing now would announce a
+GitHub-native framework that has never used GitHub at runtime.
+
+---
+
 ### PHASE 8 — Public Launch
 ```
 [ ] All namespaces secured
