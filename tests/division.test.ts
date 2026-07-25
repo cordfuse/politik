@@ -291,6 +291,17 @@ describe('Assent — the Division decides, the Assent enacts', () => {
     );
   });
 
+  it('refuses Assent while a veto stands (ADR-0004 fourth condition)', () => {
+    assert.throws(
+      () =>
+        grantAssent(
+          { ...base, actor: 'speaker', role: 'AUTHORITY', outcome: carried(), veto_outstanding: true },
+          BASE,
+        ),
+      /a veto stands against/,
+    );
+  });
+
   it('refuses to enact the same Motion twice', () => {
     const first = grantAssent(
       { ...base, actor: 'speaker', role: 'AUTHORITY', outcome: carried() },

@@ -271,6 +271,12 @@ export interface AssentInput {
   readonly assent_role: Role;
   readonly outcome: DivisionOutcome;
   readonly state: SessionStateFile;
+  /**
+   * Is a veto standing against this Motion? ADR-0004 makes Assent invalid while
+   * one is outstanding — the fourth condition, and the one a caller is most
+   * likely to forget, so it is explicit rather than inferred.
+   */
+  readonly veto_outstanding?: boolean;
 }
 
 /**
@@ -300,6 +306,11 @@ export const grantAssent = (input: AssentInput, hansard: string): {
   }
   if (alreadyEnacted(hansard, input.motion)) {
     throw new DivisionError(`${input.motion} has already received Assent`);
+  }
+  if (input.veto_outstanding === true) {
+    throw new DivisionError(
+      `a veto stands against ${input.motion} — it may not receive Assent while that veto is outstanding`,
+    );
   }
 
   const entry: HansardEntry = {

@@ -25,6 +25,10 @@ import { commitRecord } from './git.ts';
 import { checkCostCeiling, totals } from './ledger.ts';
 import { commitRuling, fileEscalation, type RulingOutcome } from './escalation.ts';
 import {
+  demote, exitActor, hire, promote, seats, spawnChild, veto, vetoOutstanding,
+  type ExitType,
+} from './actors.ts';
+import {
   checkCapture, externalReview, fileCrisis, suspendForCrisis,
   type CrisisRuling,
 } from './crisis.ts';
@@ -70,6 +74,8 @@ Usage
   politik crisis review --reviewer <h> --accused <speaker> --ruling UPHELD|DISMISSED --reasons <text>
   politik escalate --actor <h> --role <ROLE> --title <t> --body <text> [--seq <n>]
   politik rule --seq <n> --actor <h> --outcome UPHELD|REVERSED|NOTED --body <text>
+  politik actor hire|promote|demote|exit|veto|spawn ... (see below)
+  politik actor list
   politik ledger [--dir <dir>]
   politik status [--dir <dir>]
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
@@ -87,6 +93,7 @@ Commands
   crisis      File, check, or externally review a constitutional crisis.
   escalate    Raise a Point of Order. Suspends the sitting.
   rule        Rule on a Point of Order as AUTHORITY. Resumes the sitting.
+  actor       Seat, move or remove actors; exercise a veto; refer to committee.
   ledger      Total the session's measured cost.
   status      Read STATE.json and summarise the proceeding.
   prorogue    Close a proceeding permanently and seal the Hansard.
@@ -483,6 +490,7 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
       motion: values.motion, at: nowStamp(), actor: values.actor,
       role: (values.role ?? 'AUTHORITY') as never,
       assent_role: charter.session.assent, outcome, state,
+      veto_outstanding: vetoOutstanding(hansard, values.motion),
     }, hansard);
     await writeHansard(dir, result.hansard);
     await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
@@ -583,6 +591,94 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
   }
 };
 
+
+
+/** `politik actor <verb>` — the actor lifecycle verbs. */
+const cmdActor = async (argv: readonly string[]): Promise<number> => {
+  const [verb, ...rest] = argv;
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      dir: { type: 'string' }, actor: { type: 'string' }, role: { type: 'string' },
+      subject: { type: 'string' }, seat: { type: 'string' }, to: { type: 'string' },
+      reason: { type: 'string' }, type: { type: 'string' }, motion: { type: 'string' },
+      child: { type: 'string' }, mandate: { type: 'string' },
+    },
+  });
+
+  const dir = values.dir ?? '.';
+  const { state, hansard, charter } = await loadSession(dir);
+  if (state === null || charter === null) {
+    err(`actor: ${dir} is not a session repo`);
+    return EXIT.USAGE;
+  }
+
+  if (verb === 'list') {
+    const held = seats(hansard);
+    if (held.length === 0) out('no actors seated');
+    for (const seat of held) out(`  ${seat.role.padEnd(10)} ${seat.actor}`);
+    return EXIT.OK;
+  }
+
+  const by = {
+    at: nowStamp(),
+    actor: values.actor ?? '',
+    role: (values.role ?? 'AUTHORITY') as never,
+    state,
+  };
+  if (by.actor === '') { err('actor: --actor is required'); return EXIT.USAGE; }
+
+  try {
+    let result: { hansard: string } | null = null;
+    let message = '';
+
+    if (verb === 'hire') {
+      if (values.subject === undefined || values.seat === undefined) {
+        err('actor hire: --subject and --seat are required'); return EXIT.USAGE;
+      }
+      result = hire({ ...by, subject: values.subject, seat: values.seat as never, reason: values.reason ?? 'seated' }, hansard);
+      message = `HIRED ${values.subject} as ${values.seat}`;
+    } else if (verb === 'promote' || verb === 'demote') {
+      if (values.subject === undefined || values.to === undefined) {
+        err(`actor ${verb}: --subject and --to are required`); return EXIT.USAGE;
+      }
+      const move = verb === 'promote' ? promote : demote;
+      result = move({ ...by, subject: values.subject, to: values.to as never, reason: values.reason ?? '' }, hansard);
+      message = `${verb.toUpperCase()}D ${values.subject} to ${values.to}`;
+    } else if (verb === 'exit') {
+      if (values.subject === undefined || values.type === undefined) {
+        err('actor exit: --subject and --type are required'); return EXIT.USAGE;
+      }
+      result = exitActor({
+        ...by, subject: values.subject, exit_type: values.type as ExitType,
+        reason: values.reason ?? '',
+      }, hansard);
+      message = `EXITED ${values.subject} — ${values.type}`;
+    } else if (verb === 'veto') {
+      if (values.motion === undefined) { err('actor veto: --motion is required'); return EXIT.USAGE; }
+      result = veto({
+        ...by, motion: values.motion, reason: values.reason ?? '',
+        domain_veto: charter.domain_veto,
+      }, hansard);
+      message = `VETO EXERCISED against ${values.motion}`;
+    } else if (verb === 'spawn') {
+      if (values.child === undefined) { err('actor spawn: --child is required'); return EXIT.USAGE; }
+      result = spawnChild({ ...by, child: values.child, mandate: values.mandate ?? '' }, hansard);
+      message = `REFERRED to committee ${values.child}`;
+    } else {
+      err(`actor: unknown verb "${verb ?? ''}" — expected hire | promote | demote | exit | veto | spawn | list`);
+      return EXIT.USAGE;
+    }
+
+    await writeHansard(dir, result.hansard);
+    out(message);
+    await recordAndCommit(dir, `${message} — by ${by.actor}`);
+    return EXIT.OK;
+  } catch (error) {
+    err(`actor refused: ${error instanceof Error ? error.message : String(error)}`);
+    return EXIT.REFUSED;
+  }
+};
 
 /** `politik escalate` — raise a Point of Order. */
 const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
@@ -891,6 +987,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdDivision(rest);
     case 'assent':
       return cmdAssent(rest);
+    case 'actor':
+      return cmdActor(rest);
     case 'escalate':
       return cmdEscalate(rest);
     case 'rule':
