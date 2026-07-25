@@ -20,6 +20,7 @@ export * from './election.ts';
 export * from './envelope.ts';
 export * from './git.ts';
 export * from './hansard.ts';
+export * from './heartbeat.ts';
 export * from './lockfs.ts';
 export * from './charter.ts';
 export * from './crisis.ts';
