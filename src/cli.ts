@@ -23,6 +23,10 @@ import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
 import { commitRecord } from './git.ts';
 import {
+  checkCapture, externalReview, fileCrisis, suspendForCrisis,
+  type CrisisRuling,
+} from './crisis.ts';
+import {
   callDivision, castVote, grantAssent, recordOutcome, tallyDivision,
   type Vote,
 } from './division.ts';
@@ -59,6 +63,9 @@ Usage
   politik division vote --motion <id> --actor <h> --role <ROLE> --vote AYE|NO|ABSTAIN
   politik division tally --motion <id>
   politik assent --motion <id> --actor <h> --role AUTHORITY
+  politik crisis file --actor <h> --role <ROLE> --against <speaker> --grounds <text>
+  politik crisis check
+  politik crisis review --reviewer <h> --accused <speaker> --ruling UPHELD|DISMISSED --reasons <text>
   politik status [--dir <dir>]
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
 
@@ -72,6 +79,7 @@ Commands
   run         Seat an agent, give it the business, record what it did.
   division    Call a Division, cast a vote, or tally the result.
   assent      Enact a carried Motion. The Division decides; Assent enacts.
+  crisis      File, check, or externally review a constitutional crisis.
   status      Read STATE.json and summarise the proceeding.
   prorogue    Close a proceeding permanently and seal the Hansard.
 `;
@@ -474,6 +482,94 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
   }
 };
 
+
+/** `politik crisis file|check|review`. */
+const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
+  const [verb, ...rest] = argv;
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      dir: { type: 'string' }, actor: { type: 'string' }, role: { type: 'string' },
+      against: { type: 'string' }, grounds: { type: 'string' },
+      reviewer: { type: 'string' }, accused: { type: 'string' },
+      ruling: { type: 'string' }, reasons: { type: 'string' },
+    },
+  });
+
+  const dir = values.dir ?? '.';
+  const { state, hansard, charter } = await loadSession(dir);
+  if (state === null || charter === null) {
+    err(`crisis: ${dir} is not a session repo`);
+    return EXIT.USAGE;
+  }
+
+  const operators = charter.constituencies
+    .filter((c) => c.role === 'OPERATOR')
+    .reduce((n, c) => n + c.slots, 0);
+
+  try {
+    if (verb === 'file') {
+      if (values.actor === undefined || values.against === undefined || values.grounds === undefined) {
+        err('crisis file: --actor, --against and --grounds are required');
+        return EXIT.USAGE;
+      }
+      const result = fileCrisis({
+        at: nowStamp(), actor: values.actor, role: (values.role ?? 'OPERATOR') as never,
+        grounds: values.grounds, against: values.against, state,
+      }, hansard);
+      await writeHansard(dir, result.hansard);
+      out(`CRISIS FILED by ${values.actor} against ${values.against}`);
+      await recordAndCommit(dir, `CONSTITUTIONAL_CRISIS_FILED — ${values.actor}`);
+
+      const check = checkCapture(result.hansard, operators);
+      out(`  ${check.reason}`);
+      if (check.triggered) {
+        const suspended = suspendForCrisis(check, nowStamp(), state, result.hansard);
+        await writeHansard(dir, suspended.hansard);
+        await writeFile(join(dir, 'STATE.json'), serializeState(suspended.state), 'utf8');
+        out('');
+        out('  CONSTITUTIONAL CRISIS — the session is SUSPENDED');
+        out('  Resumption requires review by a human outside this session.');
+        await recordAndCommit(dir, 'CONSTITUTIONAL_CRISIS — session suspended');
+      }
+      return EXIT.OK;
+    }
+
+    if (verb === 'check') {
+      const check = checkCapture(hansard, operators);
+      out(check.triggered ? 'CAPTURE DECLARED' : 'no capture declared');
+      out(`  filings   ${check.filed} of ${check.operators} OPERATOR actors`);
+      out(`  threshold ${check.required}`);
+      out(`  ${check.reason}`);
+      return check.triggered ? EXIT.REFUSED : EXIT.OK;
+    }
+
+    if (verb === 'review') {
+      if (values.reviewer === undefined || values.accused === undefined || values.reasons === undefined) {
+        err('crisis review: --reviewer, --accused and --reasons are required');
+        return EXIT.USAGE;
+      }
+      const result = externalReview({
+        at: nowStamp(), reviewer: values.reviewer, accused: values.accused,
+        ruling: ((values.ruling ?? 'UPHELD').toUpperCase()) as CrisisRuling,
+        reasons: values.reasons, state,
+      }, hansard);
+      await writeHansard(dir, result.hansard);
+      await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
+      out(`EXTERNAL RULING — ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
+      out(`  session is now ${result.state.state}`);
+      await recordAndCommit(dir, `CONSTITUTIONAL_CRISIS_RULING — ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
+      return EXIT.OK;
+    }
+
+    err(`crisis: unknown verb "${verb ?? ''}" — expected file | check | review`);
+    return EXIT.USAGE;
+  } catch (error) {
+    err(`crisis refused: ${error instanceof Error ? error.message : String(error)}`);
+    return EXIT.REFUSED;
+  }
+};
+
 /** Run one turn of a session. */
 const cmdRun = async (argv: readonly string[]): Promise<number> => {
   const { values } = parseArgs({
@@ -647,6 +743,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdValidate(rest);
     case 'init':
       return cmdInit(rest);
+    case 'crisis':
+      return cmdCrisis(rest);
     case 'division':
       return cmdDivision(rest);
     case 'assent':
