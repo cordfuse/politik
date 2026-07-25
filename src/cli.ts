@@ -22,6 +22,7 @@ import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
 import { commitRecord } from './git.ts';
+import { checkCostCeiling, totals } from './ledger.ts';
 import {
   checkCapture, externalReview, fileCrisis, suspendForCrisis,
   type CrisisRuling,
@@ -66,6 +67,7 @@ Usage
   politik crisis file --actor <h> --role <ROLE> --against <speaker> --grounds <text>
   politik crisis check
   politik crisis review --reviewer <h> --accused <speaker> --ruling UPHELD|DISMISSED --reasons <text>
+  politik ledger [--dir <dir>]
   politik status [--dir <dir>]
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
 
@@ -80,6 +82,7 @@ Commands
   division    Call a Division, cast a vote, or tally the result.
   assent      Enact a carried Motion. The Division decides; Assent enacts.
   crisis      File, check, or externally review a constitutional crisis.
+  ledger      Total the session's measured cost.
   status      Read STATE.json and summarise the proceeding.
   prorogue    Close a proceeding permanently and seal the Hansard.
 `;
@@ -365,7 +368,12 @@ const writeHansard = (dir: string, hansard: string) =>
  * durable.
  */
 const recordAndCommit = async (dir: string, message: string): Promise<void> => {
-  const result = await commitRecord(dir, message);
+  const result = await commitRecord(dir, message, [
+    'HANSARD.md',
+    'STATE.json',
+    'LEDGER.md',
+    '.politik/LEDGER.md',
+  ]);
   if (result.committed) out(`  recorded ${result.sha?.slice(0, 8) ?? ''}`);
   else if (result.reason === 'not a git repository') {
     out('  [WARN] not a git repository — the record is not durable');
@@ -570,6 +578,41 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
   }
 };
 
+/** `politik ledger` — total the cost record. */
+const cmdLedger = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' } } });
+  const dir = values.dir ?? '.';
+  const { charter } = await loadSession(dir);
+  const path = charter?.ledger.path ?? 'LEDGER.md';
+  const document = await readIfPresent(join(dir, path));
+  if (document === null) {
+    err(`ledger: no ${path} in ${dir}`);
+    return EXIT.USAGE;
+  }
+
+  const t = totals(document);
+  out(`rows       ${t.rows}`);
+  out(`elapsed    ${(t.elapsed_ms / 1000).toFixed(1)}s`);
+  out(`tokens     ${t.tokens.toLocaleString('en-US')}`);
+  out(`cost       $${t.cost_usd.toFixed(6)}`);
+  if (t.unmeasured > 0) {
+    // Never fold unmeasured rows into the total — that would understate spend
+    // while looking authoritative.
+    out(`unmeasured ${t.unmeasured} row(s) — cost not reported by the agent`);
+  }
+
+  const ceiling = checkCostCeiling(
+    document,
+    charter?.session.endurance.max_cost_usd ?? null,
+    null,
+  );
+  if (ceiling.exceeded) {
+    err('COST CEILING EXCEEDED — the session should suspend');
+    return EXIT.REFUSED;
+  }
+  return EXIT.OK;
+};
+
 /** Run one turn of a session. */
 const cmdRun = async (argv: readonly string[]): Promise<number> => {
   const { values } = parseArgs({
@@ -749,6 +792,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdDivision(rest);
     case 'assent':
       return cmdAssent(rest);
+    case 'ledger':
+      return cmdLedger(rest);
     case 'run':
       return cmdRun(rest);
     case 'status':

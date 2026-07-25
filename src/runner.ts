@@ -28,6 +28,9 @@ import { standForElection, bowOut, type ElectionOptions } from './election.ts';
 import { nodeLockFs } from './lockfs.ts';
 import { appendEntry, type HansardEntry } from './hansard.ts';
 import { spawnAgent, type SpawnResult } from './spawn.ts';
+import {
+  appendLedgerRow, parseResultText, parseUsage, type Usage,
+} from './ledger.ts';
 import { createState, parseState, serializeState, type SessionStateFile } from './state.ts';
 
 /* -------------------------------------------------------------------------- */
@@ -50,6 +53,11 @@ export interface RunOptions {
   /** Verbs the Charter grants this role. */
   readonly verbs?: readonly Verb[];
   readonly timeout_ms?: number;
+  /**
+   * Ask the agent for structured output so the LEDGER can record real tokens
+   * and cost. On by default: an unmeasured turn is a hole in the cost record.
+   */
+  readonly measure?: boolean;
   /** Directory for constituency lockfiles. Defaults to the session's .politik. */
   readonly lock_dir?: string;
   /** Injectable for tests. */
@@ -244,11 +252,19 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     const beforeHead = await head(options.dir, spawnFn);
     const beforeDirty = await dirtyFiles(options.dir, spawnFn);
 
+    const measure = options.measure !== false && agent.json_args !== undefined;
+
     const result = await spawnAgent(agent, prompt, {
       cwd: options.dir,
       timeout_ms: options.timeout_ms,
       spawnFn,
+      extraArgs: measure ? agent.json_args : undefined,
     });
+
+    // Structured output carries the answer inside a JSON envelope; unwrap it so
+    // the Hansard records what the agent said, not how it was transported.
+    const usage: Usage | null = measure ? parseUsage(agent.id, result.stdout) : null;
+    const answer = (measure ? parseResultText(agent.id, result.stdout) : null) ?? result.stdout;
 
     const touched = await filesTouched(options.dir, beforeHead, beforeDirty, spawnFn);
 
@@ -268,11 +284,30 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
         'Files touched': touched.length > 0 ? touched.join(', ') : 'none',
       },
       body: result.ok
-        ? result.stdout.trim().slice(0, 2000)
+        ? answer.trim().slice(0, 2000)
         : `Agent failed.\n\n${result.stderr.trim().slice(0, 1000)}`,
     };
 
     await writeFile(join(options.dir, 'HANSARD.md'), appendEntry(hansard, entry), 'utf8');
+
+    // The Clerk appends after every act. A turn that produced no ledger row
+    // would be work the session cannot account for.
+    if (charter.ledger.enabled) {
+      const ledgerPath = join(options.dir, charter.ledger.path);
+      const ledger = (await readIf(ledgerPath)) ?? '';
+      await writeFile(
+        ledgerPath,
+        appendLedgerRow(ledger, {
+          at: options.now,
+          actor: options.actor,
+          role: options.role,
+          item: touched.length > 0 ? touched.join(' ') : entry.type,
+          elapsed_ms: result.elapsed_ms,
+          usage,
+        }),
+        'utf8',
+      );
+    }
 
     // The slot is consumed by the Hansard commit, not by winning the lock.
     const consumed = claimSlot(envelope);
