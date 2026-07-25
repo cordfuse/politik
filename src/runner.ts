@@ -32,6 +32,7 @@ import {
   appendLedgerRow, parseResultText, parseUsage, type Usage,
 } from './ledger.ts';
 import { createState, parseState, serializeState, type SessionStateFile } from './state.ts';
+import { checkCapability, parseProfile } from './capability.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Inputs                                                                      */
@@ -204,6 +205,26 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     ...options.task.split('\n').map((l) => `  ${l}`),
     '',
   ].join('\n');
+
+  // Capability gate. The architecture is explicit that the engine "validates
+  // model compliance at Writ Drop and refuses to spawn a mismatched model
+  // regardless of operator assignment" — so a mismatch is refused here, before
+  // an agent is spawned, not noticed afterwards.
+  const seat = charter.constituencies.find((c) => c.role === options.role);
+  const profileSource = await readIf(join(options.dir, 'actors', `${options.actor}.md`));
+  if (seat !== undefined && profileSource !== null) {
+    const profile = parseProfile(profileSource, options.actor);
+    if (profile !== null) {
+      const capability = checkCapability(profile, seat);
+      if (!capability.ok) {
+        const failures = capability.issues
+          .filter((i) => i.severity === 'fail')
+          .map((i) => i.message)
+          .join('; ');
+        return { ok: false, reason: `capability mismatch — ${failures}` };
+      }
+    }
+  }
 
   const envelopeResult = parseEnvelope(envelopeSource);
   if (!envelopeResult.ok) {
