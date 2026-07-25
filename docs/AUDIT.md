@@ -7,8 +7,39 @@
 A systematic scan of every markdown document against the implementation. Every
 finding below was verified directly against source, not inferred.
 
-**This is the resume point.** Work stopped here; nothing in this document has
-been fixed.
+## STATUS — 2026-07-25
+
+**Closed:** both integration gaps, all eight real bugs (one rejected with
+reasons), and the documentation drift.
+
+**Still open:** the *Missing — specified, no implementation* section below. Those
+are unbuilt features, not defects — the docs specify them and the code does not
+have them. They remain the backlog.
+
+| Finding | Outcome |
+|---|---|
+| SCM provider dead code | Fixed — Assent merges a real PR (`c6b48c91`) |
+| Transport unwired | Fixed — `broadcast` publishes, `run --claim` receives |
+| #1 ASSENT never enacts | Fixed with the provider wiring |
+| #2 `RecordMode` split | Fixed — `charter.ts` re-exports the protocol type |
+| #3 AUTHORITY-is-human unenforced | Fixed — constituencies carry `agent`; a machine Speaker fails Writ Drop |
+| #4 `quorum.present` wrong | Fixed — carried forward untouched by a turn |
+| #5 rule 3 counts slots | **Rejected** — Writ Drop precedes seating; see below |
+| #6 unreachable suspension causes | Fixed — all five constructible |
+| #7 ADR-0004 self-contradiction | Fixed — stale "Proposed" consequence removed |
+| #8 ADR-0002 rule 7 unenforceable | Open — noted below; coercion at parse still masks it |
+| Documentation drift | Corrected — CLAUDE.md, README, EXECUTION, manifests, dangling refs |
+| **Missing features** | **Open — see that section; this is the backlog** |
+
+**On #5.** The audit read ADR-0002 rule 3 ("check *assigned* constituencies") as
+meaning seated actors. It cannot: Writ Drop runs before the session opens, so no
+actor has been seated, and that reading would make the rule uncheckable at the
+only moment it runs. The code was right. A subagent finding that did not survive
+verification — which is why they get verified.
+
+---
+
+*Original findings follow, as recorded before any fix.*
 
 ---
 

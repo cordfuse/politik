@@ -344,7 +344,7 @@ reads as evidence.
 
 ```
 [x] Linux bare metal — OAuth        steve-cachyos, Node 26, 6 agents, ollama present
-[x] Linux Docker — API key          node:22-alpine + git, full lifecycle + 324 tests
+[x] Linux Docker — API key          node:22-alpine + git, full lifecycle + the whole test suite
 [x] Ollama local — zero auth        detected and reported by doctor
 ```
 
@@ -481,29 +481,37 @@ from the session's own governance would be the one participant above it.
 
 ---
 
-## RESUME HERE — 2026-07-25
+## AUDIT CLOSED — 2026-07-25
 
-Work stopped after a full audit of every markdown document against the
-implementation. **Findings are in [`docs/AUDIT.md`](docs/AUDIT.md); nothing in it
-has been fixed.**
+A full source-vs-documentation audit was run and recorded in
+[`docs/AUDIT.md`](docs/AUDIT.md). **Every code finding is now closed.**
 
-The two findings that matter most, both verified against source:
+The two that mattered — both real, both fixed:
 
-1. **The SCM provider is dead code at runtime.** Eleven methods, 21 passing
-   tests, live-verified against a real repo — and no module in `src/` ever
-   instantiates it or calls it. Politik runs on local markdown plus git commits,
-   so the README's "Pull Request = Motion, PR Review = Division" mapping
-   describes a provider the runtime never touches.
-2. **The transport is equally unwired.** `runTurn` synthesizes the envelope from
-   CLI arguments; no process has ever received a broadcast.
+1. **The SCM provider was dead code at runtime.** Eleven methods, 21 tests, a
+   live verification — and nothing in `src/` ever called it, so `ASSENT`
+   recorded a decision that changed nothing. Now wired: a Motion carried by
+   Division and enacted by Assent **merged a real pull request** (`#1` on
+   `politik-live-002`, merge commit `c6b48c91`).
+2. **The transport was equally unwired.** `runTurn` synthesized its envelope, so
+   no broadcast had ever been *received*. Now wired: `politik broadcast`
+   publishes, `politik run --claim` polls and takes business it is eligible for.
 
-Next action: wire the provider into the governance path — `assent` should merge,
-`division call` should request review, `escalate` should open an issue. That one
-change fixes the `ASSENT`-never-enacts bug, makes the core README claim true, and
-turns 21 passing tests into a working integration.
+Also fixed: the `RecordMode` split (`charter.ts` declared a vocabulary 8 of 10
+shipped protocols could not express), the **unenforceable** AUTHORITY-is-human
+rule (the schema had nowhere to declare a machine, so the framework's one hard
+constitutional rule was a comment asserting a check that did not exist), a
+meaningless `quorum.present`, and three unreachable suspension causes —
+`DEADLOCK`, `SPEAKER_ORDER` and `DISPUTED_EXIT` are now all constructible.
 
-**Do not start Phase 8 until that is done.** Announcing now would announce a
-GitHub-native framework that has never used GitHub at runtime.
+One audit finding was **rejected**: rule 3 counting declared slots rather than
+seated actors is correct, because Writ Drop runs before any actor is seated.
+
+**Provider is optional, not mandatory.** The spec pulls both ways — "Run local,
+run free" against "the motion system (Pull Requests)". Resolved as: git is the
+mandatory substrate, the platform is an optional projection over it.
+
+Phase 8 remains unstarted.
 
 ---
 

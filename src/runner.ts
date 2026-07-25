@@ -313,7 +313,7 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     const touched = await filesTouched(options.dir, beforeHead, beforeDirty, spawnFn);
 
     // Files the RECORD agent owns exclusively (POLITIK-ARCHITECTURE.md
-    // § FILE OWNERSHIP). An actor writing to them is a Standing Orders
+    // § File Sovereignty Rules). An actor writing to them is a Standing Orders
     // violation, and it must be recorded rather than silently tolerated —
     // a record an actor can write is not a record.
     const OWNED_BY_RECORD = ['HANSARD.md', 'STATE.json', 'LEDGER.md'];

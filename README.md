@@ -53,9 +53,14 @@ The engine speaks in canonical terms. Protocols translate them to domain vocabul
 
 ### The Session Repo
 
-The git repository IS the Politik session:
+The git repository IS the Politik session. That much is always true — Charter,
+Hansard, state and audit trail all live there.
 
-| GitHub feature | Politik primitive |
+An **SCM provider is optional**. Configure one and governance acts are
+additionally projected onto the platform; without one a session runs complete
+and correct on git alone. *Run local, run free.*
+
+| GitHub feature (when hosted) | Politik primitive |
 |---|---|
 | Repository | Session |
 | CHARTER.md | Standing Orders |
@@ -80,13 +85,15 @@ The Speaker (human) is constitutionally present, not operationally present. Drop
 
 ### Governance Protocols
 
-35+ protocols across 12 domains — Politics, Software, Sports, Military, Legal, Healthcare, Creative, Business, Education, Community, Scientific Research, Novel. Every protocol is a vocabulary translation on top of CANON. Parliamentary Democracy is the reference implementation.
+**Ten reference protocols ship** — Parliamentary, Agile, Military, Legal, Corporate, Battle Royale, League Season, Elimination Tournament, Peer Review, Red/Blue Team — spanning constitutional, authoritarian and darwinist modes. A further 25+ are specified across 12 domains in [PROTOCOLS.md](PROTOCOLS.md) and are community contributions. Every protocol is a vocabulary translation on top of CANON; Parliamentary is protocol #1, not a privileged mode.
 
 ### Hansard and LEDGER
 
 **Hansard** — append-only session record. Every motion, vote, escalation, and commit. Attributed, timestamped, immutable. Cannot be edited. Cannot be gamed.
 
-**LEDGER** — exact per-motion cost accounting. Elapsed time, token count, dollar cost. No estimation. No story points. Actual measured data.
+**LEDGER** — cost accounting per agent turn: elapsed time, token count, dollar cost, model. No story points.
+
+Measured, never estimated — and the distinction is enforced. An agent that reports usage produces exact figures; one that does not is recorded as `unmeasured`, never as `$0.00`, and totals report unmeasured rows separately rather than folding them in. Today only Claude Code reports usage; the other adapters record elapsed time and mark cost unmeasured.
 
 ---
 
@@ -121,8 +128,8 @@ That is not a feature comparison. It is a category difference.
 | Developer types ticket title | Motion title in Hansard |
 | Developer estimates story points | LEDGER — exact elapsed, tokens, dollars |
 | Someone manually assigns reviewer | Division record — attributed votes |
-| Developer links commits manually | Every Hansard entry references commit hash |
-| Developer manually closes ticket | Prorogation — automatic on session end |
+| Developer links commits manually | Every governance act is its own commit — the git history is the audit trail |
+| Developer manually closes ticket | Prorogation — one command, with the terminating trigger recorded |
 | Cost tracking is finance's estimate | LEDGER — actual cost per decision |
 
 Politik produces a superior project record as a **zero-overhead side effect** of running governed sessions. Nobody updates it. Nobody logs time. It is all there because it cannot be otherwise.

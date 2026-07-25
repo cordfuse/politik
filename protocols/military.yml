@@ -28,7 +28,7 @@ protocol:
     QUORUM: Minimum Force
     DEADLOCK: Comms Blackout
     ASSENT: Order Confirmed
-    EXIT: Relieved of Duty
+    EXIT: KIA / Relieved of Duty
 
   domain_veto: []
   no_escalation: false

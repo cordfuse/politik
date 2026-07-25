@@ -2,7 +2,7 @@
  * Hansard commit writer.
  *
  * HANSARD.md is the append-only attributed record of a proceeding
- * (POLITIK-ARCHITECTURE.md § FILE OWNERSHIP: "Append only, never edited").
+ * (POLITIK-ARCHITECTURE.md § File Sovereignty Rules: "Append only, never edited").
  * The RECORD agent writes it; no actor edits an entry once committed.
  *
  * ## On the format
