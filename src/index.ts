@@ -4,6 +4,7 @@
  * Attribution: Steve Krisjanovs, Cordfuse
  */
 
+export * from './actors.ts';
 export * from './agents.ts';
 export * from './canon.ts';
 export * from './division.ts';
