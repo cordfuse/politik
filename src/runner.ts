@@ -33,6 +33,7 @@ import {
 } from './ledger.ts';
 import { createState, parseState, serializeState, type SessionStateFile } from './state.ts';
 import { checkCapability, parseProfile } from './capability.ts';
+import { breachEntry, checkContainment } from './containment.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Inputs                                                                      */
@@ -319,6 +320,12 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     const OWNED_BY_RECORD = ['HANSARD.md', 'STATE.json', 'LEDGER.md'];
     const violations = touched.filter((f) => OWNED_BY_RECORD.includes(f));
 
+    // Hard Containment Rule. Checked after the turn because it is detection,
+    // not prevention — a spawned process runs with the OS's permissions and
+    // nothing here can stop it. The Hansard records what happened, which is the
+    // framework's answer to most of what it cannot prevent.
+    const containment = checkContainment(options.dir, touched, `${result.stdout}\n${answer}`);
+
     const entry: HansardEntry = {
       type: result.ok ? 'MOTION_TABLED' : 'SESSION_FAULT',
       at: options.now,
@@ -344,7 +351,20 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
         : `Agent failed.\n\n${result.stderr.trim().slice(0, 1000)}`,
     };
 
-    await writeFile(join(options.dir, 'HANSARD.md'), appendEntry(hansard, entry), 'utf8');
+    let record = appendEntry(hansard, entry);
+
+    // A breach suspends the sitting: logged immediately, escalated to the
+    // Speaker, paused pending a ruling (POLITIK-ARCHITECTURE.md § Hard
+    // Containment Rule). The Point of Order flow already does exactly that, so
+    // the breach reuses it rather than inventing a parallel path.
+    if (!containment.contained) {
+      record = appendEntry(
+        record,
+        breachEntry(containment, options.now, options.actor, options.role),
+      );
+    }
+
+    await writeFile(join(options.dir, 'HANSARD.md'), record, 'utf8');
 
     // The Clerk appends after every act. A turn that produced no ledger row
     // would be work the session cannot account for.
@@ -375,12 +395,30 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     const nextState = createState({
       session_guid: state.session_guid,
       protocol: state.protocol,
-      state: 'CONVENED',
+      state: containment.contained ? 'CONVENED' : 'SUSPENDED',
+      ...(containment.contained
+        ? {}
+        : {
+            suspension: {
+              cause: 'POINT_OF_ORDER' as const,
+              since: options.now,
+              record_ref: 'HANSARD.md',
+              escalation_ref: null,
+            },
+          }),
       quorum: state.quorum,
       hansard_head: state.hansard_head,
       updated_at: options.now,
     });
     await writeFile(join(options.dir, 'STATE.json'), serializeState(nextState), 'utf8');
+
+    if (!containment.contained) {
+      return {
+        ok: false,
+        reason: `containment breach — ${containment.breaches.map((b) => b.evidence).join(', ')}; the sitting is suspended pending a Speaker ruling`,
+        entry,
+      };
+    }
 
     return result.ok
       ? { ok: true, result, entry, files_touched: touched }
