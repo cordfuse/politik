@@ -43,12 +43,24 @@ export type RecordMode = ProtocolRecordMode;
 export interface Endurance {
   readonly max_motions: number | null;
   readonly max_cost_usd: number | null;
+  /**
+   * Spend at which the Speaker is warned, before the ceiling stops the session.
+   * The low-fuel light: a proceeding that dies at its ceiling with no warning
+   * gives nobody the chance to extend the budget or wind down gracefully.
+   */
+  readonly cost_warning_usd: number | null;
+  /** What a breached ceiling does. */
+  readonly deadline_action: 'escalate' | 'suspend' | 'dissolve';
 }
 
 export interface SessionBlock {
   readonly quorum: number;
   readonly escalation: EscalationSetting;
   readonly heartbeat_timeout_hours: number;
+  /** What a stale heartbeat does. RUNTIME.md § Session Heartbeat. */
+  readonly stale_action: 'suspend' | 'dissolve';
+  /** Hours between STATE_SNAPSHOT commits, or null for none. */
+  readonly checkpoint_interval_hours: number | null;
   readonly deadline: string | null;
   readonly merge_strategy: MergeStrategy;
   readonly assent: Role;
@@ -90,6 +102,24 @@ export interface Constituency {
   readonly mandate_alignment: string | null;
 }
 
+/**
+ * Constitutional-capture mitigations (RUNTIME.md § Constitutional Capture).
+ *
+ * These were implemented in `src/crisis.ts` but never parsed, so the YAML the
+ * documentation shows was inert — a Speaker could declare a Witness Council and
+ * get nothing. Parsed here so the declaration has effect.
+ */
+export interface Governance {
+  readonly witness_council: {
+    readonly enabled: boolean;
+    readonly roles: readonly Role[];
+  };
+  readonly consensus_suspension: {
+    readonly enabled: boolean;
+    readonly threshold: number;
+  };
+}
+
 export interface Charter {
   readonly charter_version: string;
   readonly protocol: string;
@@ -98,6 +128,7 @@ export interface Charter {
   readonly ledger: LedgerBlock;
   readonly minimum_cast: Readonly<Partial<Record<Role, number>>>;
   readonly domain_veto: readonly Role[];
+  readonly governance: Governance;
   readonly constituencies: readonly Constituency[];
   /** Unparsed Standing Orders prose. Carried, never interpreted. */
   readonly body: string;
@@ -270,9 +301,23 @@ export const parseCharter = (source: string): ParseResult => {
         ? session['merge_strategy']
         : 'merge_commit',
       assent: isRole(session['assent']) ? session['assent'] : 'AUTHORITY',
+      stale_action: session['stale_action'] === 'dissolve' ? 'dissolve' : 'suspend',
+      checkpoint_interval_hours: asNumberOrNull(session['checkpoint_interval_hours']),
       endurance: {
         max_motions: asNumberOrNull(endurance['max_motions']),
         max_cost_usd: asNumberOrNull(endurance['max_cost_usd']),
+        // RUNTIME.md shows these under `session:` as well as under
+        // `session.endurance:`. Read both, because a Charter written from the
+        // documentation should work rather than be silently ignored.
+        cost_warning_usd:
+          asNumberOrNull(endurance['cost_warning_usd']) ??
+          asNumberOrNull(session['cost_warning_usd']),
+        deadline_action:
+          session['deadline_action'] === 'dissolve'
+            ? 'dissolve'
+            : session['deadline_action'] === 'suspend'
+              ? 'suspend'
+              : 'escalate',
       },
     },
     ledger: {
@@ -287,6 +332,29 @@ export const parseCharter = (source: string): ParseResult => {
     },
     minimum_cast,
     domain_veto: asStringArray(raw['domain_veto']).filter(isRole),
+    governance: (() => {
+      const g = isObject(raw['governance']) ? raw['governance'] : {};
+      const witness = isObject(g['witness_council']) ? g['witness_council'] : {};
+      const consensus = isObject(g['consensus_suspension']) ? g['consensus_suspension'] : {};
+      const roles = asStringArray(witness['roles']).filter(isRole);
+      return {
+        witness_council: {
+          enabled: witness['enabled'] === true && roles.length > 0,
+          roles,
+        },
+        consensus_suspension: {
+          // Defaults to enabled: a constitutional protocol that silently had no
+          // capture mechanism would be worse than one that declares it off.
+          enabled: consensus['enabled'] !== false,
+          threshold:
+            typeof consensus['threshold'] === 'number' &&
+            consensus['threshold'] > 0 &&
+            consensus['threshold'] <= 1
+              ? consensus['threshold']
+              : 0.75,
+        },
+      };
+    })(),
     constituencies,
     body: split.body,
   };
