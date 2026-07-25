@@ -21,6 +21,7 @@ export * from './git.ts';
 export * from './hansard.ts';
 export * from './lockfs.ts';
 export * from './charter.ts';
+export * from './crisis.ts';
 export * from './init.ts';
 export * from './scm.ts';
 export * from './spawn.ts';
