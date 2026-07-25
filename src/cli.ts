@@ -23,6 +23,7 @@ import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
 import { commitRecord } from './git.ts';
 import { checkCostCeiling, totals } from './ledger.ts';
+import { commitRuling, fileEscalation, type RulingOutcome } from './escalation.ts';
 import {
   checkCapture, externalReview, fileCrisis, suspendForCrisis,
   type CrisisRuling,
@@ -67,6 +68,8 @@ Usage
   politik crisis file --actor <h> --role <ROLE> --against <speaker> --grounds <text>
   politik crisis check
   politik crisis review --reviewer <h> --accused <speaker> --ruling UPHELD|DISMISSED --reasons <text>
+  politik escalate --actor <h> --role <ROLE> --title <t> --body <text> [--seq <n>]
+  politik rule --seq <n> --actor <h> --outcome UPHELD|REVERSED|NOTED --body <text>
   politik ledger [--dir <dir>]
   politik status [--dir <dir>]
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
@@ -82,6 +85,8 @@ Commands
   division    Call a Division, cast a vote, or tally the result.
   assent      Enact a carried Motion. The Division decides; Assent enacts.
   crisis      File, check, or externally review a constitutional crisis.
+  escalate    Raise a Point of Order. Suspends the sitting.
+  rule        Rule on a Point of Order as AUTHORITY. Resumes the sitting.
   ledger      Total the session's measured cost.
   status      Read STATE.json and summarise the proceeding.
   prorogue    Close a proceeding permanently and seal the Hansard.
@@ -578,6 +583,100 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
   }
 };
 
+
+/** `politik escalate` — raise a Point of Order. */
+const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: {
+      dir: { type: 'string' }, actor: { type: 'string' }, role: { type: 'string' },
+      title: { type: 'string' }, body: { type: 'string' }, seq: { type: 'string' },
+    },
+  });
+
+  const dir = values.dir ?? '.';
+  const { state } = await loadSession(dir);
+  if (state === null) { err(`escalate: ${dir} is not a session repo`); return EXIT.USAGE; }
+  if (values.actor === undefined || values.title === undefined || values.body === undefined) {
+    err('escalate: --actor, --title and --body are required');
+    return EXIT.USAGE;
+  }
+
+  const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
+  const filed = fileEscalation({
+    sequence: values.seq === undefined ? 1 : Number(values.seq),
+    at: nowStamp(),
+    actor: values.actor,
+    role: (values.role ?? 'OPERATOR') as never,
+    title: values.title,
+    body: values.body,
+    state,
+  }, hansard);
+
+  await writeFiles(dir, filed.files);
+  await writeHansard(dir, filed.hansard);
+  await writeFile(join(dir, 'STATE.json'), serializeState(filed.state), 'utf8');
+
+  out('POINT OF ORDER RAISED');
+  out(`  escalation  ${filed.escalation_path}`);
+  out(`  ruling due  ${filed.ruling_path}`);
+  out('  session is SUSPENDED pending a Speaker ruling');
+  await recordAndCommit(dir, `POINT_OF_ORDER — ${values.actor}: ${values.title}`);
+
+  // The notification body is built here; delivery is the provider's job.
+  out('');
+  out('  --- Speaker notification ---');
+  for (const line of filed.notification.split('\n')) out(`  ${line}`);
+  return EXIT.OK;
+};
+
+/** `politik rule` — the Speaker rules, and the sitting resumes. */
+const cmdRule = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: {
+      dir: { type: 'string' }, seq: { type: 'string' }, actor: { type: 'string' },
+      role: { type: 'string' }, outcome: { type: 'string' }, body: { type: 'string' },
+    },
+  });
+
+  const dir = values.dir ?? '.';
+  const { state } = await loadSession(dir);
+  if (state === null) { err(`rule: ${dir} is not a session repo`); return EXIT.USAGE; }
+  if (values.actor === undefined || values.body === undefined) {
+    err('rule: --actor and --body are required');
+    return EXIT.USAGE;
+  }
+
+  const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
+
+  try {
+    const ruling = commitRuling({
+      sequence: values.seq === undefined ? 1 : Number(values.seq),
+      at: nowStamp(),
+      actor: values.actor,
+      role: (values.role ?? 'AUTHORITY') as never,
+      outcome: ((values.outcome ?? 'UPHELD').toUpperCase()) as RulingOutcome,
+      body: values.body,
+      escalation_path: state.suspension?.escalation_ref ?? 'escalations/',
+      state,
+    }, hansard);
+
+    await writeFiles(dir, ruling.files);
+    await writeHansard(dir, ruling.hansard);
+    await writeFile(join(dir, 'STATE.json'), serializeState(ruling.state), 'utf8');
+
+    out(`RULING COMMITTED — ${(values.outcome ?? 'UPHELD').toUpperCase()}`);
+    out(`  ${ruling.ruling_path}`);
+    out(`  session is ${ruling.state.state} — the sitting resumes`);
+    await recordAndCommit(dir, `RULING — ${(values.outcome ?? 'UPHELD').toUpperCase()}`);
+    return EXIT.OK;
+  } catch (error) {
+    err(`ruling refused: ${error instanceof Error ? error.message : String(error)}`);
+    return EXIT.REFUSED;
+  }
+};
+
 /** `politik ledger` — total the cost record. */
 const cmdLedger = async (argv: readonly string[]): Promise<number> => {
   const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' } } });
@@ -792,6 +891,10 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdDivision(rest);
     case 'assent':
       return cmdAssent(rest);
+    case 'escalate':
+      return cmdEscalate(rest);
+    case 'rule':
+      return cmdRule(rest);
     case 'ledger':
       return cmdLedger(rest);
     case 'run':

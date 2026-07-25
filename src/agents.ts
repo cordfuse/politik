@@ -268,7 +268,10 @@ export const composePrompt = (context: PromptContext): string => {
     '- Commit your result. Uncommitted work does not exist.',
     '- Do not traverse above the working directory. Doing so is a Standing',
     '  Orders violation, logged to the Hansard and escalated to the Speaker.',
-    '- Do not edit the Hansard. It is append-only.',
+    '- **Do not write to HANSARD.md, STATE.json or LEDGER.md at all** — not even',
+    '  to append. The RECORD agent owns them exclusively, and writing to them is',
+    '  a Standing Orders violation. Your work is recorded for you; state your',
+    '  result in your reply and it will be entered in the record.',
     '- When your task is complete, stop. You are disposed after this turn.',
     '',
   );

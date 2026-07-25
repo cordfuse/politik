@@ -268,6 +268,13 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
 
     const touched = await filesTouched(options.dir, beforeHead, beforeDirty, spawnFn);
 
+    // Files the RECORD agent owns exclusively (POLITIK-ARCHITECTURE.md
+    // § FILE OWNERSHIP). An actor writing to them is a Standing Orders
+    // violation, and it must be recorded rather than silently tolerated —
+    // a record an actor can write is not a record.
+    const OWNED_BY_RECORD = ['HANSARD.md', 'STATE.json', 'LEDGER.md'];
+    const violations = touched.filter((f) => OWNED_BY_RECORD.includes(f));
+
     const entry: HansardEntry = {
       type: result.ok ? 'MOTION_TABLED' : 'SESSION_FAULT',
       at: options.now,
@@ -282,6 +289,11 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
             : `exit ${String(result.exit_code)}`,
         'Elapsed ms': String(result.elapsed_ms),
         'Files touched': touched.length > 0 ? touched.join(', ') : 'none',
+        ...(violations.length > 0
+          ? {
+              'Standing Orders violation': `actor wrote to ${violations.join(', ')} — owned by RECORD`,
+            }
+          : {}),
       },
       body: result.ok
         ? answer.trim().slice(0, 2000)
