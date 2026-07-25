@@ -34,6 +34,10 @@ import {
 import { createState, parseState, serializeState, type SessionStateFile } from './state.ts';
 import { checkCapability, parseProfile } from './capability.ts';
 import { breachEntry, checkContainment } from './containment.ts';
+import {
+  DEFAULT_FAULT_HANDLING, autoResolvedRecord, classify, faultRecord, shouldRetry,
+  type Classification,
+} from './fault.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Inputs                                                                      */
@@ -64,6 +68,15 @@ export interface RunOptions {
   readonly lock_dir?: string;
   /** Injectable for tests. */
   readonly spawnFn?: typeof spawn;
+  /**
+   * Wait between retries. Injectable so tests do not sleep for minutes.
+   *
+   * A synchronous CLI blocking for the documented five minutes is a real cost;
+   * an operator who wants control passes `--retry-delay 0` or sets it in the
+   * Charter. The alternative — scheduling the retry — needs a daemon this
+   * architecture deliberately does not have.
+   */
+  readonly sleepFn?: (ms: number) => Promise<void>;
   /**
    * A broadcast received from the bus.
    *
@@ -298,13 +311,59 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     const beforeDirty = await dirtyFiles(options.dir, spawnFn);
 
     const measure = options.measure !== false && agent.json_args !== undefined;
+    const sleepFn = options.sleepFn ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+    const policy = {
+      auto_retry_max: charter.fault_handling.auto_retry_max,
+      auto_retry_delay_minutes: charter.fault_handling.auto_retry_delay_minutes,
+      auto_recoverable: DEFAULT_FAULT_HANDLING.auto_recoverable,
+    };
 
-    const result = await spawnAgent(agent, prompt, {
+    // PATH_A: a transient fault retries without waking anyone. Every attempt is
+    // recorded, so a session that succeeded on the third try does not read as
+    // one that succeeded cleanly.
+    let result = await spawnAgent(agent, prompt, {
       cwd: options.dir,
       timeout_ms: options.timeout_ms,
       spawnFn,
       extraArgs: measure ? agent.json_args : undefined,
     });
+
+    let attempts = 1;
+    let classification: Classification | null = null;
+    const faultEntries: HansardEntry[] = [];
+
+    while (!result.ok) {
+      classification = classify(result);
+      const decision = shouldRetry(classification, attempts, policy);
+
+      faultEntries.push(
+        faultRecord({
+          at: options.now,
+          actor: options.actor,
+          role: options.role,
+          action: `spawn ${agent.id}`,
+          classification,
+          ...(decision.retry ? { attempt: attempts, of: policy.auto_retry_max } : {}),
+        }),
+      );
+
+      if (!decision.retry) break;
+
+      await sleepFn(decision.delay_ms);
+      attempts += 1;
+      result = await spawnAgent(agent, prompt, {
+        cwd: options.dir,
+        timeout_ms: options.timeout_ms,
+        spawnFn,
+        extraArgs: measure ? agent.json_args : undefined,
+      });
+    }
+
+    if (result.ok && attempts > 1) {
+      faultEntries.push(
+        autoResolvedRecord(options.now, options.actor, options.role, attempts),
+      );
+    }
 
     // Structured output carries the answer inside a JSON envelope; unwrap it so
     // the Hansard records what the agent said, not how it was transported.
@@ -351,7 +410,11 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
         : `Agent failed.\n\n${result.stderr.trim().slice(0, 1000)}`,
     };
 
-    let record = appendEntry(hansard, entry);
+    // Faults are recorded before the turn's own entry: they happened first, and
+    // a reader should see the retries that led to the outcome.
+    let record = hansard;
+    for (const fault of faultEntries) record = appendEntry(record, fault);
+    record = appendEntry(record, entry);
 
     // A breach suspends the sitting: logged immediately, escalated to the
     // Speaker, paused pending a ruling (POLITIK-ARCHITECTURE.md § Hard
