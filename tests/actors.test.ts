@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   ActorError,
+  disputeExit,
+  speakerOrder,
   EXIT_TYPES,
   demote,
   exitActor,
@@ -248,5 +250,57 @@ describe('SPAWN', () => {
 
   it('requires a mandate', () => {
     assert.throws(() => spawnChild({ ...speaker, child: 'c', mandate: ' ' }, BASE), /must state the committee mandate/);
+  });
+});
+
+describe('Speaker order — the plainest suspension', () => {
+  it('suspends with cause SPEAKER_ORDER', () => {
+    const result = speakerOrder(AT, 'speaker', 'AUTHORITY', 'Recess.', CONVENED, BASE);
+    assert.equal(result.state.state, 'SUSPENDED');
+    assert.equal(result.state.suspension?.cause, 'SPEAKER_ORDER');
+  });
+
+  it('refuses anyone but AUTHORITY', () => {
+    assert.throws(
+      () => speakerOrder(AT, 'alpha', 'OPERATOR', 'r', CONVENED, BASE),
+      /only AUTHORITY may suspend/,
+    );
+  });
+
+  it('requires a stated reason', () => {
+    assert.throws(() => speakerOrder(AT, 'speaker', 'AUTHORITY', '  ', CONVENED, BASE), ActorError);
+  });
+});
+
+describe('disputed exit', () => {
+  const removed = () =>
+    exitActor(
+      { ...speaker, subject: 'alpha', exit_type: 'EXIT_PROTOCOL', reason: 'alleged violation' },
+      seated(),
+    ).hansard;
+
+  it('suspends the sitting with cause DISPUTED_EXIT', () => {
+    const result = disputeExit(AT, 'alpha', 'The violation is not in the record.', CONVENED, removed());
+    assert.equal(result.state.suspension?.cause, 'DISPUTED_EXIT');
+    assert.equal(result.entry.type, 'EXIT_DISPUTED');
+    assert.equal(result.entry.fields?.['Removed by'], 'speaker');
+  });
+
+  it('refuses a dispute from an actor with no recorded exit', () => {
+    assert.throws(() => disputeExit(AT, 'ghost', 'g', CONVENED, seated()), /no recorded exit/);
+  });
+
+  it('refuses disputing a departure the actor declared themselves', () => {
+    // The mirror image of the voluntold problem: manufacturing a grievance the
+    // actor never raised.
+    const own = exitActor(
+      { at: AT, actor: 'alpha', role: 'OPERATOR', state: CONVENED, subject: 'alpha', exit_type: 'EXIT_VOLUNTARY_CONCESSION', reason: 'I concede.' },
+      seated(),
+    ).hansard;
+    assert.throws(() => disputeExit(AT, 'alpha', 'g', CONVENED, own), /declared themselves/);
+  });
+
+  it('requires stated grounds', () => {
+    assert.throws(() => disputeExit(AT, 'alpha', '  ', CONVENED, removed()), ActorError);
   });
 });

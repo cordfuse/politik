@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   DivisionError,
+  suspendForDeadlock,
   alreadyEnacted,
   callDivision,
   castVote,
@@ -316,6 +317,35 @@ describe('Assent — the Division decides, the Assent enacts', () => {
         ),
       /already received Assent/,
     );
+  });
+});
+
+describe('deadlock suspends rather than silently passing', () => {
+  const tied = () =>
+    tallyDivision(
+      withVotes([{ actor: 'a', vote: 'AYE' }, { actor: 'b', vote: 'NO' }]),
+      'motion-001',
+      2,
+    );
+
+  it('suspends with cause DEADLOCK', () => {
+    const result = suspendForDeadlock(tied(), AT, CONVENED, BASE);
+    assert.equal(result.state.state, 'SUSPENDED');
+    assert.equal(result.state.suspension?.cause, 'DEADLOCK');
+    assert.equal(result.entry.type, 'DEADLOCK');
+  });
+
+  it('routes resolution to AUTHORITY — a tie is the absence of a decision', () => {
+    assert.match(suspendForDeadlock(tied(), AT, CONVENED, BASE).entry.fields?.['Resolution'] ?? '', /AUTHORITY/);
+  });
+
+  it('refuses when the Division actually decided something', () => {
+    const carried = tallyDivision(
+      withVotes([{ actor: 'a', vote: 'AYE' }, { actor: 'b', vote: 'AYE' }]),
+      'motion-001',
+      2,
+    );
+    assert.throws(() => suspendForDeadlock(carried, AT, CONVENED, BASE), DivisionError);
   });
 });
 

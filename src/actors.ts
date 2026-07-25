@@ -19,6 +19,7 @@
 
 import { ROLE_PRECEDENCE, type Role } from './canon.ts';
 import { appendEntry, parseEntries, type HansardEntry } from './hansard.ts';
+import { createState } from './state.ts';
 import type { SessionStateFile } from './state.ts';
 
 /* -------------------------------------------------------------------------- */
@@ -421,4 +422,142 @@ export const spawnChild = (input: SpawnInput, hansard: string): {
     },
   };
   return { entry, hansard: appendEntry(hansard, entry) };
+};
+
+/* -------------------------------------------------------------------------- */
+/* Speaker order                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Suspend the sitting by Speaker order.
+ *
+ * The plainest of the suspension causes and, until now, unreachable: AUTHORITY
+ * halting proceedings for a stated reason. Distinct from a Point of Order (an
+ * actor asks) and from staleness (nobody acted) — here the Speaker decides, and
+ * the record should say so rather than borrowing another cause's label.
+ */
+export const speakerOrder = (
+  at: string,
+  actor: string,
+  role: Role,
+  reason: string,
+  state: SessionStateFile,
+  hansard: string,
+): {
+  readonly entry: HansardEntry;
+  readonly hansard: string;
+  readonly state: SessionStateFile;
+} => {
+  if (role !== 'AUTHORITY') {
+    throw new ActorError(`only AUTHORITY may suspend the sitting — ${actor} is ${role}`);
+  }
+  if (state.state !== 'CONVENED') {
+    throw new ActorError(`the session is already ${state.state}`);
+  }
+  if (reason.trim() === '') {
+    throw new ActorError('a Speaker order must state its reason');
+  }
+
+  const entry: HansardEntry = {
+    type: 'SPEAKER_ORDER',
+    at,
+    actor,
+    role,
+    fields: {
+      Reason: reason,
+      'Session status': 'SUSPENDED — by order of the Speaker',
+      Resolution: 'the Speaker resumes the sitting',
+    },
+  };
+
+  return {
+    entry,
+    hansard: appendEntry(hansard, entry),
+    state: createState({
+      session_guid: state.session_guid,
+      protocol: state.protocol,
+      state: 'SUSPENDED',
+      quorum: state.quorum,
+      hansard_head: state.hansard_head,
+      updated_at: at,
+      suspension: {
+        cause: 'SPEAKER_ORDER',
+        since: at,
+        record_ref: 'HANSARD.md',
+        escalation_ref: null,
+      },
+    }),
+  };
+};
+
+/* -------------------------------------------------------------------------- */
+/* Disputed exit                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Dispute one's own removal.
+ *
+ * RUNTIME.md § Actor Elimination: an actor may challenge their removal, and the
+ * challenge suspends the sitting pending a Speaker ruling. Only the removed
+ * actor may file — a third party disputing on someone's behalf would be the
+ * mirror image of the voluntold problem, manufacturing a grievance the actor
+ * never raised.
+ */
+export const disputeExit = (
+  at: string,
+  actor: string,
+  grounds: string,
+  state: SessionStateFile,
+  hansard: string,
+): {
+  readonly entry: HansardEntry;
+  readonly hansard: string;
+  readonly state: SessionStateFile;
+} => {
+  const removal = parseEntries(hansard)
+    .filter((e) => e.type === 'ACTOR_EXITED' && e.fields['Actor affected'] === actor)
+    .at(-1);
+
+  if (removal === undefined) {
+    throw new ActorError(`${actor} has no recorded exit to dispute`);
+  }
+  if (removal.actor === actor) {
+    throw new ActorError('an actor cannot dispute a departure they declared themselves');
+  }
+  if (grounds.trim() === '') {
+    throw new ActorError('a disputed exit must state its grounds');
+  }
+
+  const entry: HansardEntry = {
+    type: 'EXIT_DISPUTED',
+    at,
+    actor,
+    role: (removal.fields['Seat held'] ?? 'MEMBER') as Role,
+    fields: {
+      'Actor affected': actor,
+      'Removed by': removal.actor,
+      'Original exit type': removal.fields['Exit type'] ?? 'unknown',
+      Grounds: grounds,
+      'Session status': 'SUSPENDED — awaiting a Speaker ruling on the removal',
+    },
+  };
+
+  return {
+    entry,
+    hansard: appendEntry(hansard, entry),
+    state: createState({
+      session_guid: state.session_guid,
+      protocol: state.protocol,
+      state: 'SUSPENDED',
+      quorum: state.quorum,
+      hansard_head: state.hansard_head,
+      updated_at: at,
+      suspension: {
+        cause: 'DISPUTED_EXIT',
+        since: at,
+        record_ref: 'HANSARD.md',
+        escalation_ref: null,
+      },
+    }),
+  };
 };

@@ -345,3 +345,71 @@ export const alreadyEnacted = (hansard: string, motion: string): boolean =>
   parseEntries(hansard).some(
     (e) => e.type === 'ASSENT_GRANTED' && e.fields['Motion'] === motion,
   );
+
+/* -------------------------------------------------------------------------- */
+/* Deadlock                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Suspend a proceeding on an undecidable Division.
+ *
+ * ADR-0004 Proposal 4 adds `DEADLOCK` to the suspension causes: a Division that
+ * yields no valid outcome is a governance failure, not a silent pass. Until
+ * this existed the tally wrote the word "DEADLOCK" into free text and the
+ * session carried on as though nothing had happened.
+ *
+ * Suspends rather than rejects, because a tie is not a decision against the
+ * Motion — it is the absence of one, and only AUTHORITY can supply what the
+ * House could not.
+ */
+export const suspendForDeadlock = (
+  outcome: DivisionOutcome,
+  at: string,
+  state: SessionStateFile,
+  hansard: string,
+): {
+  readonly entry: HansardEntry;
+  readonly hansard: string;
+  readonly state: SessionStateFile;
+} => {
+  if (outcome.carried || outcome.ayes !== outcome.noes || !outcome.quorum_met) {
+    throw new DivisionError(
+      `${outcome.motion} is not deadlocked — ${outcome.reason}`,
+    );
+  }
+  if (state.state !== 'CONVENED') {
+    throw new DivisionError(`cannot declare a deadlock while the session is ${state.state}`);
+  }
+
+  const entry: HansardEntry = {
+    type: 'DEADLOCK',
+    at,
+    actor: 'RECORD',
+    role: 'OPERATOR',
+    fields: {
+      Motion: outcome.motion,
+      Division: outcome.reason,
+      'Session status': 'SUSPENDED — no valid Division outcome',
+      Resolution: 'AUTHORITY must rule; the House could not decide',
+    },
+  };
+
+  return {
+    entry,
+    hansard: appendEntry(hansard, entry),
+    state: createState({
+      session_guid: state.session_guid,
+      protocol: state.protocol,
+      state: 'SUSPENDED',
+      quorum: state.quorum,
+      hansard_head: state.hansard_head,
+      updated_at: at,
+      suspension: {
+        cause: 'DEADLOCK',
+        since: at,
+        record_ref: 'HANSARD.md',
+        escalation_ref: null,
+      },
+    }),
+  };
+};
