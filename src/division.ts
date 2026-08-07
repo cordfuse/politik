@@ -224,11 +224,64 @@ export interface DivisionOutcome {
  * that cannot be decided is a DEADLOCK for AUTHORITY to rule on — not a silent
  * pass.
  */
+/**
+ * How a Division resolves — the first protocol override point (ADR-0007). The
+ * engine is single and shared; a protocol picks which rule decides the outcome.
+ * `majority` is the default and reproduces the original behavior exactly.
+ */
+export type Resolution = 'majority' | 'supermajority' | 'unanimity';
+
+export const RESOLUTIONS: readonly Resolution[] = Object.freeze([
+  'majority',
+  'supermajority',
+  'unanimity',
+]);
+
+export const isResolution = (v: unknown): v is Resolution =>
+  typeof v === 'string' && (RESOLUTIONS as readonly string[]).includes(v);
+
+/**
+ * Each strategy is a pure function of the ballot and nothing else, so the same
+ * votes and the same rule always yield the same verdict — the property the
+ * Hansard's auditability depends on (ADR-0007).
+ */
+const RESOLUTION_RULES: Readonly<
+  Record<Resolution, (ayes: number, noes: number, abstentions: number) => { carried: boolean; reason: string }>
+> = Object.freeze({
+  majority: (ayes, noes) =>
+    ayes > noes
+      ? { carried: true, reason: `carried ${ayes} to ${noes}` }
+      : {
+          carried: false,
+          reason: ayes === noes ? `tied ${ayes} all — no majority, DEADLOCK` : `rejected ${ayes} to ${noes}`,
+        },
+  supermajority: (ayes, noes) => {
+    // Two-thirds of the decisive votes, abstentions excluded.
+    const carried = ayes > 0 && ayes * 3 >= (ayes + noes) * 2 && ayes > noes;
+    return carried
+      ? { carried: true, reason: `carried ${ayes} to ${noes} — two-thirds supermajority met` }
+      : { carried: false, reason: `rejected ${ayes} to ${noes} — a two-thirds supermajority was required` };
+  },
+  unanimity: (ayes, noes, abstentions) => {
+    // Every seated voter must assent; a single dissent or abstention hangs it.
+    const carried = ayes > 0 && noes === 0 && abstentions === 0;
+    if (carried) return { carried: true, reason: `carried unanimously, ${ayes} to 0` };
+    return {
+      carried: false,
+      reason:
+        noes > 0
+          ? `rejected — unanimity required, ${noes} against`
+          : `no verdict — unanimity required, ${abstentions} abstained`,
+    };
+  },
+});
+
 export const tallyDivision = (
   hansard: string,
   motion: string,
   quorumRequired: number,
   override?: QuorumOverride | null,
+  resolution: Resolution = 'majority',
 ): DivisionOutcome => {
   const votes = votesFor(hansard, motion);
   const ayes = votes.filter((v) => v.vote === 'AYE').length;
@@ -254,22 +307,14 @@ export const tallyDivision = (
     };
   }
 
-  if (ayes > noes) {
-    return {
-      motion, ayes, noes, abstentions,
-      carried: true,
-      quorum_met: true,
-      quorum_required: quorumRequired,
-      reason: `carried ${ayes} to ${noes}${quorum.degraded ? ' (degraded quorum)' : ''}`,
-    };
-  }
-
+  const decision = RESOLUTION_RULES[resolution](ayes, noes, abstentions);
   return {
     motion, ayes, noes, abstentions,
-    carried: false,
+    carried: decision.carried,
     quorum_met: true,
     quorum_required: quorumRequired,
-    reason: ayes === noes ? `tied ${ayes} all — no majority, DEADLOCK` : `rejected ${ayes} to ${noes}`,
+    reason:
+      decision.carried && quorum.degraded ? `${decision.reason} (degraded quorum)` : decision.reason,
   };
 };
 

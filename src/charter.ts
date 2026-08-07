@@ -21,6 +21,7 @@ import {
   type Role,
 } from './canon.ts';
 import type { ProtocolRecordMode } from './protocol.ts';
+import { isResolution, type Resolution } from './division.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Schema                                                                      */
@@ -128,6 +129,11 @@ export interface Charter {
   readonly ledger: LedgerBlock;
   readonly minimum_cast: Readonly<Partial<Record<Role, number>>>;
   readonly domain_veto: readonly Role[];
+  /** Protocol override points (ADR-0007). Absent selections default to the
+   * parliamentary behavior, so an older Charter is unchanged. */
+  readonly mechanics: {
+    readonly resolution: Resolution;
+  };
   readonly governance: Governance;
   /** PATH_A auto-recovery policy (RUNTIME.md § Three Resolution Paths). */
   readonly fault_handling: {
@@ -337,6 +343,12 @@ export const parseCharter = (source: string): ParseResult => {
     },
     minimum_cast,
     domain_veto: asStringArray(raw['domain_veto']).filter(isRole),
+    mechanics: {
+      resolution: (() => {
+        const m = isObject(raw['mechanics']) ? raw['mechanics'] : {};
+        return isResolution(m['resolution']) ? m['resolution'] : 'majority';
+      })(),
+    },
     fault_handling: (() => {
       const f = isObject(raw['fault_handling']) ? raw['fault_handling'] : {};
       const max = asNumberOrNull(f['auto_retry_max']);

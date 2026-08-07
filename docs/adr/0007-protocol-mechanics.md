@@ -58,7 +58,7 @@ The initial override points and their built-in strategies:
 
 | Point | Question | Strategies (default first) |
 |---|---|---|
-| **resolution** | How does a Division resolve? | `majority` · `supermajority` (≥⅔ aye) · `unanimity` · `plurality` |
+| **resolution** | How does a Division resolve? | `majority` · `supermajority` (≥⅔ of cast) · `unanimity` (`plurality` deferred — needs multi-option Divisions) |
 | **exit** | How does an actor leave? | `division` (voted out) · `elimination` (lose → out) · `none` (until terminal) |
 | **pairing** | Who acts together? | `plenary` (all) · `bracket` · `swiss` |
 | **termination** | When does the session end? | `objective` · `last-standing` · `rounds` · `verdict` |

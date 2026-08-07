@@ -529,7 +529,9 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
         err(`division refused: the Division on ${values.motion} is already decided — its outcome is on the record`);
         return EXIT.REFUSED;
       }
-      const outcome = tallyDivision(hansard, values.motion, charter.session.quorum);
+      const outcome = tallyDivision(
+        hansard, values.motion, charter.session.quorum, null, charter.mechanics.resolution,
+      );
       const result = recordOutcome(outcome, nowStamp(), values.actor ?? 'RECORD',
         (values.role ?? 'OPERATOR') as never, hansard);
       await writeHansard(dir, result.hansard);

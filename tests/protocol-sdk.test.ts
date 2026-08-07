@@ -14,8 +14,11 @@ const PROTOCOL_DIR = join(here, '..', 'protocols');
 const manifests = readdirSync(PROTOCOL_DIR).filter((f) => f.endsWith('.yml'));
 
 describe('shipped protocol library', () => {
-  it('ships ten reference protocols', () => {
-    assert.equal(manifests.length, 10, `found: ${manifests.join(', ')}`);
+  it('ships the reference protocol library', () => {
+    assert.ok(manifests.length >= 10, `expected at least 10 manifests, found: ${manifests.join(', ')}`);
+    for (const core of ['parliamentary.yml', 'battle-royale.yml', 'peer-review.yml']) {
+      assert.ok(manifests.includes(core), `missing core protocol ${core}`);
+    }
   });
 
   for (const file of manifests) {

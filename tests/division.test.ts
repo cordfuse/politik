@@ -382,6 +382,51 @@ describe('a vote requires a Division to have been called', () => {
   });
 });
 
+describe('resolution strategies — same ballot, different verdict (ADR-0007)', () => {
+  // Two AYE, one NO — the ballot that separates the rules.
+  const split = withVotes([
+    { actor: 'a', vote: 'AYE' },
+    { actor: 'b', vote: 'AYE' },
+    { actor: 'c', vote: 'NO' },
+  ]);
+
+  it('majority carries 2 to 1', () => {
+    assert.equal(tallyDivision(split, 'motion-001', 1).carried, true);
+  });
+
+  it('unanimity rejects the same ballot — one dissent hangs it', () => {
+    const outcome = tallyDivision(split, 'motion-001', 1, null, 'unanimity');
+    assert.equal(outcome.carried, false);
+    assert.match(outcome.reason, /unanimity required/);
+  });
+
+  it('unanimity carries only when every vote is AYE', () => {
+    const clean = withVotes([{ actor: 'a', vote: 'AYE' }, { actor: 'b', vote: 'AYE' }]);
+    assert.equal(tallyDivision(clean, 'motion-001', 1, null, 'unanimity').carried, true);
+  });
+
+  it('unanimity hangs on an abstention, not just a NO', () => {
+    const abstained = withVotes([{ actor: 'a', vote: 'AYE' }, { actor: 'b', vote: 'ABSTAIN' }]);
+    assert.equal(tallyDivision(abstained, 'motion-001', 1, null, 'unanimity').carried, false);
+  });
+
+  it('supermajority carries 2 to 1 (two-thirds) but rejects 3 to 2', () => {
+    assert.equal(tallyDivision(split, 'motion-001', 1, null, 'supermajority').carried, true);
+    const threeTwo = withVotes([
+      { actor: 'a', vote: 'AYE' }, { actor: 'b', vote: 'AYE' }, { actor: 'c', vote: 'AYE' },
+      { actor: 'd', vote: 'NO' }, { actor: 'e', vote: 'NO' },
+    ]);
+    assert.equal(tallyDivision(threeTwo, 'motion-001', 1, null, 'supermajority').carried, false);
+  });
+
+  it('defaults to majority when no strategy is given — behavior is unchanged', () => {
+    assert.deepEqual(
+      tallyDivision(split, 'motion-001', 1),
+      tallyDivision(split, 'motion-001', 1, null, 'majority'),
+    );
+  });
+});
+
 describe('only a CANON role may act on a Division', () => {
   it('refuses a vote whose role is not a CANON role', () => {
     assert.throws(
