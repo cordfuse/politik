@@ -230,12 +230,13 @@ Politik inherits both the problem and the solution.
 
 | Agent | Command | Auth (local) | Auth (headless) | Notes |
 |---|---|---|---|---|
-| Claude Code | `claude -p "..."` | OAuth ✅ | API key | Primary target |
-| Gemini CLI | `gemini --skip-trust -p "..."` | OAuth ✅ | API key | 1M context. Refuses an untrusted directory without `--skip-trust` |
-| OpenCode | `opencode run "..."` | OAuth ✅ | API key | 75+ providers, Ollama |
-| Qwen Code | `qwen -p "..."` | OAuth ✅ | API key | stream-json, Apache 2.0 |
-| Codex CLI | `codex exec "..."` | OAuth ✅ | API key | OpenAI, Rust-based. Bare `codex` is an interactive TUI |
-| Antigravity | `agy -p "..."` | OAuth ✅ | API key | Google, `-p`/`--print` |
+| Claude Code | `claude -p "..."` | OAuth ✅ | OAuth ✅ | Primary target |
+| Gemini CLI | `gemini --skip-trust -p "..."` | OAuth ✅ | OAuth ✅ | 1M context. Refuses an untrusted directory without `--skip-trust` |
+| OpenCode | `opencode run "..."` | OAuth ✅ | OAuth ✅ | 75+ providers, Ollama |
+| Qwen Code | `qwen -p "..."` | OAuth ✅ | OAuth ✅ | stream-json, Apache 2.0 |
+| Codex CLI | `codex exec "..."` | OAuth ✅ | OAuth ✅ | OpenAI, Rust-based. Bare `codex` is an interactive TUI |
+| Antigravity | `agy -p "..."` | OAuth ✅ | OAuth ✅ | Google, `-p`/`--print` |
+| GitHub Copilot | `copilot -p "..." --allow-all-tools` | OAuth ✅ | OAuth ✅ | Agentic CLI (v1+). Needs an active Copilot subscription + the CLI policy enabled |
 | Aider | `aider --message "..."` | API key | API key | Strong git integration |
 | Goose | `goose run "..."` | API key | API key | MCP-native, Block |
 | Cline CLI | `cline "..."` | API key | API key | CLI 2.0 headless |
@@ -243,10 +244,19 @@ Politik inherits both the problem and the solution.
 | Kilo Code CLI | `kilo "..."` | API key | API key | Orchestrator mode |
 | Amazon Q | `q chat "..."` | AWS auth | AWS auth | AWS-focused |
 
+**Auth, headless.** "Auth (headless)" is the credential a session uses when
+running unattended — CI, a VPS, a container. The one thing that cannot happen
+headless is the interactive *login*; once a credential persists on the host,
+invocation is non-interactive. A stored **OAuth token qualifies** — proven live:
+`claude -p`, `codex exec`, `opencode run`, `agy -p` all run unattended on their
+subscription logins, refreshing the token silently — as do an API key and AWS
+auth. The bar for a Politik agent is *a non-interactive credential path*, not a
+specific credential type. (A truly ephemeral runner with no prior login must have
+the credential injected as a secret — an OAuth token, an API key, or AWS auth.)
+
 ### Explicitly Excluded (IDE-primary, no headless prompt)
 - Cursor — IDE only
-- Windsurf — IDE only  
-- GitHub Copilot CLI — suggestion tool, not an agent
+- Windsurf — IDE only
 - Roo Code — VS Code extension primary
 - Continue — IDE extension
 

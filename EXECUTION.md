@@ -133,7 +133,7 @@ per agent — agents differ only in argv shape and auth story.
 **Live results.** Each agent was driven through `spawnAgent()` with a trivial
 prompt and had to return a specific token. Five passed.
 
-**Cost measurement — five of eight agents report usage.** The LEDGER was
+**Cost measurement — five of nine agents report usage.** The LEDGER was
 `unmeasured` for everything but Claude Code until the adapters were probed
 directly:
 
@@ -145,6 +145,7 @@ directly:
 | Codex CLI | yes | — | — |
 | Qwen Code | yes (same shape as Gemini) | — | yes |
 | Antigravity | — | — | — |
+| GitHub Copilot | — | — | — |
 | Aider, Goose | not installed | — | — |
 
 Where a vendor does not report spend the row records `unmeasured`, never a
@@ -152,24 +153,27 @@ figure derived from a rate card. An estimate dressed as a measurement is the one
 failure this ledger exists to avoid.
 
 **Supported set.** The agents in active use — and the ones the LEDGER is kept
-honest for — are **Claude Code, Antigravity (`agy`), Codex, OpenCode**.
-Everything else stays in the registry and runs, but is not on the critical path.
+honest for — are **Claude Code, Antigravity (`agy`), Codex, OpenCode**. **GitHub
+Copilot** is now in the registry too (see below), with live measurement pending a
+subscription. Everything else stays in the registry and runs, but is not on the
+critical path.
 
 **Backlog (active).**
 
 | Agent | Blocker | To close |
 |---|---|---|
 | Antigravity | usage only emits under `--dangerously-skip-permissions` | capture one real sample, then add its ledger parser |
+| GitHub Copilot | needs an active Copilot subscription with the CLI policy enabled | verify live, then capture usage shape for its parser |
 
-**GitHub Copilot — wanted, needs a ruling.** The registry deliberately excludes
-IDE-primary tools "that expose no headless prompt" (`tests/agents.test.ts`), and
-requires every agent to run headless via an API key (`canRunHeadless`). The new
-agentic `copilot -p --allow-all-tools` breaks the first premise — it *does* have
-a headless prompt now — but not the second: Copilot authenticates via GitHub
-OAuth / subscription, not an API key, so it does not fit the "headless in CI via
-a token" model. Adding it is a design call: relax the IDE exclusion **and** settle
-whether Copilot's OAuth counts as headless-capable (or is developer-machine-only).
-Not forced into the registry until that ruling lands.
+**GitHub Copilot — added (auth model corrected).** The registry originally
+excluded Copilot as an IDE tool "with no headless prompt" and required every
+agent to run headless via an API key. Both premises were wrong: the agentic
+`copilot -p --allow-all-tools` has a headless prompt, and headless auth is not
+API-key-only — a persisted OAuth token runs unattended (proven live this session
+for Claude, Codex, OpenCode, agy). `canRunHeadless` now accepts any
+non-interactive credential (OAuth, API key, AWS), and Copilot is in the registry
+with OAuth headless auth. Its ledger parser lands once a real usage sample is
+captured against an active subscription — same as Antigravity.
 
 **Roadmap — help wanted (outside the used set).** Gemini, Qwen, Aider, Goose.
 Gemini and Qwen already report tokens and keep working; Aider and Goose record

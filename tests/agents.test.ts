@@ -29,13 +29,17 @@ describe('registry', () => {
       'antigravity',
       'aider',
       'goose',
+      'copilot',
     ]) {
       assert.ok(findAgent(id), `${id} missing from registry`);
     }
   });
 
   it('excludes IDE-primary tools — they expose no headless prompt', () => {
-    for (const id of ['cursor', 'windsurf', 'copilot', 'continue', 'roo']) {
+    // GitHub Copilot's agentic CLI (`copilot -p`) now has a headless prompt, so
+    // it is a registry agent — no longer on this list. Cursor/Windsurf/Continue/
+    // Roo remain IDE-only.
+    for (const id of ['cursor', 'windsurf', 'continue', 'roo']) {
       assert.equal(findAgent(id), null, `${id} must not be a constituency`);
     }
   });
@@ -52,7 +56,7 @@ describe('registry', () => {
     }
   });
 
-  it('reports every agent as headless-capable via API key', () => {
+  it('reports every agent as headless-capable via a non-interactive credential', () => {
     for (const agent of AGENTS) {
       assert.ok(canRunHeadless(agent), `${agent.id} cannot run headless`);
     }
