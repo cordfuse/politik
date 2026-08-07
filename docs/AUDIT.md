@@ -87,9 +87,11 @@ pass that closed eleven integrity bugs across the core loop.
 1. ~~LEDGER rows only from `run`.~~ **Closed** — every governance act (division,
    assent, escalate, rule, actor, crisis, prorogue) now writes a LEDGER row with
    unmeasured cost, so the LEDGER is a complete account of a session.
-2. **Doc overstatements** — "35+ protocols" and "every Hansard entry references a
-   commit hash" should be trimmed to what ships (or, for the protocol count, met
-   by completing the manifest library — in progress).
+2. **Doc overstatements** — "35+ protocols" is now **true**: 52 manifests ship,
+   each linting VALID and scaffoldable via `scaffold --protocol <name>`, with real
+   mechanics where they fit (jury-deliberation, battle-royale, elimination). Still
+   open: "every Hansard entry references a commit hash" (false — no SHA in
+   entries) should be trimmed.
 3. **DEADLOCK / Disputed Exit** are constructed but not wired into the CLI flow.
 4. The rest of the missing-features list remains the backlog.
 
