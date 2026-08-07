@@ -46,7 +46,9 @@ import {
   callDivision, castVote, cull, divisionCalled, divisionDecided, grantAssent, isExitPolicy,
   isResolution, recordOutcome, tallyDivision, type Vote,
 } from './division.ts';
-import { PROTOCOL_MODES, parseProtocol, type ProtocolMode } from './protocol.ts';
+import {
+  PROTOCOL_MODES, parseProtocol, roleTerm, term, type Protocol, type ProtocolMode,
+} from './protocol.ts';
 import { checkTermination, isTerminationPolicy, lastStanding, prorogue, type Trigger } from './prorogation.ts';
 import { appendEntry, parseEntries } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
@@ -447,6 +449,29 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
 /* Division helpers                                                            */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The protocol a session runs, resolved from its manifest for vocabulary
+ * translation (ADR-0007 / protocol.ts). The stored record stays CANON — the
+ * engine reads it — so translation is presentation only, applied to what the
+ * user sees. Null for a protocol with no shipped manifest; callers fall back to
+ * the CANON term, which is exactly what roleTerm/term do.
+ */
+const sessionProtocol = async (protocolName: string): Promise<Protocol | null> => {
+  const path = join(dirname(fileURLToPath(import.meta.url)), '..', 'protocols', `${protocolName}.yml`);
+  const src = await readIfPresent(path);
+  if (src === null) return null;
+  const parsed = parseProtocol(src);
+  return parsed.ok ? parsed.protocol : null;
+};
+
+/** Render a CANON role in the session protocol's vocabulary, or CANON if none. */
+const asRoleTerm = (protocol: Protocol | null, role: string): string =>
+  protocol === null ? role : roleTerm(protocol, role as never);
+
+/** Render a CANON primitive/verb in the session protocol's vocabulary. */
+const asTerm = (protocol: Protocol | null, canon: string): string =>
+  protocol === null ? canon : term(protocol, canon);
+
 const loadSession = async (dir: string) => {
   const stateRaw = await readIfPresent(join(dir, 'STATE.json'));
   const state = stateRaw === null ? null : parseState(stateRaw);
@@ -548,6 +573,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
     err('division: --motion is required');
     return EXIT.USAGE;
   }
+  const protocol = await sessionProtocol(charter.protocol);
 
   try {
     if (verb === 'call') {
@@ -559,7 +585,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
         state,
       }, hansard);
       await writeHansard(dir, result.hansard);
-      out(`DIVISION CALLED on ${values.motion}`);
+      out(`${asTerm(protocol, 'DIVISION')} called on ${values.motion}`);
 
       const { provider } = resolveProvider({ repo: values.repo, token: values.token });
       const reviewers = (values.reviewers ?? '').split(',').filter((r) => r.length > 0);
@@ -637,7 +663,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       }
 
       await writeHansard(dir, doc);
-      out(outcome.carried ? 'MOTION CARRIED' : 'MOTION NOT CARRIED');
+      out(outcome.carried ? `${asTerm(protocol, 'MOTION')} CARRIED` : `${asTerm(protocol, 'MOTION')} NOT CARRIED`);
       out(`  ayes ${outcome.ayes}  noes ${outcome.noes}  abstentions ${outcome.abstentions}`);
       out(`  quorum ${outcome.quorum_met ? 'met' : 'NOT MET'}`);
       out(`  ${outcome.reason}`);
@@ -945,9 +971,10 @@ const cmdActor = async (argv: readonly string[]): Promise<number> => {
   }
 
   if (verb === 'list') {
+    const protocol = await sessionProtocol(charter.protocol);
     const held = seats(hansard);
     if (held.length === 0) out('no actors seated');
-    for (const seat of held) out(`  ${seat.role.padEnd(10)} ${seat.actor}`);
+    for (const seat of held) out(`  ${asRoleTerm(protocol, seat.role).padEnd(16)} ${seat.actor}`);
     return EXIT.OK;
   }
 
