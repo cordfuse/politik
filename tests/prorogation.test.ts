@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 
 import {
   ProrogationError,
+  TERMINATION_POLICIES,
   checkTermination,
+  isTerminationPolicy,
   lastStanding,
   prorogue,
   type Ceilings,
@@ -294,5 +296,35 @@ describe('termination: last-standing (ADR-0007)', () => {
     const check = lastStanding(BASE);
     assert.equal(check.terminate, true);
     assert.equal(check.survivor, null);
+  });
+});
+
+describe('termination: verdict (ADR-0007)', () => {
+  const CONVENED_V = createState({
+    session_guid: 'v',
+    protocol: 'parliamentary',
+    state: 'CONVENED',
+    quorum: { required: 1, present: 1 },
+    updated_at: '2026-04-08T14:00:00Z',
+  });
+
+  it('recognises verdict as a termination policy', () => {
+    assert.ok(isTerminationPolicy('verdict'));
+    assert.ok(TERMINATION_POLICIES.includes('verdict'));
+  });
+
+  it('seals via TRIGGER_VERDICT as an engine trigger, no AUTHORITY needed', () => {
+    const result = prorogue(
+      {
+        at: '2026-04-08T15:00:00Z',
+        actor: 'RECORD',
+        role: 'OPERATOR',
+        trigger: 'TRIGGER_VERDICT',
+        state: CONVENED_V,
+        summary: 'Verdict reached on motion-001',
+      },
+      '# HANSARD\n\n---\n',
+    );
+    assert.equal(result.state.state, 'PROROGUED');
   });
 });

@@ -36,6 +36,7 @@ export const TRIGGERS = [
   'TRIGGER_COST',
   'TRIGGER_SPEAKER',
   'TRIGGER_LAST_STANDING',
+  'TRIGGER_VERDICT',
 ] as const;
 
 export type Trigger = (typeof TRIGGERS)[number];
@@ -44,13 +45,16 @@ export type Trigger = (typeof TRIGGERS)[number];
  * When a session ends on its own — the third protocol override point (ADR-0007).
  * `objective` (default) ends only on an explicit prorogation or a configured
  * ceiling. `last-standing` ends the moment one seated actor remains — the Battle
- * Royale terminal condition, checked after an elimination cull.
+ * Royale terminal, checked after an elimination cull. `verdict` ends the moment a
+ * Division carries — a decision has been reached, so the Jury rises. Composed
+ * with `resolution: unanimity` it is a jury that deliberates until unanimous.
  */
-export type TerminationPolicy = 'objective' | 'last-standing';
+export type TerminationPolicy = 'objective' | 'last-standing' | 'verdict';
 
 export const TERMINATION_POLICIES: readonly TerminationPolicy[] = Object.freeze([
   'objective',
   'last-standing',
+  'verdict',
 ]);
 
 export const isTerminationPolicy = (v: unknown): v is TerminationPolicy =>

@@ -540,28 +540,35 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       const eliminated = cull(doc, values.motion, charter.mechanics.exit, nowStamp());
       for (const entry of eliminated) doc = appendEntry(doc, entry);
 
-      // termination: last-standing ends the session the moment a cull leaves one
-      // seated actor (ADR-0007). Checked only after an actual elimination, so a
-      // fresh, as-yet-unseated session is never mistaken for a finished one.
-      let sealed: { survivor: string | null } | null = null;
+      // termination override point (ADR-0007). last-standing seals the moment a
+      // cull leaves one seated actor — checked only after an actual elimination,
+      // so a fresh session is never mistaken for a finished one. verdict seals the
+      // moment a Division carries: a decision has been reached and the body rises.
+      let terminationMsg: string | null = null;
+      const seal = async (trigger: Trigger, summary: string, msg: string) => {
+        const end = prorogue(
+          { at: nowStamp(), actor: 'RECORD', role: 'OPERATOR' as never, trigger, state, summary },
+          doc,
+        );
+        doc = end.hansard;
+        await writeFile(join(dir, 'STATE.json'), serializeState(end.state), 'utf8');
+        terminationMsg = msg;
+      };
       if (charter.mechanics.termination === 'last-standing' && eliminated.length > 0) {
         const standing = lastStanding(doc);
         if (standing.terminate) {
-          const end = prorogue(
-            {
-              at: nowStamp(),
-              actor: 'RECORD',
-              role: 'OPERATOR' as never,
-              trigger: 'TRIGGER_LAST_STANDING' as Trigger,
-              state,
-              summary: standing.survivor ? `Last standing: ${standing.survivor}` : 'No actors remain',
-            },
-            doc,
+          await seal(
+            'TRIGGER_LAST_STANDING' as Trigger,
+            standing.survivor ? `Last standing: ${standing.survivor}` : 'No actors remain',
+            `last standing: ${standing.survivor ?? 'none'}`,
           );
-          doc = end.hansard;
-          await writeFile(join(dir, 'STATE.json'), serializeState(end.state), 'utf8');
-          sealed = { survivor: standing.survivor };
         }
+      } else if (charter.mechanics.termination === 'verdict' && outcome.carried) {
+        await seal(
+          'TRIGGER_VERDICT' as Trigger,
+          `Verdict reached on ${values.motion}`,
+          `verdict reached on ${values.motion}`,
+        );
       }
 
       await writeHansard(dir, doc);
@@ -572,8 +579,8 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       if (eliminated.length > 0) {
         out(`  eliminated ${eliminated.length}: ${eliminated.map((e) => e.fields?.['Actor affected']).join(', ')}`);
       }
-      if (sealed !== null) {
-        out(`  TERMINATED — last standing: ${sealed.survivor ?? 'none'} — the Hansard is sealed`);
+      if (terminationMsg !== null) {
+        out(`  TERMINATED — ${terminationMsg} — the Hansard is sealed`);
       }
       await recordAndCommit(dir, `${outcome.carried ? 'MOTION_CARRIED' : 'MOTION_REJECTED'} — ${values.motion}`);
       return outcome.carried ? EXIT.OK : EXIT.REFUSED;
