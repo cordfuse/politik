@@ -61,9 +61,11 @@ export interface AgentSpec {
  * Agents Politik can spawn as constituencies.
  *
  * Transcribed from RUNTIME.md § Politik Compatible. IDE-primary tools (Cursor,
- * Windsurf, Copilot CLI, Roo, Continue) are deliberately absent: they expose no
- * headless prompt, so they cannot be a constituency. A developer using one is
- * an OPERATOR in the session, not an agent of it.
+ * Windsurf, Roo, Continue) are deliberately absent: they expose no headless
+ * prompt, so they cannot be a constituency. A developer using one is an OPERATOR
+ * in the session, not an agent of it. GitHub Copilot's agentic CLI (`copilot -p`)
+ * DOES expose a headless prompt, so it is now included (auth is a persisted
+ * OAuth login, same as the other subscription CLIs).
  */
 export const AGENTS: readonly AgentSpec[] = Object.freeze([
   {
@@ -72,7 +74,7 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     command: 'claude',
     prompt: { kind: 'flag', flag: '-p' },
     auth_local: 'oauth',
-    auth_headless: 'api_key',
+    auth_headless: 'oauth',
     stdio_json: true,
     json_args: ['--output-format', 'json'],
     notes: 'Primary target. --output-format json reports exact tokens and cost.',
@@ -85,7 +87,7 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     headless_args: ['--skip-trust'],
     json_args: ['-o', 'json'],
     auth_local: 'oauth',
-    auth_headless: 'api_key',
+    auth_headless: 'oauth',
     stdio_json: true,
     notes: '1M context. Refuses an untrusted directory without --skip-trust. Reports tokens, not cost.',
   },
@@ -96,7 +98,7 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     prompt: { kind: 'subcommand', subcommand: 'run' },
     json_args: ['--format', 'json'],
     auth_local: 'oauth',
-    auth_headless: 'api_key',
+    auth_headless: 'oauth',
     stdio_json: true,
     notes: '75+ providers, Ollama. Reports tokens and cost.',
   },
@@ -107,7 +109,7 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     prompt: { kind: 'flag', flag: '-p' },
     json_args: ['-o', 'json'],
     auth_local: 'oauth',
-    auth_headless: 'api_key',
+    auth_headless: 'oauth',
     stdio_json: true,
     notes: 'stream-json, Apache 2.0.',
   },
@@ -118,7 +120,7 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     prompt: { kind: 'subcommand', subcommand: 'exec' },
     json_args: ['--json'],
     auth_local: 'oauth',
-    auth_headless: 'api_key',
+    auth_headless: 'oauth',
     stdio_json: true,
     notes:
       'OpenAI, Rust-based. Bare `codex` is an interactive TUI; `exec` is headless. ' +
@@ -130,7 +132,7 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     command: 'agy',
     prompt: { kind: 'flag', flag: '-p' },
     auth_local: 'oauth',
-    auth_headless: 'api_key',
+    auth_headless: 'oauth',
     stdio_json: false,
     notes: 'Google. -p/--print for headless.',
   },
@@ -153,6 +155,20 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     auth_headless: 'api_key',
     stdio_json: false,
     notes: 'MCP-native, Block.',
+  },
+  {
+    id: 'copilot',
+    label: 'GitHub Copilot CLI',
+    command: 'copilot',
+    prompt: { kind: 'flag', flag: '-p' },
+    headless_args: ['--allow-all-tools'],
+    auth_local: 'oauth',
+    auth_headless: 'oauth',
+    stdio_json: false,
+    notes:
+      'GitHub, agentic CLI (v1+). `-p --allow-all-tools` is headless. Auth is the ' +
+      'persisted GitHub Copilot login; running headless needs an active Copilot ' +
+      'subscription with the CLI policy enabled. Usage/cost shape not yet captured.',
   },
 ]);
 
@@ -199,8 +215,17 @@ export const buildInvocation = (
 };
 
 /** Whether an agent can run in the given environment without interactive auth. */
+// Headless-capable = the agent has a non-interactive credential path. What a
+// headless run cannot do is the one-time interactive *login*; ongoing invocation
+// is fine once a credential persists. A stored OAuth token counts — `claude -p`,
+// `codex exec`, `opencode run`, `agy -p` all ran unattended on their subscription
+// logins with no API key (proven live), refreshing the token non-interactively —
+// as do an API key and AWS auth. All three modes qualify; only an interactive-
+// only tool with no persistence can't, and those are excluded from the registry.
 export const canRunHeadless = (agent: AgentSpec): boolean =>
-  agent.auth_headless === 'api_key' || agent.auth_headless === 'aws';
+  agent.auth_headless === 'oauth' ||
+  agent.auth_headless === 'api_key' ||
+  agent.auth_headless === 'aws';
 
 /* -------------------------------------------------------------------------- */
 /* Prompt injection                                                            */

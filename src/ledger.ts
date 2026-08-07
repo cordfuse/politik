@@ -105,6 +105,10 @@ export const parseUsage = (agentId: string, stdout: string): Usage | null => {
     };
   }
 
+  // Antigravity (agy) and GitHub Copilot usage will parse here once a real sample
+  // is captured (Copilot needs an active subscription first). Aider and Goose are
+  // deferred and open for a PR (see EXECUTION.md § Roadmap). Falling through to
+  // null records `unmeasured` — safe, never a fabricated number.
   return null;
 };
 

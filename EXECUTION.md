@@ -133,7 +133,7 @@ per agent — agents differ only in argv shape and auth story.
 **Live results.** Each agent was driven through `spawnAgent()` with a trivial
 prompt and had to return a specific token. Five passed.
 
-**Cost measurement — four of eight agents report usage.** The LEDGER was
+**Cost measurement — five of nine agents report usage.** The LEDGER was
 `unmeasured` for everything but Claude Code until the adapters were probed
 directly:
 
@@ -145,25 +145,43 @@ directly:
 | Codex CLI | yes | — | — |
 | Qwen Code | yes (same shape as Gemini) | — | yes |
 | Antigravity | — | — | — |
+| GitHub Copilot | — | — | — |
 | Aider, Goose | not installed | — | — |
 
 Where a vendor does not report spend the row records `unmeasured`, never a
 figure derived from a rate card. An estimate dressed as a measurement is the one
 failure this ledger exists to avoid.
 
-**Backlog — three agents unverified.** Their registry entries follow the
-documented invocation and are shipped, but none has been exercised live. Each
-is a host-setup task, not a framework defect:
+**Supported set.** The agents in active use — and the ones the LEDGER is kept
+honest for — are **Claude Code, Antigravity (`agy`), Codex, OpenCode**. **GitHub
+Copilot** is now in the registry too (see below), with live measurement pending a
+subscription. Everything else stays in the registry and runs, but is not on the
+critical path.
 
-| Agent | Blocker | To verify |
+**Backlog (active).**
+
+| Agent | Blocker | To close |
 |---|---|---|
-| Qwen Code | `No auth type is selected` | configure an auth type, then re-run the live check |
-| Aider | not installed on this host | install, then re-run |
-| Goose | not installed on this host | install, then re-run |
+| Antigravity | usage only emits under `--dangerously-skip-permissions` | capture one real sample, then add its ledger parser |
+| GitHub Copilot | needs an active Copilot subscription with the CLI policy enabled | verify live, then capture usage shape for its parser |
 
-Phase 3 is otherwise complete. These three close out by re-running the same live
-check once their host prerequisites are met — no code change is expected, but
-the codex and gemini findings below are exactly why "expected" is not "verified".
+**GitHub Copilot — added (auth model corrected).** The registry originally
+excluded Copilot as an IDE tool "with no headless prompt" and required every
+agent to run headless via an API key. Both premises were wrong: the agentic
+`copilot -p --allow-all-tools` has a headless prompt, and headless auth is not
+API-key-only — a persisted OAuth token runs unattended (proven live this session
+for Claude, Codex, OpenCode, agy). `canRunHeadless` now accepts any
+non-interactive credential (OAuth, API key, AWS), and Copilot is in the registry
+with OAuth headless auth. Its ledger parser lands once a real usage sample is
+captured against an active subscription — same as Antigravity.
+
+**Roadmap — help wanted (outside the used set).** Gemini, Qwen, Aider, Goose.
+Gemini and Qwen already report tokens and keep working; Aider and Goose record
+`unmeasured`. All ship as runnable agents. Verifying or adding their measurement
+is **deferred and open for a PR** — a missing parser returns `null`, never a
+fabricated number. Not on the v1 critical path.
+
+Phase 3 is otherwise complete.
 
 **Antigravity added.** `agy` supports `-p`/`--print` headless, is a
 Cordfuse-supported CLI, and was absent from the compatibility table. Verified
