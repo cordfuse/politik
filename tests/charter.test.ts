@@ -144,6 +144,35 @@ describe('parse — defaults', () => {
     );
     assert.equal(charter.ledger.path, '.politik/LEDGER.md');
   });
+
+  it('defaults the mechanics override points to Parliament (ADR-0007)', () => {
+    const charter = parseOk('---\ncharter_version: 1.0.0\nprotocol: parliamentary\n---\n');
+    assert.equal(charter.mechanics.resolution, 'majority');
+    assert.equal(charter.mechanics.exit, 'division');
+    assert.equal(charter.mechanics.termination, 'objective');
+  });
+
+  it('parses a Jury and a Battle Royale from their mechanics block', () => {
+    const jury = parseOk(
+      '---\ncharter_version: 1.0.0\nprotocol: parliamentary\nmechanics:\n  resolution: unanimity\n  termination: verdict\n---\n',
+    );
+    assert.equal(jury.mechanics.resolution, 'unanimity');
+    assert.equal(jury.mechanics.termination, 'verdict');
+    assert.equal(jury.mechanics.exit, 'division');
+
+    const royale = parseOk(
+      '---\ncharter_version: 1.0.0\nprotocol: parliamentary\nmechanics:\n  exit: elimination\n  termination: last-standing\n---\n',
+    );
+    assert.equal(royale.mechanics.exit, 'elimination');
+    assert.equal(royale.mechanics.termination, 'last-standing');
+  });
+
+  it('ignores an unknown mechanics value, falling back to the default', () => {
+    const charter = parseOk(
+      '---\ncharter_version: 1.0.0\nprotocol: p\nmechanics:\n  resolution: bogus\n---\n',
+    );
+    assert.equal(charter.mechanics.resolution, 'majority');
+  });
 });
 
 describe('governance keys — documented YAML that was inert', () => {

@@ -43,11 +43,11 @@ import {
   type CrisisRuling,
 } from './crisis.ts';
 import {
-  callDivision, castVote, cull, divisionCalled, divisionDecided, grantAssent, recordOutcome, tallyDivision,
-  type Vote,
+  callDivision, castVote, cull, divisionCalled, divisionDecided, grantAssent, isExitPolicy,
+  isResolution, recordOutcome, tallyDivision, type Vote,
 } from './division.ts';
 import { PROTOCOL_MODES, type ProtocolMode } from './protocol.ts';
-import { checkTermination, lastStanding, prorogue, type Trigger } from './prorogation.ts';
+import { checkTermination, isTerminationPolicy, lastStanding, prorogue, type Trigger } from './prorogation.ts';
 import { appendEntry, parseEntries } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
 
@@ -180,6 +180,10 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
       out: { type: 'string' },
       protocol: { type: 'string' },
       quorum: { type: 'string' },
+      resolution: { type: 'string' },
+      exit: { type: 'string' },
+      termination: { type: 'string' },
+      escalation: { type: 'string' },
     },
   });
 
@@ -195,11 +199,36 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
     return EXIT.USAGE;
   }
 
+  // Mechanics flags (ADR-0007) — validate up front so a typo does not silently
+  // default to Parliament.
+  if (values.resolution !== undefined && !isResolution(values.resolution)) {
+    err(`scaffold: --resolution must be majority | supermajority | unanimity`);
+    return EXIT.USAGE;
+  }
+  if (values.exit !== undefined && !isExitPolicy(values.exit)) {
+    err(`scaffold: --exit must be division | elimination | none`);
+    return EXIT.USAGE;
+  }
+  if (values.termination !== undefined && !isTerminationPolicy(values.termination)) {
+    err(`scaffold: --termination must be objective | last-standing | verdict`);
+    return EXIT.USAGE;
+  }
+  if (values.escalation !== undefined && values.escalation !== 'enabled' && values.escalation !== 'disabled') {
+    err(`scaffold: --escalation must be enabled | disabled`);
+    return EXIT.USAGE;
+  }
+
   // Session directory: `--dir` is the standard across every other command;
   // `--out` is kept as an alias so a scaffold script written against the old
   // flag still works.
   const dir = values.dir ?? values.out ?? '.';
-  const files = parliamentaryTemplates(quorum === undefined ? {} : { quorum });
+  const files = parliamentaryTemplates({
+    ...(quorum === undefined ? {} : { quorum }),
+    ...(values.resolution === undefined ? {} : { resolution: values.resolution }),
+    ...(values.exit === undefined ? {} : { exit: values.exit }),
+    ...(values.termination === undefined ? {} : { termination: values.termination }),
+    ...(values.escalation === undefined ? {} : { escalation: values.escalation }),
+  });
   await writeFiles(dir, files);
 
   out(`SCAFFOLDED ${protocol}`);

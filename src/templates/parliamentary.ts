@@ -23,6 +23,11 @@ export interface CharterTemplateOptions {
   readonly quorum?: number;
   readonly inherits_from?: string | null;
   readonly speaker?: string;
+  /** Protocol override points (ADR-0007). Defaults reproduce Parliament. */
+  readonly resolution?: string;
+  readonly exit?: string;
+  readonly termination?: string;
+  readonly escalation?: string;
 }
 
 /**
@@ -36,6 +41,10 @@ export interface CharterTemplateOptions {
 export const charterTemplate = (options: CharterTemplateOptions = {}): string => {
   const quorum = options.quorum ?? 2;
   const inherits = options.inherits_from ?? null;
+  const resolution = options.resolution ?? 'majority';
+  const exit = options.exit ?? 'division';
+  const termination = options.termination ?? 'objective';
+  const escalation = options.escalation ?? 'enabled';
 
   return `---
 charter_version: 1.0.0
@@ -44,7 +53,7 @@ inherits_from: ${inherits === null ? 'null' : inherits}
 
 session:
   quorum: ${quorum}                      # minimum actors for a valid Division
-  escalation: enabled            # Points of Order may be raised
+  escalation: ${escalation}            # 'disabled' = no Point of Order (ADR-0006)
   heartbeat_timeout_hours: 4     # no Hansard commit in this window => STALE
   deadline: null                 # ISO-8601 wall-clock ceiling, or null
   merge_strategy: merge_commit   # squash is invalid under record_mode: distributed
@@ -64,6 +73,11 @@ minimum_cast:                    # enforced at Writ Drop; hard fail
   OPERATOR: 1
 
 domain_veto: []
+
+mechanics:                       # protocol override points (ADR-0007)
+  resolution: ${resolution}          # majority | supermajority | unanimity
+  exit: ${exit}                # division | elimination | none
+  termination: ${termination}         # objective | last-standing | verdict
 
 fault_handling:
   # PATH_A auto-recovery. A rate limit or a brief outage retries without waking
