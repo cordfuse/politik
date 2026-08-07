@@ -37,3 +37,8 @@ protocol:
   no_escalation: false
   no_record: false
   immutable_charter: false
+
+  mechanics:
+    resolution: majority
+    exit: division
+    termination: verdict

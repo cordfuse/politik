@@ -220,3 +220,27 @@ describe('generator', () => {
     assert.equal(parsed.protocol.roles.MEMBER, 'Line Cook');
   });
 });
+
+describe('manifests carry mechanics (ADR-0007 plumbing)', () => {
+  it('battle-royale declares elimination + last-standing', () => {
+    const parsed = parseProtocol(readFileSync(join(PROTOCOL_DIR, 'battle-royale.yml'), 'utf8'));
+    assert.ok(parsed.ok);
+    assert.equal(parsed.protocol.mechanics.exit, 'elimination');
+    assert.equal(parsed.protocol.mechanics.termination, 'last-standing');
+  });
+
+  it('peer-review declares a verdict termination', () => {
+    const parsed = parseProtocol(readFileSync(join(PROTOCOL_DIR, 'peer-review.yml'), 'utf8'));
+    assert.ok(parsed.ok);
+    assert.equal(parsed.protocol.mechanics.termination, 'verdict');
+  });
+
+  it('a manifest with no mechanics block defaults to Parliament', () => {
+    const parsed = parseProtocol(
+      'protocol:\n  name: x\n  version: 1.0.0\n  mode: constitutional\n  record_mode: distributed\n' +
+        '  roles:\n    AUTHORITY: A\n    DELEGATE: B\n    OPERATOR: C\n    MEMBER: D\n    OBSERVER: E\n',
+    );
+    assert.ok(parsed.ok);
+    assert.deepEqual(parsed.protocol.mechanics, { resolution: 'majority', exit: 'division', termination: 'objective' });
+  });
+});

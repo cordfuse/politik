@@ -28,6 +28,8 @@ export interface CharterTemplateOptions {
   readonly exit?: string;
   readonly termination?: string;
   readonly escalation?: string;
+  /** Protocol name for the frontmatter. Defaults to parliamentary. */
+  readonly protocol?: string;
 }
 
 /**
@@ -45,10 +47,11 @@ export const charterTemplate = (options: CharterTemplateOptions = {}): string =>
   const exit = options.exit ?? 'division';
   const termination = options.termination ?? 'objective';
   const escalation = options.escalation ?? 'enabled';
+  const protocol = options.protocol ?? 'parliamentary';
 
   return `---
 charter_version: 1.0.0
-protocol: parliamentary
+protocol: ${protocol}
 inherits_from: ${inherits === null ? 'null' : inherits}
 
 session:

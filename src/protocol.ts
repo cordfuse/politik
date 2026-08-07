@@ -56,6 +56,17 @@ export interface Protocol {
   readonly no_record: boolean;
   /** True when Standing Orders cannot be amended mid-session. */
   readonly immutable_charter: boolean;
+  /**
+   * Protocol override points (ADR-0007), declared so a Charter can inherit them.
+   * Kept as plain strings here: the manifest declares a protocol's default
+   * behavior, and the Charter — validated strictly at Writ Drop — is the runtime
+   * authority. Defaults reproduce Parliament.
+   */
+  readonly mechanics: {
+    readonly resolution: string;
+    readonly exit: string;
+    readonly termination: string;
+  };
 }
 
 export interface ProtocolIssue {
@@ -183,6 +194,16 @@ export const parseProtocol = (source: string): ProtocolParseResult => {
       no_escalation: block['no_escalation'] === true,
       no_record,
       immutable_charter: block['immutable_charter'] === true,
+      mechanics: (() => {
+        const m = (typeof block['mechanics'] === 'object' && block['mechanics'] !== null
+          ? block['mechanics']
+          : {}) as Record<string, unknown>;
+        return {
+          resolution: typeof m['resolution'] === 'string' ? m['resolution'] : 'majority',
+          exit: typeof m['exit'] === 'string' ? m['exit'] : 'division',
+          termination: typeof m['termination'] === 'string' ? m['termination'] : 'objective',
+        };
+      })(),
     },
   };
 };

@@ -46,7 +46,7 @@ import {
   callDivision, castVote, cull, divisionCalled, divisionDecided, grantAssent, isExitPolicy,
   isResolution, recordOutcome, tallyDivision, type Vote,
 } from './division.ts';
-import { PROTOCOL_MODES, type ProtocolMode } from './protocol.ts';
+import { PROTOCOL_MODES, parseProtocol, type ProtocolMode } from './protocol.ts';
 import { checkTermination, isTerminationPolicy, lastStanding, prorogue, type Trigger } from './prorogation.ts';
 import { appendEntry, parseEntries } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
@@ -187,9 +187,22 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
     },
   });
 
+  // Resolve the named protocol's manifest so its declared mechanics (ADR-0007)
+  // and escalation flag are inherited into the Charter. Explicit flags below
+  // still override. This is what makes `scaffold --protocol battle-royale`
+  // produce a Charter that actually behaves like one.
   const protocol = values.protocol ?? 'parliamentary';
-  if (protocol !== 'parliamentary') {
-    err(`scaffold: unknown protocol "${protocol}" — only parliamentary ships today`);
+  const manifestPath = join(
+    dirname(fileURLToPath(import.meta.url)), '..', 'protocols', `${protocol}.yml`,
+  );
+  const manifestSrc = await readIfPresent(manifestPath);
+  if (manifestSrc === null) {
+    err(`scaffold: unknown protocol "${protocol}" — no manifest at protocols/${protocol}.yml`);
+    return EXIT.USAGE;
+  }
+  const manifest = parseProtocol(manifestSrc);
+  if (!manifest.ok) {
+    err(`scaffold: protocols/${protocol}.yml is not a valid manifest`);
     return EXIT.USAGE;
   }
 
@@ -222,12 +235,15 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
   // `--out` is kept as an alias so a scaffold script written against the old
   // flag still works.
   const dir = values.dir ?? values.out ?? '.';
+  // Explicit flag > manifest default > template default.
+  const m = manifest.protocol.mechanics;
   const files = parliamentaryTemplates({
+    protocol,
     ...(quorum === undefined ? {} : { quorum }),
-    ...(values.resolution === undefined ? {} : { resolution: values.resolution }),
-    ...(values.exit === undefined ? {} : { exit: values.exit }),
-    ...(values.termination === undefined ? {} : { termination: values.termination }),
-    ...(values.escalation === undefined ? {} : { escalation: values.escalation }),
+    resolution: values.resolution ?? m.resolution,
+    exit: values.exit ?? m.exit,
+    termination: values.termination ?? m.termination,
+    escalation: values.escalation ?? (manifest.protocol.no_escalation ? 'disabled' : 'enabled'),
   });
   await writeFiles(dir, files);
 
