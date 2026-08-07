@@ -39,6 +39,61 @@ verification — which is why they get verified.
 
 ---
 
+## RECONCILIATION — 2026-08-07
+
+A second pass, verifying every finding above against the current `main` (now 669
+tests). Much of the "still open" list turned out to be built in the interim.
+
+**All eight real bugs are now closed.** #1–#7 were confirmed fixed in source
+(`projectAssent` calls `provider.merge`; `RecordMode` re-exports the protocol
+type; constituencies carry `agent` and a machine AUTHORITY fails Writ Drop; the
+three suspension causes are all constructed). **#8 was still open and is now
+fixed** — the parser coerced a bad `assent` to AUTHORITY, masking rule 7; it now
+defaults only on absence, so rule 7 rejects a non-CANON assent.
+
+**Missing features — several were built since 2026-07-25:**
+
+| Item | Now |
+|---|---|
+| Hard Containment Rule | **Built** — `containment.ts`, wired into `runTurn`, tested |
+| `witness_council` / `consensus_suspension` parsing | **Built** — parsed in `charter.ts` |
+| `stale_action`, `checkpoint_interval_hours`, `cost_warning_usd`, `deadline_action` | **Built** — all parsed |
+| DEADLOCK suspension | **Partial** — `suspendForDeadlock` constructs it and is tested, but the CLI tally does not auto-suspend on a tie (reports it in prose only) |
+| Disputed Exit | **Partial** — `disputeExit` constructs `DISPUTED_EXIT`; no CLI filing or UPHELD/REVERSED reinstatement flow |
+| PATH_A auto-recovery, scheduled workflows, DELEGATE challenge, GLOBAL layer, Jira, `sync-vault`, NATS | **Still backlog** |
+
+**Capability claims — re-checked:**
+
+- *"Exact measured cost, `claude-code` only"* — **stale.** Five agents now report
+  usage: `claude-code`, `codex-cli`, `gemini-cli`, `opencode`, `qwen-code`.
+- *"Prorogation automatic on session end"* — **now partly true.** ADR-0007
+  `termination: last-standing | verdict` auto-prorogues; ceiling-based
+  termination is still read-only in `status`.
+- *"35+ protocols across 12 domains"* — **still overstated.** 14 manifests ship
+  (was 10; the Politics domain was transcribed this session).
+- *"Every Hansard entry references commit hash"* — **still false.** No entry
+  carries a SHA.
+- *LEDGER rows written by `politik run` only* — **still true.** `division`,
+  `assent`, `escalate`, `rule`, `actor`, `crisis`, `prorogue` write no ledger row.
+
+**New since the audit** (not defects — capability added): ADR-0006 (the
+`session.escalation` flag is enforced), ADR-0007 (the mechanics framework —
+`resolution` / `exit` / `termination` as composable override points, with a Jury
+and a Battle Royale behaving distinctly and scaffoldable turnkey), and a dogfood
+pass that closed eleven integrity bugs across the core loop.
+
+**Genuinely still open, ranked by value:**
+
+1. **LEDGER rows only from `run`.** The governance acts are exactly what the
+   "replaces a ticket system" claim is about, and none of them record cost. The
+   highest-value remaining gap.
+2. **Doc overstatements** — "35+ protocols" and "every Hansard entry references a
+   commit hash" should be trimmed to what ships.
+3. **DEADLOCK / Disputed Exit** are constructed but not wired into the CLI flow.
+4. The rest of the missing-features list remains the backlog.
+
+---
+
 *Original findings follow, as recorded before any fix.*
 
 ---
