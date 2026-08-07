@@ -5,7 +5,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { commitRecord } from '../src/git.ts';
+import { commitRecord, initSessionRepo } from '../src/git.ts';
 
 const sh = (dir: string, args: readonly string[]): Promise<number> =>
   new Promise((resolve) => {
@@ -97,6 +97,36 @@ describe('committing the record', () => {
       const result = await commitRecord(dir, 'record');
       assert.ok(!result.committed);
       assert.equal(result.reason, 'not a git repository');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('initializing a session repo', () => {
+  it('makes a non-repo directory a git repo with a writ-drop commit', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'politik-writ-'));
+    try {
+      await writeFile(join(dir, 'HANSARD.md'), '# HANSARD\n', 'utf8');
+      const result = await initSessionRepo(dir, 'steve', 'guid-abc');
+      assert.ok(result.committed, result.reason);
+      assert.ok(result.sha);
+      assert.equal(result.sha.length, 40);
+      // it is now a real repo: a record commit succeeds against it
+      await writeFile(join(dir, 'HANSARD.md'), '# HANSARD\n\n## entry\n', 'utf8');
+      const rec = await commitRecord(dir, 'VOTE_CAST — alpha');
+      assert.ok(rec.committed, rec.reason);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves an existing repo untouched (idempotent)', async () => {
+    const dir = await repo();
+    try {
+      const result = await initSessionRepo(dir, 'steve', 'guid-abc');
+      assert.ok(!result.committed);
+      assert.equal(result.reason, 'existing repository');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
