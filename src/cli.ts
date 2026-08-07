@@ -606,7 +606,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
         vote: values.vote.toUpperCase() as Vote, state,
       }, hansard);
       await writeHansard(dir, result.hansard);
-      out(`VOTE RECORDED — ${values.actor}: ${values.vote.toUpperCase()}`);
+      out(`${asTerm(protocol, 'VOTE')} recorded — ${values.actor}: ${values.vote.toUpperCase()}`);
       await recordAndCommit(dir, `VOTE_CAST — ${values.actor} on ${values.motion}`);
       return EXIT.OK;
     }
@@ -715,7 +715,7 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
     }, hansard);
     await writeHansard(dir, result.hansard);
     await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
-    out(`ASSENT GRANTED — ${values.motion} is enacted`);
+    out(`${asTerm(await sessionProtocol(charter.protocol), 'ASSENT')} granted — ${values.motion} is enacted`);
 
     // ADR-0004 defines ASSENT as merging the Motion. This is where the decision
     // reaches the world; until it was wired, assent recorded a decision that
@@ -985,6 +985,7 @@ const cmdActor = async (argv: readonly string[]): Promise<number> => {
     state,
   };
   if (by.actor === '') { err('actor: --actor is required'); return EXIT.USAGE; }
+  const protocol = await sessionProtocol(charter.protocol);
 
   try {
     let result: { hansard: string } | null = null;
@@ -995,14 +996,14 @@ const cmdActor = async (argv: readonly string[]): Promise<number> => {
         err('actor hire: --subject and --seat are required'); return EXIT.USAGE;
       }
       result = hire({ ...by, subject: values.subject, seat: values.seat as never, reason: values.reason ?? 'seated' }, hansard);
-      message = `HIRED ${values.subject} as ${values.seat}`;
+      message = `HIRED ${values.subject} as ${asRoleTerm(protocol, values.seat)}`;
     } else if (verb === 'promote' || verb === 'demote') {
       if (values.subject === undefined || values.to === undefined) {
         err(`actor ${verb}: --subject and --to are required`); return EXIT.USAGE;
       }
       const move = verb === 'promote' ? promote : demote;
       result = move({ ...by, subject: values.subject, to: values.to as never, reason: values.reason ?? '' }, hansard);
-      message = `${verb.toUpperCase()}D ${values.subject} to ${values.to}`;
+      message = `${verb.toUpperCase()}D ${values.subject} to ${asRoleTerm(protocol, values.to)}`;
     } else if (verb === 'exit') {
       if (values.subject === undefined || values.type === undefined) {
         err('actor exit: --subject and --type are required'); return EXIT.USAGE;
@@ -1089,7 +1090,7 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
   await writeHansard(dir, filed.hansard);
   await writeFile(join(dir, 'STATE.json'), serializeState(filed.state), 'utf8');
 
-  out('POINT OF ORDER RAISED');
+  out(`${asTerm(await sessionProtocol(charter?.protocol ?? 'parliamentary'), 'ESCALATION')} raised`);
   out(`  escalation  ${filed.escalation_path}`);
   out(`  ruling due  ${filed.ruling_path}`);
   out('  session is SUSPENDED pending a Speaker ruling');
