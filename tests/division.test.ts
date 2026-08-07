@@ -382,6 +382,38 @@ describe('a vote requires a Division to have been called', () => {
   });
 });
 
+describe('a decided Division is closed — one Division per Motion', () => {
+  // A carried Motion, outcome recorded.
+  const decided = (() => {
+    const voted = withVotes([{ actor: 'a', vote: 'AYE' }, { actor: 'b', vote: 'AYE' }]);
+    const outcome = tallyDivision(voted, 'motion-001', 2);
+    return recordOutcome(outcome, AT, 'speaker', 'AUTHORITY', voted).hansard;
+  })();
+
+  it('refuses a late vote once the outcome is on the record', () => {
+    assert.throws(
+      () =>
+        castVote(
+          { motion: 'motion-001', at: AT, actor: 'latecomer', role: 'OPERATOR', vote: 'NO', state: CONVENED },
+          decided,
+        ),
+      (error: unknown) => error instanceof DivisionError && /has closed/.test(error.message),
+      'a settled decision must not be overturnable by a late vote',
+    );
+  });
+
+  it('refuses a second Division call on the same Motion', () => {
+    assert.throws(
+      () =>
+        callDivision(
+          { motion: 'motion-001', at: AT, actor: 'speaker', role: 'AUTHORITY', reviewers: [], state: CONVENED },
+          decided,
+        ),
+      (error: unknown) => error instanceof DivisionError && /already been called/.test(error.message),
+    );
+  });
+});
+
 describe('the full cycle on one record', () => {
   it('reads back as an ordered, attributed governance history', () => {
     let hansard = BASE;

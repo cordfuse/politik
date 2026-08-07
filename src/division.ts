@@ -64,6 +64,12 @@ export const callDivision = (input: CallDivisionInput, hansard: string): {
       `cannot call a Division while the session is ${input.state.state}`,
     );
   }
+  // One Division per Motion. Re-calling would open a second vote on a Motion
+  // that may already be decided, letting a settled outcome be overturned. A
+  // genuinely new question is a new Motion.
+  if (divisionCalled(hansard, input.motion)) {
+    throw new DivisionError(`a Division has already been called on ${input.motion}`);
+  }
 
   const entry: HansardEntry = {
     type: 'DIVISION_CALLED',
@@ -121,6 +127,12 @@ export const castVote = (input: CastVoteInput, hansard: string): {
   if (!divisionCalled(hansard, input.motion)) {
     throw new DivisionError(`no Division has been called on ${input.motion}`);
   }
+  // A decided Division is closed. Without this a late vote could be cast after
+  // the outcome was recorded and a re-tally would overturn a settled decision —
+  // the record is append-only, but the decision it carries must be final.
+  if (divisionDecided(hansard, input.motion)) {
+    throw new DivisionError(`the Division on ${input.motion} has closed — its outcome is on the record`);
+  }
 
   // One vote per actor per Motion. A second vote is not an amendment — it is an
   // attempt to rewrite a record that is append-only by construction.
@@ -146,6 +158,15 @@ export const castVote = (input: CastVoteInput, hansard: string): {
 export const divisionCalled = (hansard: string, motion: string): boolean =>
   parseEntries(hansard).some(
     (e) => e.type === 'DIVISION_CALLED' && e.fields['Motion'] === motion,
+  );
+
+/** Whether a Division on this Motion has been decided — its outcome recorded.
+ * A DEADLOCK records MOTION_REJECTED, so it too closes the Division. */
+export const divisionDecided = (hansard: string, motion: string): boolean =>
+  parseEntries(hansard).some(
+    (e) =>
+      (e.type === 'MOTION_CARRIED' || e.type === 'MOTION_REJECTED') &&
+      e.fields['Motion'] === motion,
   );
 
 /** Every vote recorded against a Motion, read back from the Hansard. */

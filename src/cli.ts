@@ -42,7 +42,7 @@ import {
   type CrisisRuling,
 } from './crisis.ts';
 import {
-  callDivision, castVote, divisionCalled, grantAssent, recordOutcome, tallyDivision,
+  callDivision, castVote, divisionCalled, divisionDecided, grantAssent, recordOutcome, tallyDivision,
   type Vote,
 } from './division.ts';
 import { PROTOCOL_MODES, type ProtocolMode } from './protocol.ts';
@@ -513,6 +513,10 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
     if (verb === 'tally') {
       if (!divisionCalled(hansard, values.motion)) {
         err(`division refused: no Division has been called on ${values.motion}`);
+        return EXIT.REFUSED;
+      }
+      if (divisionDecided(hansard, values.motion)) {
+        err(`division refused: the Division on ${values.motion} is already decided — its outcome is on the record`);
         return EXIT.REFUSED;
       }
       const outcome = tallyDivision(hansard, values.motion, charter.session.quorum);
