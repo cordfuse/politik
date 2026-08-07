@@ -1,0 +1,36 @@
+# Republic (US-style) — Constitutional protocol.
+#
+# Checks and balances with a strong executive veto. The Filibuster is the
+# escalation path; a Government Shutdown is the deadlock. AUTHORITY (President)
+# already holds VETO as a constitutional power, so no domain_veto is declared.
+#
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: republic
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+
+  roles:
+    AUTHORITY: President
+    DELEGATE: Vice President
+    OPERATOR: Senator
+    MEMBER: Representative
+    OBSERVER: Constituent
+
+  primitives:
+    SESSION: Congress
+    CHARTER: Constitution
+    RECORD: Congressional Record
+    MOTION: Bill
+    DIVISION: Vote
+    ESCALATION: Filibuster
+    SUSPENSION: Recess
+    DEADLOCK: Government Shutdown
+    VETO: Presidential Veto
+    EXIT: Impeached or Resigned
+
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

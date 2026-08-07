@@ -1,0 +1,31 @@
+# Monarchy — Authoritarian protocol with constitutional elements.
+#
+# The Crown is AUTHORITY; a Petition may be raised and appealed to the Crown.
+#
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: monarchy
+  version: 1.0.0
+  mode: authoritarian
+  record_mode: anchored
+
+  roles:
+    AUTHORITY: The Crown
+    DELEGATE: Lord Chancellor
+    OPERATOR: Lord
+    MEMBER: Knight
+    OBSERVER: Commoner
+
+  primitives:
+    SESSION: Royal Court
+    CHARTER: Royal Decree
+    RECORD: Royal Chronicle
+    MOTION: Petition
+    DIVISION: Royal Assent
+    ESCALATION: Appeal to the Crown
+    EXIT: Banished
+
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

@@ -1,0 +1,31 @@
+# Socialism / Collective — Authoritarian protocol.
+#
+# Collective in theory, party in practice: the Party Chair is AUTHORITY and the
+# Party Record is anchored to it. A Party Challenge is the escalation path.
+#
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: socialism-collective
+  version: 1.0.0
+  mode: authoritarian
+  record_mode: anchored
+
+  roles:
+    AUTHORITY: Party Chair
+    DELEGATE: Deputy Chair
+    OPERATOR: Comrade Commissar
+    MEMBER: Worker Delegate
+    OBSERVER: Civilian
+
+  primitives:
+    SESSION: Collective
+    RECORD: Party Record
+    MOTION: Party Directive
+    ESCALATION: Party Challenge
+    DEADLOCK: Party Purge
+    EXIT: Purged
+
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false
