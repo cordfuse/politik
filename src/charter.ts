@@ -314,7 +314,10 @@ export const parseCharter = (source: string): ParseResult => {
       merge_strategy: isMergeStrategy(session['merge_strategy'])
         ? session['merge_strategy']
         : 'merge_commit',
-      assent: isRole(session['assent']) ? session['assent'] : 'AUTHORITY',
+      // Default only when absent. A present-but-invalid value is preserved so
+      // Writ Drop rule 7 can reject it — coercing it to AUTHORITY here masked the
+      // rule and let a bad assent silently open a session (AUDIT #8).
+      assent: session['assent'] === undefined ? 'AUTHORITY' : (session['assent'] as Role),
       stale_action: session['stale_action'] === 'dissolve' ? 'dissolve' : 'suspend',
       checkpoint_interval_hours: asNumberOrNull(session['checkpoint_interval_hours']),
       endurance: {
@@ -505,8 +508,8 @@ export const validateCharter = (
     });
   }
 
-  // Rule 7 — assent must name a CANON role. Parsing defaults it to AUTHORITY,
-  // so an out-of-CANON value is only detectable pre-coercion; guard anyway.
+  // Rule 7 — assent must name a CANON role. Parsing now defaults only when the
+  // key is absent, so a present-but-invalid value reaches here and is rejected.
   if (!isRole(charter.session.assent)) {
     issues.push({
       field: 'session.assent',

@@ -342,9 +342,14 @@ describe('rule 6 — fast_forward requires quorum 1', () => {
 });
 
 describe('rule 7 — assent names a CANON role', () => {
-  it('falls back to AUTHORITY when an unknown role is declared', () => {
+  it('rejects an assent that is not a CANON role — no silent fallback (AUDIT #8)', () => {
     const charter = mutated('assent: AUTHORITY', 'assent: SPEAKER');
-    assert.equal(charter.session.assent, 'AUTHORITY');
+    // The invalid value is preserved through parse, not coerced to AUTHORITY...
+    assert.equal(charter.session.assent, 'SPEAKER');
+    // ...so Writ Drop rule 7 can actually reject it.
+    const result = validateCharter(charter);
+    assert.ok(!result.valid);
+    assert.ok(result.issues.some((i) => i.rule === 7), 'rule 7 must fire');
   });
 
   it('accepts a CANON role other than AUTHORITY', () => {
