@@ -1297,6 +1297,9 @@ const cmdRun = async (argv: readonly string[]): Promise<number> => {
   out(`  elapsed  ${outcome.result.elapsed_ms}ms`);
   out(`  files    ${outcome.files_touched.length > 0 ? outcome.files_touched.join(', ') : 'none'}`);
   out('  recorded in HANSARD.md');
+  if (outcome.suspended === true) {
+    out('  POINT OF ORDER — the agent escalated; the sitting is SUSPENDED pending a Speaker ruling');
+  }
   await recordAndCommit(
     dir,
     `${outcome.entry.type} — ${values.actor} (${values.role ?? 'OPERATOR'})`,

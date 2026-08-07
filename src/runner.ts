@@ -89,7 +89,14 @@ export interface RunOptions {
 }
 
 export type RunOutcome =
-  | { readonly ok: true; readonly result: SpawnResult; readonly entry: HansardEntry; readonly files_touched: readonly string[] }
+  | {
+      readonly ok: true;
+      readonly result: SpawnResult;
+      readonly entry: HansardEntry;
+      readonly files_touched: readonly string[];
+      /** The turn completed but the agent filed a Point of Order, so the sitting is now suspended. */
+      readonly suspended?: boolean;
+    }
   | { readonly ok: false; readonly reason: string; readonly entry?: HansardEntry };
 
 /* -------------------------------------------------------------------------- */
@@ -379,6 +386,18 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     const OWNED_BY_RECORD = ['HANSARD.md', 'STATE.json', 'LEDGER.md'];
     const violations = touched.filter((f) => OWNED_BY_RECORD.includes(f));
 
+    // An agent that hits a decision above its authority is told (composePrompt,
+    // Rules of the Floor) to file a Point of Order instead of proceeding. On a
+    // hosted session the point-of-order workflow catches the pushed file and
+    // suspends; a local session has no such watcher, so the runner closes the
+    // loop: a new file under escalations/ — a ruling excepted, since that is the
+    // Speaker's own reply — is an agent-filed Point of Order, and the sitting
+    // suspends pending a ruling exactly as the CLI `escalate` path does.
+    const escalationFiles = touched.filter(
+      (f) => f.startsWith('escalations/') && !f.slice('escalations/'.length).startsWith('ruling'),
+    );
+    const agentEscalated = escalationFiles.length > 0;
+
     // Hard Containment Rule. Checked after the turn because it is detection,
     // not prevention — a spawned process runs with the OS's permissions and
     // nothing here can stop it. The Hansard records what happened, which is the
@@ -402,6 +421,11 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
         ...(violations.length > 0
           ? {
               'Standing Orders violation': `actor wrote to ${violations.join(', ')} — owned by RECORD`,
+            }
+          : {}),
+        ...(agentEscalated
+          ? {
+              'Point of Order': `actor filed ${escalationFiles.join(', ')} — the sitting is suspended pending a Speaker ruling`,
             }
           : {}),
       },
@@ -455,20 +479,25 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     // `present` counts actors eligible to vote — it was previously being
     // overwritten with the leftover broadcast slot count, which is a different
     // quantity entirely and made the figure meaningless.
+    // The sitting suspends on a containment breach or an agent-filed Point of
+    // Order — both pause pending a Speaker ruling, and both carry the same
+    // POINT_OF_ORDER cause. A breach names no escalation file; an agent's Point
+    // of Order does, so its path is recorded as the escalation reference.
+    const suspend = !containment.contained || agentEscalated;
     const nextState = createState({
       session_guid: state.session_guid,
       protocol: state.protocol,
-      state: containment.contained ? 'CONVENED' : 'SUSPENDED',
-      ...(containment.contained
-        ? {}
-        : {
+      state: suspend ? 'SUSPENDED' : 'CONVENED',
+      ...(suspend
+        ? {
             suspension: {
               cause: 'POINT_OF_ORDER' as const,
               since: options.now,
               record_ref: 'HANSARD.md',
-              escalation_ref: null,
+              escalation_ref: agentEscalated ? (escalationFiles[0] ?? null) : null,
             },
-          }),
+          }
+        : {}),
       quorum: state.quorum,
       hansard_head: state.hansard_head,
       updated_at: options.now,
@@ -484,7 +513,7 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     }
 
     return result.ok
-      ? { ok: true, result, entry, files_touched: touched }
+      ? { ok: true, result, entry, files_touched: touched, ...(agentEscalated ? { suspended: true } : {}) }
       : { ok: false, reason: `agent failed: exit ${String(result.exit_code)}`, entry };
   } finally {
     // Always release, including on a throw — a lock held by a dead turn would

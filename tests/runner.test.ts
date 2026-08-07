@@ -10,6 +10,7 @@ import { parseEnvelope, type Envelope } from '../src/envelope.ts';
 import { dropWrit } from '../src/init.ts';
 import { charterTemplate } from '../src/templates/parliamentary.ts';
 import { parseEntries } from '../src/hansard.ts';
+import { parseState } from '../src/state.ts';
 
 /** Build a session repo on disk, without git or an agent. */
 const session = async (): Promise<string> => {
@@ -266,6 +267,87 @@ describe('turn recording', () => {
         task: 'y', now: NOW, spawnFn: fakeSpawn,
       });
       assert.ok(second.ok, 'lock was not released after the first turn');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('an agent-filed Point of Order suspends the sitting', () => {
+  /**
+   * A spawn double where the agent, rather than acting beyond its authority,
+   * files a Point of Order — a new file under escalations/. git reports it as a
+   * newly-dirty file once the agent has run.
+   */
+  const escalatingSpawn = (() => {
+    let agentRan = false;
+    return ((command: string, args: readonly string[]) => {
+      const listeners: Record<string, ((...a: unknown[]) => void)[]> = {};
+      const stdoutListeners: ((c: Buffer) => void)[] = [];
+      const child = {
+        stdout: { on: (_e: string, fn: (c: Buffer) => void) => stdoutListeners.push(fn) },
+        stderr: { on: () => undefined },
+        kill: () => undefined,
+        on: (event: string, fn: (...a: unknown[]) => void) => {
+          (listeners[event] ??= []).push(fn);
+          return child;
+        },
+      };
+      queueMicrotask(() => {
+        let output = '';
+        if (command === 'git' && args[0] === 'rev-parse') output = 'abc123';
+        else if (command === 'git' && args[0] === 'status') {
+          output = agentRan ? '?? escalations/POINT-OF-ORDER-001.md' : '';
+        } else if (command === 'git') output = '';
+        else {
+          agentRan = true;
+          output = 'This decision is above my authority; I am filing a Point of Order.';
+        }
+        for (const fn of stdoutListeners) fn(Buffer.from(output));
+        for (const fn of listeners['close'] ?? []) fn(0);
+      });
+      return child as never;
+    }) as never;
+  })();
+
+  it('suspends the session and records the Point of Order', async () => {
+    const dir = await session();
+    try {
+      const outcome = await runTurn({
+        dir,
+        agent_id: 'claude-code',
+        actor: 'minister-alpha',
+        role: 'OPERATOR',
+        task: 'Do something requiring authority you do not hold.',
+        now: NOW,
+        spawnFn: escalatingSpawn,
+      });
+
+      assert.ok(outcome.ok, `turn should complete: ${JSON.stringify(outcome)}`);
+      assert.equal(outcome.suspended, true, 'the sitting must suspend on an agent Point of Order');
+
+      const state = parseState(readFileSync(join(dir, 'STATE.json'), 'utf8'));
+      assert.equal(state?.state, 'SUSPENDED');
+      assert.equal(state?.suspension?.cause, 'POINT_OF_ORDER');
+      assert.equal(state?.suspension?.escalation_ref, 'escalations/POINT-OF-ORDER-001.md');
+
+      const last = parseEntries(readFileSync(join(dir, 'HANSARD.md'), 'utf8')).at(-1);
+      assert.match(last?.fields['Point of Order'] ?? '', /POINT-OF-ORDER-001\.md/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves the session CONVENED when the agent touches no escalation file', async () => {
+    const dir = await session();
+    try {
+      const outcome = await runTurn({
+        dir, agent_id: 'claude-code', actor: 'a', role: 'OPERATOR',
+        task: 'Just answer.', now: NOW, spawnFn: fakeSpawnShared,
+      });
+      assert.ok(outcome.ok);
+      assert.notEqual(outcome.suspended, true);
+      assert.equal(parseState(readFileSync(join(dir, 'STATE.json'), 'utf8'))?.state, 'CONVENED');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
