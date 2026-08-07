@@ -330,6 +330,29 @@ export const exitActor = (input: ExitInput, hansard: string): {
   return { entry, hansard: appendEntry(hansard, entry) };
 };
 
+/**
+ * An elimination exit, declared by the engine rather than an actor (ADR-0007,
+ * exit: elimination). A Battle Royale culls the losing side of a Division; the
+ * cull is EXIT_DARWINIST and final, so it does not pass through the guarded
+ * exit() path — no actor is declaring it and there is nothing to appeal.
+ * AUTHORITY is never culled: the Speaker holds no seat in the register, so a
+ * caller can never reach this with one.
+ */
+export const darwinistExit = (subject: string, seat: Role, at: string): HansardEntry => ({
+  type: 'ACTOR_EXITED',
+  at,
+  actor: subject,
+  role: seat,
+  fields: {
+    'Actor affected': subject,
+    'Seat held': seat,
+    'Exit type': 'EXIT_DARWINIST',
+    Declared: 'by the protocol — elimination',
+    Reason: 'eliminated: backed the losing side of a Division under an elimination protocol',
+    Appealable: 'no — elimination is final',
+  },
+});
+
 /* -------------------------------------------------------------------------- */
 /* VETO                                                                        */
 /* -------------------------------------------------------------------------- */

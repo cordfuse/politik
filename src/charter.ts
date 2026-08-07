@@ -21,7 +21,7 @@ import {
   type Role,
 } from './canon.ts';
 import type { ProtocolRecordMode } from './protocol.ts';
-import { isResolution, type Resolution } from './division.ts';
+import { isResolution, isExitPolicy, type Resolution, type ExitPolicy } from './division.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Schema                                                                      */
@@ -133,6 +133,7 @@ export interface Charter {
    * parliamentary behavior, so an older Charter is unchanged. */
   readonly mechanics: {
     readonly resolution: Resolution;
+    readonly exit: ExitPolicy;
   };
   readonly governance: Governance;
   /** PATH_A auto-recovery policy (RUNTIME.md § Three Resolution Paths). */
@@ -343,12 +344,13 @@ export const parseCharter = (source: string): ParseResult => {
     },
     minimum_cast,
     domain_veto: asStringArray(raw['domain_veto']).filter(isRole),
-    mechanics: {
-      resolution: (() => {
-        const m = isObject(raw['mechanics']) ? raw['mechanics'] : {};
-        return isResolution(m['resolution']) ? m['resolution'] : 'majority';
-      })(),
-    },
+    mechanics: (() => {
+      const m = isObject(raw['mechanics']) ? raw['mechanics'] : {};
+      return {
+        resolution: isResolution(m['resolution']) ? m['resolution'] : 'majority',
+        exit: isExitPolicy(m['exit']) ? m['exit'] : 'division',
+      };
+    })(),
     fault_handling: (() => {
       const f = isObject(raw['fault_handling']) ? raw['fault_handling'] : {};
       const max = asNumberOrNull(f['auto_retry_max']);

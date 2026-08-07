@@ -16,6 +16,7 @@ import { isRole, type Role } from './canon.ts';
 import { appendEntry, parseEntries, type HansardEntry } from './hansard.ts';
 import { checkQuorum, type QuorumOverride } from './quorum.ts';
 import { createState, type SessionStateFile } from './state.ts';
+import { darwinistExit, seatOf } from './actors.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Votes                                                                       */
@@ -174,6 +175,49 @@ export const divisionDecided = (hansard: string, motion: string): boolean =>
       (e.type === 'MOTION_CARRIED' || e.type === 'MOTION_REJECTED') &&
       e.fields['Motion'] === motion,
   );
+
+/**
+ * How an actor leaves — the second protocol override point (ADR-0007).
+ * `division` (default) removes an actor only through the normal exit/expel path;
+ * `elimination` culls the losing side of a Division; `none` keeps everyone until
+ * the session terminates (a Jury cannot lose a member mid-deliberation).
+ */
+export type ExitPolicy = 'division' | 'elimination' | 'none';
+
+export const EXIT_POLICIES: readonly ExitPolicy[] = Object.freeze([
+  'division',
+  'elimination',
+  'none',
+]);
+
+export const isExitPolicy = (v: unknown): v is ExitPolicy =>
+  typeof v === 'string' && (EXIT_POLICIES as readonly string[]).includes(v);
+
+/**
+ * The elimination cull: under `exit: elimination`, the actors on the losing side
+ * of a decided Division are removed (EXIT_DARWINIST). The minority is culled; a
+ * tie culls no one; abstainers took no side and survive. Only seated actors are
+ * culled, so AUTHORITY — which holds no seat in the register — is never touched.
+ * Returns the exit entries to append; empty under any other policy.
+ */
+export const cull = (
+  hansard: string,
+  motion: string,
+  policy: ExitPolicy,
+  at: string,
+): readonly HansardEntry[] => {
+  if (policy !== 'elimination') return [];
+  const votes = votesFor(hansard, motion);
+  const ayes = votes.filter((v) => v.vote === 'AYE');
+  const noes = votes.filter((v) => v.vote === 'NO');
+  const losers = ayes.length > noes.length ? noes : noes.length > ayes.length ? ayes : [];
+  const entries: HansardEntry[] = [];
+  for (const loser of losers) {
+    const seat = seatOf(hansard, loser.actor);
+    if (seat !== null) entries.push(darwinistExit(loser.actor, seat.role, at));
+  }
+  return entries;
+};
 
 /** Every vote recorded against a Motion, read back from the Hansard. */
 export const votesFor = (hansard: string, motion: string): readonly CastVote[] =>

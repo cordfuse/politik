@@ -12,6 +12,8 @@ import {
   tallyDivision,
   votesFor,
 } from '../src/division.ts';
+import { cull } from '../src/division.ts';
+import { hire } from '../src/actors.ts';
 import { createState } from '../src/state.ts';
 import { parseEntries } from '../src/hansard.ts';
 
@@ -379,6 +381,62 @@ describe('a vote requires a Division to have been called', () => {
       hansard,
     );
     assert.equal(result.entry.type, 'VOTE_CAST');
+  });
+});
+
+describe('exit: elimination culls the losing side (ADR-0007)', () => {
+  const speaker = { at: AT, actor: 'speaker', role: 'AUTHORITY' as const, state: CONVENED };
+  const seated = (...names: string[]) =>
+    names.reduce((h, n) => hire({ ...speaker, subject: n, seat: 'MEMBER', reason: 'seated' }, h).hansard, BASE);
+  const ballot = (base: string, votes: readonly { actor: string; vote: 'AYE' | 'NO' | 'ABSTAIN' }[]) => {
+    let h = withCall(base, 'm');
+    for (const v of votes) {
+      h = castVote({ motion: 'm', at: AT, actor: v.actor, role: 'MEMBER', vote: v.vote, state: CONVENED }, h).hansard;
+    }
+    return h;
+  };
+
+  it('culls the seated minority when the Motion carries', () => {
+    const h = ballot(seated('alpha', 'bravo', 'charlie'), [
+      { actor: 'alpha', vote: 'AYE' }, { actor: 'bravo', vote: 'AYE' }, { actor: 'charlie', vote: 'NO' },
+    ]);
+    const exits = cull(h, 'm', 'elimination', AT);
+    assert.equal(exits.length, 1);
+    assert.equal(exits[0]!.fields?.['Actor affected'], 'charlie');
+    assert.equal(exits[0]!.fields?.['Exit type'], 'EXIT_DARWINIST');
+  });
+
+  it('culls the AYE side when the Motion is rejected', () => {
+    const h = ballot(seated('alpha', 'bravo', 'charlie'), [
+      { actor: 'alpha', vote: 'AYE' }, { actor: 'bravo', vote: 'NO' }, { actor: 'charlie', vote: 'NO' },
+    ]);
+    assert.deepEqual(cull(h, 'm', 'elimination', AT).map((e) => e.fields?.['Actor affected']), ['alpha']);
+  });
+
+  it('culls no one on a tie', () => {
+    const h = ballot(seated('alpha', 'bravo'), [{ actor: 'alpha', vote: 'AYE' }, { actor: 'bravo', vote: 'NO' }]);
+    assert.deepEqual(cull(h, 'm', 'elimination', AT), []);
+  });
+
+  it('spares abstainers — they took no side', () => {
+    const h = ballot(seated('alpha', 'bravo', 'charlie'), [
+      { actor: 'alpha', vote: 'AYE' }, { actor: 'bravo', vote: 'AYE' }, { actor: 'charlie', vote: 'ABSTAIN' },
+    ]);
+    assert.deepEqual(cull(h, 'm', 'elimination', AT), []);
+  });
+
+  it('does nothing under the default division policy', () => {
+    const h = ballot(seated('alpha', 'bravo', 'charlie'), [
+      { actor: 'alpha', vote: 'AYE' }, { actor: 'bravo', vote: 'AYE' }, { actor: 'charlie', vote: 'NO' },
+    ]);
+    assert.deepEqual(cull(h, 'm', 'division', AT), []);
+  });
+
+  it('does not cull an unseated loser — only seated actors can be eliminated', () => {
+    const h = ballot(seated('alpha', 'bravo'), [
+      { actor: 'alpha', vote: 'AYE' }, { actor: 'bravo', vote: 'AYE' }, { actor: 'charlie', vote: 'NO' },
+    ]);
+    assert.deepEqual(cull(h, 'm', 'elimination', AT), []);
   });
 });
 

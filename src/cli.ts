@@ -43,7 +43,7 @@ import {
   type CrisisRuling,
 } from './crisis.ts';
 import {
-  callDivision, castVote, divisionCalled, divisionDecided, grantAssent, recordOutcome, tallyDivision,
+  callDivision, castVote, cull, divisionCalled, divisionDecided, grantAssent, recordOutcome, tallyDivision,
   type Vote,
 } from './division.ts';
 import { PROTOCOL_MODES, type ProtocolMode } from './protocol.ts';
@@ -534,11 +534,19 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       );
       const result = recordOutcome(outcome, nowStamp(), values.actor ?? 'RECORD',
         (values.role ?? 'OPERATOR') as never, hansard);
-      await writeHansard(dir, result.hansard);
+      // exit: elimination culls the losing side (ADR-0007). The outcome is
+      // recorded first, then the cull it triggers, so the record reads in order.
+      let doc = result.hansard;
+      const eliminated = cull(doc, values.motion, charter.mechanics.exit, nowStamp());
+      for (const entry of eliminated) doc = appendEntry(doc, entry);
+      await writeHansard(dir, doc);
       out(outcome.carried ? 'MOTION CARRIED' : 'MOTION NOT CARRIED');
       out(`  ayes ${outcome.ayes}  noes ${outcome.noes}  abstentions ${outcome.abstentions}`);
       out(`  quorum ${outcome.quorum_met ? 'met' : 'NOT MET'}`);
       out(`  ${outcome.reason}`);
+      if (eliminated.length > 0) {
+        out(`  eliminated ${eliminated.length}: ${eliminated.map((e) => e.fields?.['Actor affected']).join(', ')}`);
+      }
       await recordAndCommit(dir, `${outcome.carried ? 'MOTION_CARRIED' : 'MOTION_REJECTED'} — ${values.motion}`);
       return outcome.carried ? EXIT.OK : EXIT.REFUSED;
     }
