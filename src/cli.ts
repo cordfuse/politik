@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { isRole } from './canon.ts';
+import { isRole, type Role } from './canon.ts';
 import { parseCharter, validateCharter } from './charter.ts';
 import { dropWrit } from './init.ts';
 import { initSessionRepo } from './git.ts';
@@ -31,7 +31,7 @@ import {
   linkEntry, projectAssent, projectDivision, projectEscalation,
   projectionEntry, resolveProvider,
 } from './projection.ts';
-import { checkCostCeiling, totals } from './ledger.ts';
+import { appendLedgerRow, checkCostCeiling, totals } from './ledger.ts';
 import { checkHeartbeat, lastSnapshot, markStale, resume, snapshot } from './heartbeat.ts';
 import { commitRuling, fileEscalation, type RulingOutcome } from './escalation.ts';
 import {
@@ -452,6 +452,26 @@ const writeHansard = (dir: string, hansard: string) =>
  * outside git is legitimate, but the operator should know the record is not
  * durable.
  */
+/**
+ * Record a governance act in the LEDGER. Governance acts spawn no agent, so
+ * their cost is `unmeasured` — but the act still belongs in the cost record, or
+ * the LEDGER accounts for a session's agent turns and nothing else, and the
+ * "replaces a ticket system" claim covers exactly these acts (AUDIT). Loads the
+ * Charter itself so a caller needs only the act's who and what. Call before the
+ * commit, which then includes the new row.
+ */
+const logAct = async (dir: string, actor: string, role: Role, item: string): Promise<void> => {
+  const { charter } = await loadSession(dir);
+  if (charter === null || !charter.ledger.enabled) return;
+  const path = join(dir, charter.ledger.path);
+  const doc = (await readIfPresent(path)) ?? '';
+  await writeFile(
+    path,
+    appendLedgerRow(doc, { at: nowStamp(), actor, role, item, elapsed_ms: 0, usage: null }),
+    'utf8',
+  );
+};
+
 const recordAndCommit = async (dir: string, message: string): Promise<void> => {
   const result = await commitRecord(dir, message, [
     'HANSARD.md',
@@ -611,6 +631,8 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       if (terminationMsg !== null) {
         out(`  TERMINATED — ${terminationMsg} — the Hansard is sealed`);
       }
+      await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'OPERATOR') as never,
+        `${outcome.carried ? 'MOTION_CARRIED' : 'MOTION_REJECTED'} ${values.motion}`);
       await recordAndCommit(dir, `${outcome.carried ? 'MOTION_CARRIED' : 'MOTION_REJECTED'} — ${values.motion}`);
       return outcome.carried ? EXIT.OK : EXIT.REFUSED;
     }
@@ -662,6 +684,7 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
     );
     await reportProjection(dir, `ASSENT ${values.motion}`, merged, result.hansard);
 
+    await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'AUTHORITY') as never, `ASSENT ${values.motion}`);
     await recordAndCommit(dir, `ASSENT_GRANTED — ${values.motion} enacted`);
     return EXIT.OK;
   } catch (error) {
@@ -711,6 +734,7 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
       }, hansard);
       await writeHansard(dir, result.hansard);
       out(`CRISIS FILED by ${values.actor} against ${values.against}`);
+      await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'OPERATOR') as never, `CRISIS_FILED against ${values.against}`);
       await recordAndCommit(dir, `CONSTITUTIONAL_CRISIS_FILED — ${values.actor}`);
 
       // The Charter's own declaration, not a hardcoded default. Until these
@@ -766,6 +790,7 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
       await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
       out(`EXTERNAL RULING — ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
       out(`  session is now ${result.state.state}`);
+      await logAct(dir, values.reviewer ?? 'RECORD', 'OBSERVER' as never, `CRISIS_RULING ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
       await recordAndCommit(dir, `CONSTITUTIONAL_CRISIS_RULING — ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
       return EXIT.OK;
     }
@@ -962,6 +987,7 @@ const cmdActor = async (argv: readonly string[]): Promise<number> => {
 
     await writeHansard(dir, result.hansard);
     out(message);
+    await logAct(dir, by.actor, by.role as never, message);
     await recordAndCommit(dir, `${message} — by ${by.actor}`);
     return EXIT.OK;
   } catch (error) {
@@ -1029,6 +1055,7 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
   );
   await reportProjection(dir, `ESCALATION ${values.title}`, opened, filed.hansard);
 
+  await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'OPERATOR') as never, `POINT_OF_ORDER ${values.title}`);
   await recordAndCommit(dir, `POINT_OF_ORDER — ${values.actor}: ${values.title}`);
 
   // The notification body is built here; delivery is the provider's job.
@@ -1078,6 +1105,8 @@ const cmdRule = async (argv: readonly string[]): Promise<number> => {
     out(`RULING COMMITTED — ${(values.outcome ?? 'UPHELD').toUpperCase()}`);
     out(`  ${ruling.ruling_path}`);
     out(`  session is ${ruling.state.state} — the sitting resumes`);
+    await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'AUTHORITY') as never,
+      `RULING ${(values.outcome ?? 'UPHELD').toUpperCase()}`);
     await recordAndCommit(dir, `RULING — ${(values.outcome ?? 'UPHELD').toUpperCase()}`);
     return EXIT.OK;
   } catch (error) {
@@ -1480,6 +1509,7 @@ const cmdProrogue = async (argv: readonly string[]): Promise<number> => {
       hansard,
     );
 
+    await logAct(dir, values.actor, values.role as never, `PROROGUED ${trigger}`);
     await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
     await writeFile(join(dir, 'HANSARD.md'), result.hansard, 'utf8');
     await writeFiles(dir, result.files);
