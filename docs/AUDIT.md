@@ -88,10 +88,6 @@ pass that closed eleven integrity bugs across the core loop.
    assent, escalate, rule, actor, crisis, prorogue) now writes a LEDGER row with
    unmeasured cost, so the LEDGER is a complete account of a session.
 2. ~~Doc overstatements.~~ **Closed** — the README honesty pass corrected the shipped-protocol list (10 exemplars), the cost-agent count (five report usage), the "runs natively on every layer" claim, and the game-theory table; no false capability claim remains in the front door.
-   each linting VALID and scaffoldable via `scaffold --protocol <name>`, with real
-   mechanics where they fit (jury-deliberation, battle-royale, elimination). Still
-   open: "every Hansard entry references a commit hash" (false — no SHA in
-   entries) should be trimmed.
 3. **DEADLOCK / Disputed Exit** are constructed but not wired into the CLI flow.
 4. The rest of the missing-features list remains the backlog.
 
