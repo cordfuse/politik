@@ -16,6 +16,7 @@ import { parseArgs } from 'node:util';
 
 import { parseCharter, validateCharter } from './charter.ts';
 import { dropWrit } from './init.ts';
+import { initSessionRepo } from './git.ts';
 import { parseState, serializeState } from './state.ts';
 import { parliamentaryTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
@@ -366,11 +367,17 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
     return EXIT.REFUSED;
   }
 
+  // Writ Drop creates the session repo. On a local session that means making
+  // `dir` a git repo, or the record silently never commits. Idempotent — an
+  // existing (e.g. cloned GitHub) repo is left alone.
+  const repo = await initSessionRepo(dir, values.speaker, result.state.session_guid);
+
   out('WRIT DROPPED');
   out(`  session  ${result.state.session_guid}`);
   out(`  protocol ${result.charter.protocol}`);
   out(`  state    ${result.state.state}`);
   out(`  files    ${result.files.length} written to ${dir}`);
+  out(`  git      ${repo.reason}${repo.sha ? ` (${repo.sha.slice(0, 7)})` : ''}`);
   return EXIT.OK;
 };
 

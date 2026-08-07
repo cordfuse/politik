@@ -95,3 +95,33 @@ export const commitRecord = async (
   const sha = await git(dir, ['rev-parse', 'HEAD'], spawnFn);
   return { committed: true, sha: sha.out || null, reason: 'recorded' };
 };
+
+/**
+ * Make a local session directory into a git repository so the record actually
+ * persists. Writ Drop "creates the session repo"; on a local session that means
+ * a git repo, or `commitRecord` silently no-ops and no governance act is ever
+ * recorded. Best-effort and idempotent: an existing repo is left untouched, and
+ * a host without git degrades to a plain directory rather than failing the Writ.
+ *
+ * Sets a local identity attributed to the Speaker so later record commits — made
+ * headless by the engine — have an author without relying on ambient git config.
+ */
+export const initSessionRepo = async (
+  dir: string,
+  speaker: string,
+  guid: string,
+  spawnFn: typeof spawn = spawn,
+): Promise<CommitResult> => {
+  const isRepo = await git(dir, ['rev-parse', '--is-inside-work-tree'], spawnFn);
+  if (isRepo.code === 0) return { committed: false, sha: null, reason: 'existing repository' };
+  if ((await git(dir, ['init', '-q'], spawnFn)).code !== 0) {
+    return { committed: false, sha: null, reason: 'git unavailable — local directory only' };
+  }
+  await git(dir, ['config', 'user.name', speaker], spawnFn);
+  await git(dir, ['config', 'user.email', `${speaker}@politik.local`], spawnFn);
+  await git(dir, ['add', '-A'], spawnFn);
+  const commit = await git(dir, ['commit', '-m', `writ drop: session ${guid}`], spawnFn);
+  if (commit.code !== 0) return { committed: false, sha: null, reason: 'repo initialized, nothing to commit' };
+  const sha = await git(dir, ['rev-parse', 'HEAD'], spawnFn);
+  return { committed: true, sha: sha.out || null, reason: 'session repo initialized' };
+};
