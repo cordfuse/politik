@@ -312,6 +312,7 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
       protocol: charter.protocol,
       standing_orders: charter.body,
       hansard_excerpt: recentRecord(hansard),
+      escalation_enabled: charter.session.escalation !== 'disabled',
     });
 
     const beforeHead = await head(options.dir, spawnFn);
@@ -396,7 +397,12 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     const escalationFiles = touched.filter(
       (f) => f.startsWith('escalations/') && !f.slice('escalations/'.length).startsWith('ruling'),
     );
-    const agentEscalated = escalationFiles.length > 0;
+    // A protocol declaring no escalation (ADR-0006) has no mechanism to resolve a
+    // Point of Order, so an agent's escalation file is recorded but does not
+    // suspend — suspending would deadlock the sitting in a state it cannot lift.
+    const escalationDisabled = charter.session.escalation === 'disabled';
+    const agentEscalated = escalationFiles.length > 0 && !escalationDisabled;
+    const escalationIgnored = escalationFiles.length > 0 && escalationDisabled;
 
     // Hard Containment Rule. Checked after the turn because it is detection,
     // not prevention — a spawned process runs with the OS's permissions and
@@ -426,6 +432,11 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
         ...(agentEscalated
           ? {
               'Point of Order': `actor filed ${escalationFiles.join(', ')} — the sitting is suspended pending a Speaker ruling`,
+            }
+          : {}),
+        ...(escalationIgnored
+          ? {
+              'Point of Order': `actor filed ${escalationFiles.join(', ')} — ignored: this protocol declares no escalation`,
             }
           : {}),
       },

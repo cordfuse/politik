@@ -243,6 +243,12 @@ export interface PromptContext {
   readonly hansard_excerpt?: string;
   /** Standing Orders prose from the Charter. */
   readonly standing_orders?: string;
+  /**
+   * Whether the protocol permits escalation (ADR-0006). Defaults to true. When
+   * false — a Darwinist chamber — the agent is told there is no Point of Order:
+   * it decides within its mandate or exits, since an appeal has no resolver.
+   */
+  readonly escalation_enabled?: boolean;
 }
 
 /**
@@ -266,9 +272,12 @@ export const composePrompt = (context: PromptContext): string => {
     '## Your mandate',
     '',
     `Verbs granted to your role: ${context.verbs.length > 0 ? context.verbs.join(', ') : 'none'}.`,
-    'You may not take an action your verbs do not grant. If you believe the',
-    'correct action requires a verb you do not hold, file a Point of Order',
-    'instead of proceeding.',
+    'You may not take an action your verbs do not grant.',
+    context.escalation_enabled === false
+      ? 'This protocol has no escalation: there is no Point of Order and no appeal. ' +
+        'Decide within your mandate, or exit. A decision here is final.'
+      : 'If you believe the correct action requires a verb you do not hold, file a ' +
+        'Point of Order instead of proceeding.',
     '',
     '## Standing Orders',
     '',

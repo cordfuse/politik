@@ -45,6 +45,12 @@ export interface EscalationInput {
   readonly body: string;
   /** Current state, which the escalation suspends. */
   readonly state: SessionStateFile;
+  /**
+   * True when the Charter's protocol declares `session.escalation: disabled`
+   * (ADR-0006). A protocol with no appeals — a Darwinist chamber — has no
+   * mechanism to resolve a Point of Order, so it refuses to raise one at all.
+   */
+  readonly escalation_disabled?: boolean;
 }
 
 export interface EscalationResult {
@@ -84,6 +90,13 @@ export const fileEscalation = (
   input: EscalationInput,
   hansard: string,
 ): EscalationResult & { readonly hansard: string } => {
+  // A protocol that declares no escalation has no mechanism to resolve a Point
+  // of Order (ADR-0006). Refusing to raise one is what makes a Darwinist chamber
+  // behave like one: the decision stands, and a dissenting actor exits.
+  if (input.escalation_disabled === true) {
+    throw new EscalationError('this protocol declares no escalation — a Point of Order cannot be raised');
+  }
+
   // A Point of Order suspends a live sitting, so it can only be raised from one.
   // Without this guard it would fire on any state — reopening a PROROGUED
   // (sealed) session, or clobbering the pending ruling of a session already

@@ -226,6 +226,28 @@ describe('a Point of Order may only be raised from a live sitting', () => {
   it('still files from CONVENED', () => {
     assert.equal(FILED.state.state, 'SUSPENDED');
   });
+
+  it('refuses when the protocol declares no escalation (ADR-0006)', () => {
+    assert.throws(
+      () =>
+        fileEscalation(
+          {
+            sequence: 1,
+            at: '2026-04-08T14:15:00Z',
+            actor: 'MEMBER-1',
+            role: 'MEMBER',
+            title: 'appeal',
+            body: 'let me appeal',
+            state: CONVENED,
+            escalation_disabled: true,
+          },
+          HANSARD,
+        ),
+      (error: unknown) =>
+        error instanceof EscalationError && /no escalation/.test(error.message),
+      'a Darwinist chamber has no mechanism to resolve a Point of Order',
+    );
+  });
 });
 
 describe('fault records', () => {

@@ -279,7 +279,9 @@ describe('an agent-filed Point of Order suspends the sitting', () => {
    * files a Point of Order — a new file under escalations/. git reports it as a
    * newly-dirty file once the agent has run.
    */
-  const escalatingSpawn = (() => {
+  // A factory: each test needs a fresh closure, or the agentRan flag leaks
+  // between tests and git reports no newly-dirty escalation file.
+  const makeEscalatingSpawn = () => {
     let agentRan = false;
     return ((command: string, args: readonly string[]) => {
       const listeners: Record<string, ((...a: unknown[]) => void)[]> = {};
@@ -308,7 +310,7 @@ describe('an agent-filed Point of Order suspends the sitting', () => {
       });
       return child as never;
     }) as never;
-  })();
+  };
 
   it('suspends the session and records the Point of Order', async () => {
     const dir = await session();
@@ -320,7 +322,7 @@ describe('an agent-filed Point of Order suspends the sitting', () => {
         role: 'OPERATOR',
         task: 'Do something requiring authority you do not hold.',
         now: NOW,
-        spawnFn: escalatingSpawn,
+        spawnFn: makeEscalatingSpawn(),
       });
 
       assert.ok(outcome.ok, `turn should complete: ${JSON.stringify(outcome)}`);
@@ -348,6 +350,37 @@ describe('an agent-filed Point of Order suspends the sitting', () => {
       assert.ok(outcome.ok);
       assert.notEqual(outcome.suspended, true);
       assert.equal(parseState(readFileSync(join(dir, 'STATE.json'), 'utf8'))?.state, 'CONVENED');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does NOT suspend on an agent escalation when the protocol declares no escalation (ADR-0006)', async () => {
+    const dir = await session();
+    try {
+      // A Darwinist charter: no escalation. An agent Point of Order is recorded
+      // but must not suspend — there would be no mechanism to lift it.
+      const charter = readFileSync(join(dir, 'CHARTER.md'), 'utf8').replace(
+        'escalation: enabled',
+        'escalation: disabled',
+      );
+      await writeFile(join(dir, 'CHARTER.md'), charter, 'utf8');
+
+      const outcome = await runTurn({
+        dir,
+        agent_id: 'claude-code',
+        actor: 'minister-alpha',
+        role: 'OPERATOR',
+        task: 'Do something requiring authority you do not hold.',
+        now: NOW,
+        spawnFn: makeEscalatingSpawn(),
+      });
+
+      assert.ok(outcome.ok, JSON.stringify(outcome));
+      assert.notEqual(outcome.suspended, true, 'a no-escalation protocol must not suspend');
+      assert.equal(parseState(readFileSync(join(dir, 'STATE.json'), 'utf8'))?.state, 'CONVENED');
+      const last = parseEntries(readFileSync(join(dir, 'HANSARD.md'), 'utf8')).at(-1);
+      assert.match(last?.fields['Point of Order'] ?? '', /ignored: this protocol declares no escalation/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

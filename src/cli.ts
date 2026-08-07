@@ -908,13 +908,19 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
   });
 
   const dir = values.dir ?? '.';
-  const { state } = await loadSession(dir);
+  const { state, charter } = await loadSession(dir);
   if (state === null) { err(`escalate: ${dir} is not a session repo`); return EXIT.USAGE; }
   if (values.actor === undefined || values.title === undefined || values.body === undefined) {
     err('escalate: --actor, --title and --body are required');
     return EXIT.USAGE;
   }
   if (badRole(values.role)) { err(`escalate: "${values.role}" is not a CANON role`); return EXIT.USAGE; }
+  // A protocol that declares no escalation refuses a Point of Order outright
+  // (ADR-0006) — there is no mechanism to resolve one.
+  if (charter?.session.escalation === 'disabled') {
+    err('escalate refused: this protocol declares no escalation — a Point of Order cannot be raised');
+    return EXIT.REFUSED;
+  }
   // A Point of Order suspends a live sitting; refuse from any other state so a
   // sealed (PROROGUED) session is never reopened and a pending ruling is never
   // clobbered. Mirrors division/assent.
@@ -932,6 +938,7 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
     title: values.title,
     body: values.body,
     state,
+    escalation_disabled: charter?.session.escalation === 'disabled',
   }, hansard);
 
   await writeFiles(dir, filed.files);
