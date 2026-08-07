@@ -1252,6 +1252,7 @@ const cmdRun = async (argv: readonly string[]): Promise<number> => {
   });
 
   const dir = values.dir ?? '.';
+  if (badRole(values.role)) { err(`run: "${values.role}" is not a CANON role`); return EXIT.USAGE; }
   const role = (values.role ?? 'OPERATOR') as never;
 
   // Claim mode: take business off the bus rather than inventing it. This is the
