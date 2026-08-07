@@ -14,6 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
+import { isRole } from './canon.ts';
 import { parseCharter, validateCharter } from './charter.ts';
 import { dropWrit } from './init.ts';
 import { initSessionRepo } from './git.ts';
@@ -127,6 +128,15 @@ Commands
 
 const out = (line = '') => process.stdout.write(`${line}\n`);
 const err = (line: string) => process.stderr.write(`${line}\n`);
+
+/**
+ * A supplied --role/--target must name a CANON role; an absent one falls back to
+ * a default downstream. Governance-critical commands (Division, actors) already
+ * reject a bad role in their pure layer; this guards the record-writing commands
+ * that only carry the role as attribution, so a garbage string never reaches the
+ * immutable Hansard.
+ */
+const badRole = (value: string | undefined): boolean => value !== undefined && !isRole(value);
 
 /** Exit codes: 0 success, 1 refusal (invalid input), 2 usage error. */
 const EXIT = { OK: 0, REFUSED: 1, USAGE: 2 } as const;
@@ -617,6 +627,7 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
         err('crisis file: --actor, --against and --grounds are required');
         return EXIT.USAGE;
       }
+      if (badRole(values.role)) { err(`crisis file: "${values.role}" is not a CANON role`); return EXIT.USAGE; }
       const result = fileCrisis({
         at: nowStamp(), actor: values.actor, role: (values.role ?? 'OPERATOR') as never,
         grounds: values.grounds, against: values.against, state,
@@ -896,6 +907,7 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
     err('escalate: --actor, --title and --body are required');
     return EXIT.USAGE;
   }
+  if (badRole(values.role)) { err(`escalate: "${values.role}" is not a CANON role`); return EXIT.USAGE; }
   // A Point of Order suspends a live sitting; refuse from any other state so a
   // sealed (PROROGUED) session is never reopened and a pending ruling is never
   // clobbered. Mirrors division/assent.
@@ -955,6 +967,7 @@ const cmdRule = async (argv: readonly string[]): Promise<number> => {
     err('rule: --actor and --body are required');
     return EXIT.USAGE;
   }
+  if (badRole(values.role)) { err(`rule: "${values.role}" is not a CANON role`); return EXIT.USAGE; }
 
   const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
 
@@ -1102,6 +1115,7 @@ const cmdBroadcast = async (argv: readonly string[]): Promise<number> => {
     return EXIT.REFUSED;
   }
 
+  if (badRole(values.target)) { err(`broadcast: "${values.target}" is not a CANON role`); return EXIT.USAGE; }
   const target = values.target ?? 'OPERATOR';
   const declared = charter.constituencies
     .filter((c) => c.role === target)
@@ -1349,6 +1363,10 @@ const cmdProrogue = async (argv: readonly string[]): Promise<number> => {
   const dir = values.dir ?? '.';
   if (values.actor === undefined || values.role === undefined) {
     err('prorogue: --actor and --role are required');
+    return EXIT.USAGE;
+  }
+  if (badRole(values.role)) {
+    err(`prorogue: "${values.role}" is not a CANON role`);
     return EXIT.USAGE;
   }
 
