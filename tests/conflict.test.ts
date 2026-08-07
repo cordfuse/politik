@@ -6,6 +6,7 @@ import {
   IS_GOVERNANCE_FAILURE,
   conflictEntry,
   detectConflicts,
+  detectRecordConflicts,
   mayResolve,
   openConflicts,
   resolveConflict,
@@ -58,6 +59,41 @@ describe('detection', () => {
   it('handles a single Motion and an empty set', () => {
     assert.deepEqual(detectConflicts([{ motion: 'a', files: ['x'] }]), []);
     assert.deepEqual(detectConflicts([]), []);
+  });
+});
+
+describe('detecting conflicts from the record', () => {
+  const turn = (actor: string, at: string, files: string) => ({
+    type: 'MOTION_TABLED' as const,
+    at,
+    actor,
+    role: 'OPERATOR' as const,
+    fields: { 'Files touched': files },
+  });
+
+  const record = (...entries: ReturnType<typeof turn>[]) =>
+    entries.reduce((h, e) => appendEntry(h, e), '# HANSARD\n\n---\n');
+
+  it('flags two agent turns that touch the same file, though neither carries a Motion id', () => {
+    // The regression: agent turns carry "Files touched" but no Motion id. Keying
+    // by the file list collapsed both turns into one unit and reported nothing.
+    const conflicts = detectRecordConflicts(
+      record(turn('claude-1', 'T1', 'src/shared.ts'), turn('codex-1', 'T2', 'src/shared.ts, src/x.ts')),
+    );
+    assert.equal(conflicts.length, 1, 'the overlap on src/shared.ts must be detected');
+    assert.deepEqual([...conflicts[0]!.files], ['src/shared.ts']);
+    assert.equal(conflicts[0]!.motions.length, 2, 'both turns are named as distinct parties');
+  });
+
+  it('does not flag turns that touch different files', () => {
+    assert.deepEqual(
+      detectRecordConflicts(record(turn('a', 'T1', 'src/a.ts'), turn('b', 'T2', 'src/b.ts'))),
+      [],
+    );
+  });
+
+  it('ignores entries with no files touched', () => {
+    assert.deepEqual(detectRecordConflicts(record(turn('a', 'T1', 'none'))), []);
   });
 });
 

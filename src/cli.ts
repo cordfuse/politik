@@ -24,7 +24,7 @@ import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
 import { GitTransport } from './transport.ts';
-import { conflictEntry, detectConflicts, openConflicts, resolveConflict } from './conflict.ts';
+import { conflictEntry, detectRecordConflicts, openConflicts, resolveConflict } from './conflict.ts';
 import { parseEnvelope, isEligible, type Envelope } from './envelope.ts';
 import { commitRecord } from './git.ts';
 import {
@@ -1023,17 +1023,7 @@ const cmdConflict = async (argv: readonly string[]): Promise<number> => {
   if (verb === 'check') {
     // Motions are files under motions/; a conflict is an overlap in what the
     // Motions themselves touch, read from the record.
-    const touched = new Map<string, string[]>();
-    for (const entry of parseEntries(hansard)) {
-      const files = entry.fields['Files touched'];
-      const motion = entry.fields['Motion'] ?? entry.fields['Files touched'];
-      if (files === undefined || files === 'none' || motion === undefined) continue;
-      touched.set(motion, files.split(',').map((f) => f.trim()).filter((f) => f.length > 0));
-    }
-
-    const conflicts = detectConflicts(
-      [...touched.entries()].map(([motion, files]) => ({ motion, files })),
-    );
+    const conflicts = detectRecordConflicts(hansard);
 
     if (conflicts.length === 0) {
       out('no conflicts');

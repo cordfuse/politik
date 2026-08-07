@@ -68,6 +68,27 @@ export const detectConflicts = (motions: readonly MotionFiles[]): readonly Confl
   return conflicts;
 };
 
+/**
+ * Detect conflicts directly from the record.
+ *
+ * Reads every entry that declares "Files touched" and treats each as a unit of
+ * work. A Motion id names the unit when present; an agent turn carries none, so
+ * it is identified by actor+timestamp. Keying by the file list instead — as an
+ * earlier version did — collapsed two turns that touched the *same* file into
+ * one unit, and the conflict between them, the very overlap this detects, was
+ * lost. This is governance logic, so it lives here rather than in the CLI.
+ */
+export const detectRecordConflicts = (hansard: string): readonly Conflict[] => {
+  const touched = new Map<string, string[]>();
+  for (const entry of parseEntries(hansard)) {
+    const files = entry.fields['Files touched'];
+    if (files === undefined || files === 'none') continue;
+    const motion = entry.fields['Motion'] ?? `${entry.actor}@${entry.at}`;
+    touched.set(motion, files.split(',').map((f) => f.trim()).filter((f) => f.length > 0));
+  }
+  return detectConflicts([...touched.entries()].map(([motion, files]) => ({ motion, files })));
+};
+
 /* -------------------------------------------------------------------------- */
 /* Standing                                                                    */
 /* -------------------------------------------------------------------------- */
