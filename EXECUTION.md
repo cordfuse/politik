@@ -151,19 +151,22 @@ Where a vendor does not report spend the row records `unmeasured`, never a
 figure derived from a rate card. An estimate dressed as a measurement is the one
 failure this ledger exists to avoid.
 
-**Backlog — three agents unverified.** Their registry entries follow the
-documented invocation and are shipped, but none has been exercised live. Each
-is a host-setup task, not a framework defect:
+**Backlog.** Registry entries follow the documented invocation and ship, but
+these have not been fully closed. Host-setup, not framework defects:
 
-| Agent | Blocker | To verify |
+| Agent | Blocker | To close |
 |---|---|---|
 | Qwen Code | `No auth type is selected` | configure an auth type, then re-run the live check |
-| Aider | not installed on this host | install, then re-run |
-| Goose | not installed on this host | install, then re-run |
+| Antigravity | usage only emits under `--dangerously-skip-permissions` | capture one real sample, then add its ledger parser |
 
-Phase 3 is otherwise complete. These three close out by re-running the same live
-check once their host prerequisites are met — no code change is expected, but
-the codex and gemini findings below are exactly why "expected" is not "verified".
+**Roadmap — Aider & Goose ledger measurement (help wanted).** Both ship as
+runnable agents and record `unmeasured` in the LEDGER. That is safe by design:
+a missing parser returns `null`, never a fabricated number. Adding cost
+measurement for them is **deferred and open for a PR** — install the tool,
+capture its real usage output, and add a `parseAider` / `parseGoose` to
+`src/ledger.ts` following the existing pattern. Not on the v1 critical path.
+
+Phase 3 is otherwise complete.
 
 **Antigravity added.** `agy` supports `-p`/`--print` headless, is a
 Cordfuse-supported CLI, and was absent from the compatibility table. Verified

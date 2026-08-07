@@ -105,6 +105,11 @@ export const parseUsage = (agentId: string, stdout: string): Usage | null => {
     };
   }
 
+  // Antigravity (agy) usage will parse here once a real sample is captured.
+  // Aider and Goose are deliberately deferred and open for a PR (see EXECUTION.md
+  // § Roadmap — Aider & Goose): install the tool, capture its real usage output,
+  // and add a parseAider/parseGoose here. Falling through to null records
+  // `unmeasured` — safe, never a fabricated number.
   return null;
 };
 
