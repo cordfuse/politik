@@ -753,6 +753,13 @@ const cmdSnapshot = async (argv: readonly string[]): Promise<number> => {
   const dir = values.dir ?? '.';
   const { state, hansard, charter } = await loadSession(dir);
   if (state === null || charter === null) { err(`snapshot: ${dir} is not a session repo`); return EXIT.USAGE; }
+  // A checkpoint records live business (completed/in-flight/pending) so a STALE
+  // sitting can resume from it — meaningless on a sealed or dead session, and
+  // appending to a Hansard prorogation sealed would break the seal.
+  if (state.state === 'PROROGUED' || state.state === 'INVALID') {
+    err(`snapshot refused: the session is ${state.state} — its Hansard is sealed`);
+    return EXIT.REFUSED;
+  }
 
   const ledgerDoc = (await readIfPresent(join(dir, charter.ledger.path))) ?? '';
   const spent = totals(ledgerDoc);
