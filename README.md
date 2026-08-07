@@ -85,15 +85,15 @@ The Speaker (human) is constitutionally present, not operationally present. Drop
 
 ### Governance Protocols
 
-**Ten reference protocols ship** — Parliamentary, Agile, Military, Legal, Corporate, Battle Royale, League Season, Elimination Tournament, Peer Review, Red/Blue Team — spanning constitutional, authoritarian and darwinist modes. A further 25+ are specified across 12 domains in [PROTOCOLS.md](PROTOCOLS.md) and are community contributions. Every protocol is a vocabulary translation on top of CANON; Parliamentary is protocol #1, not a privileged mode.
+**Ten reference protocols ship** — Parliamentary, Republic, Monarchy, Socialism (political archetypes), Jury Deliberation, Elimination Tournament, Emergency Response (ICS), Corporate, Peer Review, and Adversarial Collaboration — spanning constitutional, authoritarian and darwinist modes. Each is a vocabulary translation **plus** a composition of behavioral mechanics — how a decision resolves (majority · supermajority · unanimity), how an actor exits (voted out · elimination · none), and when a session ends (objective · last-standing · verdict) — on top of CANON. You compose your own for anything else; the framework is the product, these are exemplars. Parliamentary is protocol #1, not a privileged mode. A wider catalogue of governance shapes is sketched in [PROTOCOLS.md](PROTOCOLS.md).
 
 ### Hansard and LEDGER
 
 **Hansard** — append-only session record. Every motion, vote, escalation, and commit. Attributed, timestamped, immutable. Cannot be edited. Cannot be gamed.
 
-**LEDGER** — cost accounting per agent turn: elapsed time, token count, dollar cost, model. No story points.
+**LEDGER** — cost accounting per act: elapsed time, token count, dollar cost, model. Every governance act writes a row; agent turns carry measured spend, and the human-driven acts (division, assent, escalation, ruling) carry `unmeasured` cost, so the ledger is a complete account of a session. No story points.
 
-Measured, never estimated — and the distinction is enforced. An agent that reports usage produces exact figures; one that does not is recorded as `unmeasured`, never as `$0.00`, and totals report unmeasured rows separately rather than folding them in. Today only Claude Code reports usage; the other adapters record elapsed time and mark cost unmeasured.
+Measured, never estimated — and the distinction is enforced. An agent that reports usage produces exact figures; one that does not is recorded as `unmeasured`, never as `$0.00`, and totals report unmeasured rows separately rather than folding them in. Five CLI agents report usage today — Claude Code, Codex, Gemini, OpenCode and Qwen; the rest record elapsed time and mark cost `unmeasured`.
 
 ---
 
@@ -107,13 +107,13 @@ Every protocol in Politik instantiates a formal game structure:
 
 | Protocol | Game Structure | Nash Equilibrium Prediction |
 |---|---|---|
-| Parliamentary Democracy | Cooperative with veto players | Stable coalition at quorum threshold |
-| Military Operation | Stackelberg leader-follower | Full compliance, zero deviation |
-| Agile/Scrum | Cooperative, shared payoff | Consensus-seeking, slow convergence |
-| Battle Royale | All-pay elimination | Aggressive early, conservative late |
-| Legal/Adversarial | Two-player zero-sum | Maximum evidence disclosure |
+| Parliamentary | Cooperative with veto players | Stable coalition at quorum threshold |
+| Emergency Response (ICS) | Stackelberg leader-follower | Full compliance, zero deviation |
+| Jury Deliberation | Unanimity / holdout game | Convergence to consensus, or a hung result |
+| Elimination Tournament | All-pay elimination | Aggressive early, conservative late |
+| Adversarial Collaboration | Two-player, pre-committed | Maximum honest disclosure |
 
-**The research question:** do AI agents converge on Nash Equilibrium predictions when governed by protocols that formally instantiate known game structures? If yes — protocol selection becomes a mechanism design problem. If no — why do agents deviate? Either result is publishable. Either result is significant.
+**The research question** (not yet a built feature — see [RESEARCH.md](RESEARCH.md)): do AI agents converge on Nash Equilibrium predictions when governed by protocols that formally instantiate known game structures? If yes — protocol selection becomes a mechanism design problem. If no — why do agents deviate? Either result is publishable.
 
 ---
 
@@ -134,9 +134,9 @@ That is not a feature comparison. It is a category difference.
 
 Politik produces a superior project record as a **zero-overhead side effect** of running governed sessions. Nobody updates it. Nobody logs time. It is all there because it cannot be otherwise.
 
-### GitHub Platform Alignment
+### GitHub Alignment
 
-Microsoft owns GitHub, GitHub Actions, Azure, VS Code, Copilot, and Teams. Politik runs natively on every layer of this stack. GitHub Copilot is included in GitHub Enterprise seat licences at flat cost — no per-token billing. When Politik runs on GitHub Actions with Copilot as the agent, sessions run at **zero marginal inference cost**. The inference economics structurally favour the GitHub platform.
+A session is a git repository, so Politik runs anywhere git does. Point it at a GitHub repo and governance acts additionally project onto the platform — a Motion becomes a pull request, a Division a review request, an Escalation an issue, Assent a merge — and a shipped Actions workflow emails the Speaker when an escalation is filed. Agents run in GitHub Actions like any other CLI. The projection is optional; without it a session is complete and correct on git alone.
 
 ### Open Source
 
