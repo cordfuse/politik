@@ -74,6 +74,14 @@ describe('HIRE', () => {
       ActorError,
     );
   });
+
+  it('refuses a seat that is not a CANON role', () => {
+    assert.throws(
+      () => hire({ ...speaker, subject: 'x', seat: 'WIZARD' as never, reason: 'r' }, BASE),
+      (error: unknown) => error instanceof ActorError && /not a CANON role/.test(error.message),
+      'a non-CANON seat must never reach the immutable record',
+    );
+  });
 });
 
 describe('PROMOTE and DEMOTE', () => {
@@ -106,6 +114,13 @@ describe('PROMOTE and DEMOTE', () => {
     assert.throws(
       () => promote({ ...speaker, subject: 'alpha', to: 'AUTHORITY', reason: 'r' }, seated()),
       /may be promoted into AUTHORITY/,
+    );
+  });
+
+  it('refuses a destination that is not a CANON role', () => {
+    assert.throws(
+      () => promote({ ...speaker, subject: 'alpha', to: 'WIZARD' as never, reason: 'r' }, seated()),
+      (error: unknown) => error instanceof ActorError && /not a CANON role/.test(error.message),
     );
   });
 

@@ -17,7 +17,7 @@
  * Attribution: Steve Krisjanovs, Cordfuse
  */
 
-import { ROLE_PRECEDENCE, type Role } from './canon.ts';
+import { ROLE_PRECEDENCE, isRole, type Role } from './canon.ts';
 import { appendEntry, parseEntries, type HansardEntry } from './hansard.ts';
 import { createState } from './state.ts';
 import type { SessionStateFile } from './state.ts';
@@ -169,6 +169,9 @@ export const hire = (input: HireInput, hansard: string): {
   requireConvened(input.state, 'HIRE');
   requireAuthority(input, 'HIRE');
 
+  if (!isRole(input.seat)) {
+    throw new ActorError(`not a CANON role: ${String(input.seat)}`);
+  }
   if (input.seat === 'AUTHORITY') {
     throw new ActorError(
       'AUTHORITY cannot be granted by HIRE — the Speaker is constitutional, not appointed',
@@ -213,6 +216,9 @@ const move = (
   const seat = seatOf(hansard, input.subject);
   if (seat === null) throw new ActorError(`${input.subject} holds no seat`);
 
+  if (!isRole(input.to)) {
+    throw new ActorError(`not a CANON role: ${String(input.to)}`);
+  }
   if (input.to === 'AUTHORITY') {
     throw new ActorError('no actor may be promoted into AUTHORITY');
   }
