@@ -97,6 +97,7 @@ Usage
   politik motion link --motion <id> --pr <n> [--url <u>]
   politik ledger [--dir <dir>]
   politik status [--dir <dir>]
+  politik hansard [--dir <dir>]           # the record, in the protocol's vocabulary
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
 
 Commands
@@ -1469,6 +1470,53 @@ const cmdRun = async (argv: readonly string[]): Promise<number> => {
   return EXIT.OK;
 };
 
+/**
+ * Render a CANON entry type in the protocol's vocabulary. The stored type stays
+ * CANON (the engine parses it); this is only for the human-facing `hansard` view.
+ * Unknown types humanise gracefully rather than showing a raw token.
+ */
+const translateEntryType = (protocol: Protocol | null, type: string): string => {
+  const t = (canon: string) => asTerm(protocol, canon);
+  const map: Record<string, string> = {
+    WRIT_DROP: 'Writ dropped',
+    MOTION_TABLED: `${t('MOTION')} tabled`,
+    MOTION_CARRIED: `${t('MOTION')} carried`,
+    MOTION_REJECTED: `${t('MOTION')} rejected`,
+    VOTE_CAST: `${t('VOTE')} cast`,
+    DIVISION_CALLED: `${t('DIVISION')} called`,
+    POINT_OF_ORDER: `${t('ESCALATION')} raised`,
+    RULING: 'Ruling',
+    ASSENT_GRANTED: `${t('ASSENT')} granted`,
+    ACTOR_HIRED: 'Seated',
+    ACTOR_EXITED: `${t('EXIT')}`,
+    ACTOR_PROMOTED: `${t('PROMOTE')}`,
+    ACTOR_DEMOTED: `${t('DEMOTE')}`,
+    STATE_SNAPSHOT: 'Checkpoint',
+    SESSION_TIMEOUT: `${t('DISSOLVE')}`,
+  };
+  return map[type] ?? type.toLowerCase().replace(/_/g, ' ');
+};
+
+/** `politik hansard` — the record, rendered in the protocol's vocabulary. */
+const cmdHansard = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' } } });
+  const dir = values.dir ?? '.';
+  const { state, hansard, charter } = await loadSession(dir);
+  if (state === null) { err(`hansard: ${dir} is not a session repo`); return EXIT.USAGE; }
+
+  const protocol = charter === null ? null : await sessionProtocol(charter.protocol);
+  const entries = parseEntries(hansard);
+  out(`RECORD — ${charter?.protocol ?? 'session'} (${entries.length} entr${entries.length === 1 ? 'y' : 'ies'})`);
+  out('');
+  for (const entry of entries) {
+    out(`${entry.at}  ${translateEntryType(protocol, entry.type)}`);
+    out(`  by ${entry.actor} (${asRoleTerm(protocol, entry.role)})`);
+    const body = (entry.fields['Body'] ?? '').trim();
+    if (body !== '') out(`  ${body}`);
+  }
+  return EXIT.OK;
+};
+
 const cmdStatus = async (argv: readonly string[]): Promise<number> => {
   const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' } } });
   const dir = values.dir ?? '.';
@@ -1628,6 +1676,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdLedger(rest);
     case 'run':
       return cmdRun(rest);
+    case 'hansard':
+      return cmdHansard(rest);
     case 'status':
       return cmdStatus(rest);
     case 'prorogue':
