@@ -1054,7 +1054,8 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
     title: values.title,
     body: values.body,
     state,
-    escalation_disabled: charter?.session.escalation === 'disabled',
+    // The escalation-disabled case already returned above, so it cannot be
+    // disabled here; fileEscalation's own guard covers non-CLI callers.
   }, hansard);
 
   await writeFiles(dir, filed.files);

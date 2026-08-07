@@ -102,6 +102,7 @@ describe('linter — errors', () => {
     no_escalation: false,
     no_record: false,
     immutable_charter: false,
+    mechanics: { resolution: 'majority', exit: 'division', termination: 'objective' },
   };
 
   it('rejects a name that is not lower-kebab-case', () => {
@@ -151,6 +152,7 @@ describe('linter — warnings', () => {
     no_escalation: true,
     no_record: false,
     immutable_charter: false,
+    mechanics: { resolution: 'majority', exit: 'division', termination: 'objective' },
   };
 
   it('warns on a non-semver version without failing', () => {

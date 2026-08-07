@@ -51,7 +51,7 @@ export interface ProviderConfig {
   readonly baseBranch?: string | undefined;
 }
 
-export interface Resolution {
+export interface ProviderResolution {
   readonly provider: ScmProvider | null;
   /** Why there is no provider, for the operator. Null when there is one. */
   readonly reason: string | null;
@@ -67,7 +67,7 @@ export interface Resolution {
 export const resolveProvider = (
   config: ProviderConfig,
   env: NodeJS.ProcessEnv = process.env,
-): Resolution => {
+): ProviderResolution => {
   if (config.repo === undefined || config.repo === '') {
     return { provider: null, reason: 'no --repo given — running local-only' };
   }
