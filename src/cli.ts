@@ -888,6 +888,13 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
     err('escalate: --actor, --title and --body are required');
     return EXIT.USAGE;
   }
+  // A Point of Order suspends a live sitting; refuse from any other state so a
+  // sealed (PROROGUED) session is never reopened and a pending ruling is never
+  // clobbered. Mirrors division/assent.
+  if (state.state !== 'CONVENED') {
+    err(`escalate refused: cannot raise a Point of Order while the session is ${state.state}`);
+    return EXIT.REFUSED;
+  }
 
   const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
   const filed = fileEscalation({
@@ -1079,6 +1086,12 @@ const cmdBroadcast = async (argv: readonly string[]): Promise<number> => {
   if (values.task === undefined) {
     err('broadcast: --task is required');
     return EXIT.USAGE;
+  }
+  // Opening the floor dispatches work to agents; only a live sitting may do so.
+  // A sealed or suspended session must not be sending out fresh business.
+  if (state.state !== 'CONVENED') {
+    err(`broadcast refused: cannot open the floor while the session is ${state.state}`);
+    return EXIT.REFUSED;
   }
 
   const target = values.target ?? 'OPERATOR';

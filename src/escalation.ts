@@ -73,10 +73,27 @@ export const rulingPath = (sequence: number): string =>
  * halt as soon as this state is committed — the pause is a consequence of the
  * record, not a separate mechanism.
  */
+export class EscalationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'EscalationError';
+  }
+}
+
 export const fileEscalation = (
   input: EscalationInput,
   hansard: string,
 ): EscalationResult & { readonly hansard: string } => {
+  // A Point of Order suspends a live sitting, so it can only be raised from one.
+  // Without this guard it would fire on any state — reopening a PROROGUED
+  // (sealed) session, or clobbering the pending ruling of a session already
+  // SUSPENDED for an earlier Point of Order. Mirrors the Division/Assent guard.
+  if (input.state.state !== 'CONVENED') {
+    throw new EscalationError(
+      `cannot raise a Point of Order while the session is ${input.state.state}`,
+    );
+  }
+
   const escalation_path = escalationPath(input.at);
   const ruling_path = rulingPath(input.sequence);
 

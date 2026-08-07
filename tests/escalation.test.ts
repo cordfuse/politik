@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  EscalationError,
   RulingError,
   commitRuling,
   escalationPath,
@@ -186,6 +187,44 @@ describe('constitutional constraints on ruling', () => {
       () => commitRuling({ ...base, role: 'AUTHORITY', state: crisis }, FILED.hansard),
       /CONSTITUTIONAL_CRISIS/,
     );
+  });
+});
+
+describe('a Point of Order may only be raised from a live sitting', () => {
+  const stateIn = (s: 'PROROGUED' | 'SUSPENDED' | 'STALE' | 'INVALID') =>
+    createState({
+      session_guid: 'session-1',
+      protocol: 'parliamentary',
+      state: s,
+      quorum: { required: 2, present: 2 },
+      updated_at: '2026-04-08T14:00:00Z',
+    });
+
+  for (const s of ['PROROGUED', 'SUSPENDED', 'STALE', 'INVALID'] as const) {
+    it(`refuses to file while the session is ${s}`, () => {
+      assert.throws(
+        () =>
+          fileEscalation(
+            {
+              sequence: 1,
+              at: '2026-04-08T14:15:00Z',
+              actor: 'MEMBER-1',
+              role: 'MEMBER',
+              title: 'late',
+              body: 'too late',
+              state: stateIn(s),
+            },
+            HANSARD,
+          ),
+        (error: unknown) =>
+          error instanceof EscalationError && new RegExp(s).test(error.message),
+        `${s} must not be reopened by an escalation`,
+      );
+    });
+  }
+
+  it('still files from CONVENED', () => {
+    assert.equal(FILED.state.state, 'SUSPENDED');
   });
 });
 
