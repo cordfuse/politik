@@ -67,12 +67,12 @@ const USAGE = `politik — governed multi-agent sessions on git
 
 Usage
   politik version
-  politik scaffold --out <dir> [--protocol parliamentary] [--quorum <n>]
+  politik scaffold --dir <dir> [--protocol parliamentary] [--quorum <n>]
   politik doctor
   politik protocol lint <manifest.yml>
   politik protocol new <name> [--mode <mode>] [--out <dir>]
   politik validate <charter.md> [--protocol <name>]
-  politik init --charter <path> --speaker <handle> [--out <dir>] [--guid <id>]
+  politik init --charter <path> --speaker <handle> [--dir <dir>] [--guid <id>]
   politik run --agent <id> --actor <h> --role <ROLE> (--task <text> | --claim)
   politik division call --motion <id> --actor <h> --role <ROLE> [--reviewers a,b]
   politik division vote --motion <id> --actor <h> --role <ROLE> --vote AYE|NO|ABSTAIN
@@ -166,6 +166,7 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
   const { values } = parseArgs({
     args: [...argv],
     options: {
+      dir: { type: 'string' },
       out: { type: 'string' },
       protocol: { type: 'string' },
       quorum: { type: 'string' },
@@ -184,7 +185,10 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
     return EXIT.USAGE;
   }
 
-  const dir = values.out ?? '.';
+  // Session directory: `--dir` is the standard across every other command;
+  // `--out` is kept as an alias so a scaffold script written against the old
+  // flag still works.
+  const dir = values.dir ?? values.out ?? '.';
   const files = parliamentaryTemplates(quorum === undefined ? {} : { quorum });
   await writeFiles(dir, files);
 
@@ -328,6 +332,7 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
     options: {
       charter: { type: 'string' },
       speaker: { type: 'string' },
+      dir: { type: 'string' },
       out: { type: 'string' },
       guid: { type: 'string' },
       protocol: { type: 'string' },
@@ -353,7 +358,8 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
     protocol: values.protocol === undefined ? undefined : { name: values.protocol },
   });
 
-  const dir = values.out ?? '.';
+  // `--dir` is the standard flag; `--out` stays an accepted alias here.
+  const dir = values.dir ?? values.out ?? '.';
   await writeFiles(dir, result.files);
 
   if (!result.ok) {
