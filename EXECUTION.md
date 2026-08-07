@@ -133,7 +133,7 @@ per agent — agents differ only in argv shape and auth story.
 **Live results.** Each agent was driven through `spawnAgent()` with a trivial
 prompt and had to return a specific token. Five passed.
 
-**Cost measurement — four of eight agents report usage.** The LEDGER was
+**Cost measurement — five of nine agents report usage.** The LEDGER was
 `unmeasured` for everything but Claude Code until the adapters were probed
 directly:
 
@@ -145,26 +145,30 @@ directly:
 | Codex CLI | yes | — | — |
 | Qwen Code | yes (same shape as Gemini) | — | yes |
 | Antigravity | — | — | — |
+| GitHub Copilot | — | — | — |
 | Aider, Goose | not installed | — | — |
 
 Where a vendor does not report spend the row records `unmeasured`, never a
 figure derived from a rate card. An estimate dressed as a measurement is the one
 failure this ledger exists to avoid.
 
-**Backlog.** Registry entries follow the documented invocation and ship, but
-these have not been fully closed. Host-setup, not framework defects:
+**Supported set.** The agents in active use — and the ones the LEDGER is kept
+honest for — are **Claude Code, Antigravity (`agy`), Codex, OpenCode**, plus
+**GitHub Copilot** (newly added to the registry). Everything else stays in the
+registry and runs, but is not on the critical path.
+
+**Backlog (active).**
 
 | Agent | Blocker | To close |
 |---|---|---|
-| Qwen Code | `No auth type is selected` | configure an auth type, then re-run the live check |
 | Antigravity | usage only emits under `--dangerously-skip-permissions` | capture one real sample, then add its ledger parser |
+| GitHub Copilot | needs an active Copilot subscription with the CLI policy enabled | once reachable, verify live + capture the usage shape for a parser |
 
-**Roadmap — Aider & Goose ledger measurement (help wanted).** Both ship as
-runnable agents and record `unmeasured` in the LEDGER. That is safe by design:
-a missing parser returns `null`, never a fabricated number. Adding cost
-measurement for them is **deferred and open for a PR** — install the tool,
-capture its real usage output, and add a `parseAider` / `parseGoose` to
-`src/ledger.ts` following the existing pattern. Not on the v1 critical path.
+**Roadmap — help wanted (outside the used set).** Gemini, Qwen, Aider, Goose.
+Gemini and Qwen already report tokens and keep working; Aider and Goose record
+`unmeasured`. All ship as runnable agents. Verifying or adding their measurement
+is **deferred and open for a PR** — a missing parser returns `null`, never a
+fabricated number. Not on the v1 critical path.
 
 Phase 3 is otherwise complete.
 
