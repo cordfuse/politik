@@ -16,7 +16,7 @@ const manifests = readdirSync(PROTOCOL_DIR).filter((f) => f.endsWith('.yml'));
 describe('shipped protocol library', () => {
   it('ships the reference protocol library', () => {
     assert.ok(manifests.length >= 10, `expected at least 10 manifests, found: ${manifests.join(', ')}`);
-    for (const core of ['parliamentary.yml', 'battle-royale.yml', 'peer-review.yml']) {
+    for (const core of ['parliamentary.yml', 'jury-deliberation.yml', 'peer-review.yml']) {
       assert.ok(manifests.includes(core), `missing core protocol ${core}`);
     }
   });
@@ -58,22 +58,22 @@ describe('mode families', () => {
     return parsed.protocol;
   };
 
-  it('battle-royale forbids appeals — Darwinist, pure statute', () => {
-    const p = load('battle-royale.yml');
+  it('elimination-tournament is Darwinist and eliminates', () => {
+    const p = load('elimination-tournament.yml');
     assert.equal(p.mode, 'darwinist');
-    assert.ok(p.no_escalation);
+    assert.equal(p.mechanics.exit, 'elimination');
   });
 
-  it('military is authoritarian and still records', () => {
-    const p = load('military.yml');
+  it('emergency-response is authoritarian and still records', () => {
+    const p = load('emergency-response-ics.yml');
     assert.equal(p.mode, 'authoritarian');
     assert.ok(!p.no_record);
   });
 
-  it('legal grants the Jury a domain veto despite OBSERVER trust', () => {
-    const p = load('legal.yml');
+  it('emergency-response gives the Safety Officer a domain veto', () => {
+    const p = load('emergency-response-ics.yml');
     assert.deepEqual([...p.domain_veto], ['OBSERVER']);
-    assert.equal(p.roles.OBSERVER, 'Jury');
+    assert.equal(p.roles.OBSERVER, 'Safety Officer');
   });
 
   it('peer-review grants a reviewer-level domain veto', () => {
@@ -222,8 +222,8 @@ describe('generator', () => {
 });
 
 describe('manifests carry mechanics (ADR-0007 plumbing)', () => {
-  it('battle-royale declares elimination + last-standing', () => {
-    const parsed = parseProtocol(readFileSync(join(PROTOCOL_DIR, 'battle-royale.yml'), 'utf8'));
+  it('elimination-tournament declares elimination + last-standing', () => {
+    const parsed = parseProtocol(readFileSync(join(PROTOCOL_DIR, 'elimination-tournament.yml'), 'utf8'));
     assert.ok(parsed.ok);
     assert.equal(parsed.protocol.mechanics.exit, 'elimination');
     assert.equal(parsed.protocol.mechanics.termination, 'last-standing');
