@@ -9,14 +9,18 @@ framework, plus the Phase 2 reference implementation.
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
-**Current status: PHASES 2–7 COMPLETE, on `main`.** The framework runs, governs,
-and has been exercised live — Motions tabled by real agents, carried by Division,
-enacted by Assent onto a real pull request, and a simulated constitutional
-collapse. 32 modules, 542 tests.
+**Current status: PHASES 2–7 COMPLETE + protocol mechanics, on `main`.** The
+framework runs, governs, and has been exercised live — Motions tabled by real
+agents, carried by Division, enacted by Assent, a simulated constitutional
+collapse. Protocols now genuinely **behave** differently (one shared engine,
+composable mechanics — ADR-0007) and **read** differently (vocabulary display).
+~35 modules, 656 tests, CI green.
 
 Architecture decisions are in [`docs/adr/`](docs/adr/). ADR-0001 (transport),
 ADR-0002 (CHARTER.md schema), ADR-0003 (STATE.json schema), ADR-0004 (motion
-enactment) and ADR-0005 (Hansard format) are all **Accepted**.
+enactment), ADR-0005 (Hansard format), ADR-0006 (protocol behavioral
+enforcement — `session.escalation`) and ADR-0007 (protocol mechanics — composable
+`resolution`/`exit`/`termination` override points) are all **Accepted**.
 `POLITIK-ARCHITECTURE.md` was amended only by ADR-0004, which added the `ASSENT`
 verb and the `CONFLICT` primitive.
 
@@ -26,6 +30,43 @@ is now closed; the remaining entries are documentation history.
 
 Phase 1's only remaining item is the arXiv preprint. Phase 8 (public launch) has
 not started.
+
+## Where we left off (2026-08-07)
+
+A long session that took Politik from "works" to "behaves, reads, and tells the
+truth." What shipped, all on `main`:
+
+- **ADR-0007 — protocol mechanics.** One engine, composable override points a
+  protocol declares: `resolution` (majority/supermajority/unanimity), `exit`
+  (division/elimination/none), `termination` (objective/last-standing/verdict).
+  A Jury (unanimity+verdict) and a Battle Royale (elimination+last-standing)
+  behave distinctly. `scaffold --protocol <name>` inherits a manifest's mechanics
+  turnkey. Charter is the runtime authority (like `domain_veto`); manifests
+  declare for coherence.
+- **ADR-0006 — `session.escalation` enforced.** A no-escalation protocol refuses
+  a Point of Order (CLI, pure `fileEscalation`, and the agent-turn auto-suspend).
+- **Vocabulary display.** The CLI speaks each session's protocol (roles + terms),
+  and `politik hansard` renders the CANON record in the protocol's language on
+  demand. The stored `HANSARD.md` stays CANON — the engine parses it.
+- **Ledger coverage.** Every governance act writes a LEDGER row (`unmeasured` for
+  human acts), so the ledger is a complete account, not agent-turns-only.
+- **Protocol library curated to 10 exemplars** (was 52 → cut fascism +
+  organized-crime as liabilities, then the toys). Kept the political archetypes
+  (parliamentary/republic/monarchy/socialism) at Steve's instruction. The wider
+  catalogue lives as prose in PROTOCOLS.md.
+- **Audit reconciled** (`docs/AUDIT.md`) — all 8 real bugs closed (#8 fixed this
+  session); README honesty pass corrected the false capability claims.
+- **Dogfood pass** earlier in the session closed 11 core-loop integrity bugs.
+
+**Process note:** run `npm run lint` (tsc) before every push — `tsx` test runs
+skip typechecking, which silently failed CI on ~30 commits until caught.
+
+**Open / next, ranked:** (1) wire `DEADLOCK` auto-suspend on a tie and the
+`disputed-exit` reinstatement flow into the CLI (both constructed + tested, not
+wired). (2) Backlog: PATH_A auto-recovery, scheduled heartbeat/ruling workflows,
+NATS transport, the `pairing`/`scoring` override points (Swiss/tournament). (3)
+A showcase run (real agents, a Jury or Battle Royale deciding something, ledger
+showing real cost) as the launch artifact. Phase 8 (public launch) not started.
 
 **Implementation stack (decided):** Node + TypeScript, npm `@cordfuse/politik`,
 binary `politik`. Consistent with the namespace reserved in Phase 0 and the
