@@ -6,6 +6,31 @@ See [POLITIK-ARCHITECTURE.md](POLITIK-ARCHITECTURE.md) for CANON, session struct
 
 ---
 
+## Implementation status
+
+This library is the protocol *design* — the vocabulary, roles, and governance
+shape of each protocol, with its game-theory analysis. What the engine enforces
+today is narrower than what is described here, and the two should not be
+conflated:
+
+- **Vocabulary** — enforced. A protocol's role and primitive terms translate
+  CANON for the interface and the record.
+- **Behavioral flags** — partially enforced. `session.escalation` is wired
+  (a protocol declaring no escalation refuses a Point of Order — see
+  [ADR-0006](docs/adr/0006-protocol-behavioral-enforcement.md)). `no_record` and
+  `immutable_charter` are declared on the manifests but not yet enforced.
+- **Game-theory mechanics** — *not built*. Elimination, tournament brackets,
+  scoring, and the Nash-equilibrium behaviors analysed below are the research
+  agenda ([RESEARCH.md](RESEARCH.md)), not engine features. A `mode: darwinist`
+  protocol differs from Parliament today only in its enforced behavioral flags,
+  not in any elimination engine. Read the "Mode" and "Nash Eq" lines below as the
+  *intended* design, not a description of current runtime behavior.
+
+Ten protocols ship as manifests in `protocols/*.yml`; only `parliamentary` has a
+full scaffoldable Charter. The rest of this document is the design catalogue.
+
+---
+
 ## PROTOCOL LIBRARY
 
 ### DOMAIN: POLITICS & GOVERNANCE
