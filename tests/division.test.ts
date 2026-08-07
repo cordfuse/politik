@@ -382,6 +382,31 @@ describe('a vote requires a Division to have been called', () => {
   });
 });
 
+describe('only a CANON role may act on a Division', () => {
+  it('refuses a vote whose role is not a CANON role', () => {
+    assert.throws(
+      () =>
+        castVote(
+          { motion: 'motion-001', at: AT, actor: 'a', role: 'KING' as never, vote: 'AYE', state: CONVENED },
+          withCall(BASE),
+        ),
+      (error: unknown) => error instanceof DivisionError && /not a CANON role/.test(error.message),
+      'a non-CANON role must never reach the immutable record',
+    );
+  });
+
+  it('refuses a Division call whose role is not a CANON role', () => {
+    assert.throws(
+      () =>
+        callDivision(
+          { motion: 'm', at: AT, actor: 'x', role: 'WIZARD' as never, reviewers: [], state: CONVENED },
+          BASE,
+        ),
+      (error: unknown) => error instanceof DivisionError && /not a CANON role/.test(error.message),
+    );
+  });
+});
+
 describe('a decided Division is closed — one Division per Motion', () => {
   // A carried Motion, outcome recorded.
   const decided = (() => {

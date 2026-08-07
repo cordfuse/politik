@@ -12,7 +12,7 @@
  * Attribution: Steve Krisjanovs, Cordfuse
  */
 
-import type { Role } from './canon.ts';
+import { isRole, type Role } from './canon.ts';
 import { appendEntry, parseEntries, type HansardEntry } from './hansard.ts';
 import { checkQuorum, type QuorumOverride } from './quorum.ts';
 import { createState, type SessionStateFile } from './state.ts';
@@ -59,6 +59,9 @@ export const callDivision = (input: CallDivisionInput, hansard: string): {
   readonly entry: HansardEntry;
   readonly hansard: string;
 } => {
+  if (!isRole(input.role)) {
+    throw new DivisionError(`not a CANON role: ${String(input.role)}`);
+  }
   if (input.state.state !== 'CONVENED') {
     throw new DivisionError(
       `cannot call a Division while the session is ${input.state.state}`,
@@ -111,6 +114,9 @@ export const castVote = (input: CastVoteInput, hansard: string): {
   readonly entry: HansardEntry;
   readonly hansard: string;
 } => {
+  if (!isRole(input.role)) {
+    throw new DivisionError(`not a CANON role: ${String(input.role)}`);
+  }
   if (input.state.state !== 'CONVENED') {
     throw new DivisionError(`cannot vote while the session is ${input.state.state}`);
   }
