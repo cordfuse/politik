@@ -38,7 +38,15 @@ const SUSPENDED = createState({
 const AT = '2026-04-08T15:00:00Z';
 const BASE = '# HANSARD\n\n---\n';
 
-/** Cast a run of votes onto a Hansard. */
+/** A Hansard with a Division already called on the motion — the precondition
+ * for any vote. Votes cannot be cast into a Division that was never called. */
+const withCall = (hansard: string, motion = 'motion-001'): string =>
+  callDivision(
+    { motion, at: AT, actor: 'speaker', role: 'AUTHORITY', reviewers: [], state: CONVENED },
+    hansard,
+  ).hansard;
+
+/** Cast a run of votes onto a Hansard, calling the Division first. */
 const withVotes = (
   votes: readonly { actor: string; vote: 'AYE' | 'NO' | 'ABSTAIN' }[],
   motion = 'motion-001',
@@ -49,7 +57,7 @@ const withVotes = (
         { motion, at: AT, actor: v.actor, role: 'OPERATOR', vote: v.vote, state: CONVENED },
         hansard,
       ).hansard,
-    BASE,
+    withCall(BASE, motion),
   );
 
 describe('calling a Division', () => {
@@ -92,6 +100,7 @@ describe('casting votes', () => {
 
   it('scopes votes to their Motion', () => {
     let hansard = withVotes([{ actor: 'alpha', vote: 'AYE' }]);
+    hansard = withCall(hansard, 'motion-002');
     hansard = castVote(
       { motion: 'motion-002', at: AT, actor: 'alpha', role: 'OPERATOR', vote: 'NO', state: CONVENED },
       hansard,
@@ -346,6 +355,30 @@ describe('deadlock suspends rather than silently passing', () => {
       2,
     );
     assert.throws(() => suspendForDeadlock(carried, AT, CONVENED, BASE), DivisionError);
+  });
+});
+
+describe('a vote requires a Division to have been called', () => {
+  it('refuses a vote on a Motion no Division was called on', () => {
+    assert.throws(
+      () =>
+        castVote(
+          { motion: 'never-called', at: AT, actor: 'a', role: 'OPERATOR', vote: 'AYE', state: CONVENED },
+          BASE,
+        ),
+      (error: unknown) =>
+        error instanceof DivisionError && /no Division has been called/.test(error.message),
+      'phantom votes would let an un-called Motion be tallied as carried',
+    );
+  });
+
+  it('accepts the vote once the Division is called', () => {
+    const hansard = withCall(BASE, 'real-motion');
+    const result = castVote(
+      { motion: 'real-motion', at: AT, actor: 'a', role: 'OPERATOR', vote: 'AYE', state: CONVENED },
+      hansard,
+    );
+    assert.equal(result.entry.type, 'VOTE_CAST');
   });
 });
 

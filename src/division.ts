@@ -115,6 +115,13 @@ export const castVote = (input: CastVoteInput, hansard: string): {
     throw new DivisionError(`not a valid vote: ${String(input.vote)}`);
   }
 
+  // A vote only exists inside a Division. Without this a vote could be cast on a
+  // Motion no Division was ever called on, and enough such phantom votes would
+  // let a tally "carry" a Motion that never reached the floor.
+  if (!divisionCalled(hansard, input.motion)) {
+    throw new DivisionError(`no Division has been called on ${input.motion}`);
+  }
+
   // One vote per actor per Motion. A second vote is not an amendment — it is an
   // attempt to rewrite a record that is append-only by construction.
   const already = votesFor(hansard, input.motion).find((v) => v.actor === input.actor);
@@ -134,6 +141,12 @@ export const castVote = (input: CastVoteInput, hansard: string): {
 
   return { entry, hansard: appendEntry(hansard, entry) };
 };
+
+/** Whether a Division was ever called on this Motion. */
+export const divisionCalled = (hansard: string, motion: string): boolean =>
+  parseEntries(hansard).some(
+    (e) => e.type === 'DIVISION_CALLED' && e.fields['Motion'] === motion,
+  );
 
 /** Every vote recorded against a Motion, read back from the Hansard. */
 export const votesFor = (hansard: string, motion: string): readonly CastVote[] =>
