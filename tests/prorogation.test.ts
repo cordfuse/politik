@@ -4,10 +4,12 @@ import assert from 'node:assert/strict';
 import {
   ProrogationError,
   checkTermination,
+  lastStanding,
   prorogue,
   type Ceilings,
 } from '../src/prorogation.ts';
 import { createState } from '../src/state.ts';
+import { hire } from '../src/actors.ts';
 import { lastEntry, parseEntries } from '../src/hansard.ts';
 
 const NONE: Ceilings = {
@@ -263,5 +265,34 @@ describe('sealed record', () => {
     );
     assert.equal(parseEntries(again.hansard).length, 2);
     assert.ok(again.hansard.startsWith(withEntry.hansard));
+  });
+});
+
+describe('termination: last-standing (ADR-0007)', () => {
+  const CONVENED = createState({
+    session_guid: 'ls',
+    protocol: 'parliamentary',
+    state: 'CONVENED',
+    quorum: { required: 1, present: 1 },
+    updated_at: '2026-04-08T14:00:00Z',
+  });
+  const seat = (h: string, who: string) =>
+    hire({ at: '2026-04-08T14:00:00Z', actor: 'host', role: 'AUTHORITY', state: CONVENED, subject: who, seat: 'MEMBER', reason: 'seated' }, h).hansard;
+  const BASE = '# HANSARD\n\n---\n';
+
+  it('terminates with a survivor when one seat remains', () => {
+    const check = lastStanding(seat(BASE, 'solo'));
+    assert.equal(check.terminate, true);
+    assert.equal(check.survivor, 'solo');
+  });
+
+  it('does not terminate while two or more remain', () => {
+    assert.equal(lastStanding(seat(seat(BASE, 'a'), 'b')).terminate, false);
+  });
+
+  it('terminates with no survivor when the field is empty — a mutual wipeout', () => {
+    const check = lastStanding(BASE);
+    assert.equal(check.terminate, true);
+    assert.equal(check.survivor, null);
   });
 });

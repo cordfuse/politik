@@ -47,7 +47,7 @@ import {
   type Vote,
 } from './division.ts';
 import { PROTOCOL_MODES, type ProtocolMode } from './protocol.ts';
-import { checkTermination, prorogue, type Trigger } from './prorogation.ts';
+import { checkTermination, lastStanding, prorogue, type Trigger } from './prorogation.ts';
 import { appendEntry, parseEntries } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
 
@@ -539,6 +539,31 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       let doc = result.hansard;
       const eliminated = cull(doc, values.motion, charter.mechanics.exit, nowStamp());
       for (const entry of eliminated) doc = appendEntry(doc, entry);
+
+      // termination: last-standing ends the session the moment a cull leaves one
+      // seated actor (ADR-0007). Checked only after an actual elimination, so a
+      // fresh, as-yet-unseated session is never mistaken for a finished one.
+      let sealed: { survivor: string | null } | null = null;
+      if (charter.mechanics.termination === 'last-standing' && eliminated.length > 0) {
+        const standing = lastStanding(doc);
+        if (standing.terminate) {
+          const end = prorogue(
+            {
+              at: nowStamp(),
+              actor: 'RECORD',
+              role: 'OPERATOR' as never,
+              trigger: 'TRIGGER_LAST_STANDING' as Trigger,
+              state,
+              summary: standing.survivor ? `Last standing: ${standing.survivor}` : 'No actors remain',
+            },
+            doc,
+          );
+          doc = end.hansard;
+          await writeFile(join(dir, 'STATE.json'), serializeState(end.state), 'utf8');
+          sealed = { survivor: standing.survivor };
+        }
+      }
+
       await writeHansard(dir, doc);
       out(outcome.carried ? 'MOTION CARRIED' : 'MOTION NOT CARRIED');
       out(`  ayes ${outcome.ayes}  noes ${outcome.noes}  abstentions ${outcome.abstentions}`);
@@ -546,6 +571,9 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       out(`  ${outcome.reason}`);
       if (eliminated.length > 0) {
         out(`  eliminated ${eliminated.length}: ${eliminated.map((e) => e.fields?.['Actor affected']).join(', ')}`);
+      }
+      if (sealed !== null) {
+        out(`  TERMINATED — last standing: ${sealed.survivor ?? 'none'} — the Hansard is sealed`);
       }
       await recordAndCommit(dir, `${outcome.carried ? 'MOTION_CARRIED' : 'MOTION_REJECTED'} — ${values.motion}`);
       return outcome.carried ? EXIT.OK : EXIT.REFUSED;

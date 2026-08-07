@@ -24,6 +24,7 @@ import type { Role } from './canon.ts';
 import { appendEntry } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
 import { createState, type SessionStateFile } from './state.ts';
+import { seats } from './actors.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Triggers                                                                    */
@@ -34,9 +35,39 @@ export const TRIGGERS = [
   'TRIGGER_DEADLINE',
   'TRIGGER_COST',
   'TRIGGER_SPEAKER',
+  'TRIGGER_LAST_STANDING',
 ] as const;
 
 export type Trigger = (typeof TRIGGERS)[number];
+
+/**
+ * When a session ends on its own — the third protocol override point (ADR-0007).
+ * `objective` (default) ends only on an explicit prorogation or a configured
+ * ceiling. `last-standing` ends the moment one seated actor remains — the Battle
+ * Royale terminal condition, checked after an elimination cull.
+ */
+export type TerminationPolicy = 'objective' | 'last-standing';
+
+export const TERMINATION_POLICIES: readonly TerminationPolicy[] = Object.freeze([
+  'objective',
+  'last-standing',
+]);
+
+export const isTerminationPolicy = (v: unknown): v is TerminationPolicy =>
+  typeof v === 'string' && (TERMINATION_POLICIES as readonly string[]).includes(v);
+
+/**
+ * Is the field down to a single survivor? Reads the seat register — AUTHORITY
+ * holds no seat, so a lone Speaker never counts as the winner. Caller should
+ * only consult this after an elimination actually occurred, so an as-yet-unseated
+ * fresh session is not mistaken for a finished one.
+ */
+export const lastStanding = (hansard: string): { readonly terminate: boolean; readonly survivor: string | null } => {
+  const remaining = seats(hansard);
+  return remaining.length <= 1
+    ? { terminate: true, survivor: remaining[0]?.actor ?? null }
+    : { terminate: false, survivor: null };
+};
 
 /** Ceilings from the Charter. Null means the condition is not configured. */
 export interface Ceilings {

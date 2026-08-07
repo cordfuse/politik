@@ -22,6 +22,7 @@ import {
 } from './canon.ts';
 import type { ProtocolRecordMode } from './protocol.ts';
 import { isResolution, isExitPolicy, type Resolution, type ExitPolicy } from './division.ts';
+import { isTerminationPolicy, type TerminationPolicy } from './prorogation.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Schema                                                                      */
@@ -134,6 +135,7 @@ export interface Charter {
   readonly mechanics: {
     readonly resolution: Resolution;
     readonly exit: ExitPolicy;
+    readonly termination: TerminationPolicy;
   };
   readonly governance: Governance;
   /** PATH_A auto-recovery policy (RUNTIME.md § Three Resolution Paths). */
@@ -349,6 +351,7 @@ export const parseCharter = (source: string): ParseResult => {
       return {
         resolution: isResolution(m['resolution']) ? m['resolution'] : 'majority',
         exit: isExitPolicy(m['exit']) ? m['exit'] : 'division',
+        termination: isTerminationPolicy(m['termination']) ? m['termination'] : 'objective',
       };
     })(),
     fault_handling: (() => {
