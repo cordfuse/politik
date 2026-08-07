@@ -1,0 +1,27 @@
+# Motorsport / F1 — Constitutional protocol.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: motorsport-f1
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Race Director
+    DELEGATE: Deputy Race Director
+    OPERATOR: Team Principal
+    MEMBER: Driver
+    OBSERVER: Spectator
+  primitives:
+    SESSION: Race Weekend
+    CHARTER: Sporting Regulations
+    RECORD: Race Results
+    MOTION: Pit Strategy Call
+    DIVISION: Stewards Decision
+    ESCALATION: Protest to Stewards
+    SUSPENSION: Safety Car
+    EXIT: DNF
+    DEADLOCK: Stewards Under Review
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

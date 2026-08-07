@@ -1,0 +1,26 @@
+# Round Robin — Constitutional protocol.
+# Everyone plays everyone; standings decide, no elimination mid-pool.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: round-robin
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Tournament Director
+    DELEGATE: Deputy Director
+    OPERATOR: Team Captain
+    MEMBER: Competitor
+    OBSERVER: Spectator
+  primitives:
+    SESSION: Round Robin Pool
+    RECORD: Points Table
+    MOTION: Match
+    DIVISION: Match Result
+    SUSPENSION: Pool Complete
+    EXIT: Pool Stage Elimination
+    DEADLOCK: Points Tie
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

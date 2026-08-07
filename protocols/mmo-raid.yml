@@ -1,0 +1,27 @@
+# MMO Raid / Guild — Constitutional protocol.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: mmo-raid
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Guild Master
+    DELEGATE: Officer
+    OPERATOR: Role Lead
+    MEMBER: Member
+    OBSERVER: Applicant
+  primitives:
+    SESSION: Raid
+    CHARTER: Guild Rules
+    RECORD: Raid Report
+    MOTION: Raid Call
+    DIVISION: Loot Vote
+    ESCALATION: Officer Ticket
+    SUSPENSION: Reset
+    EXIT: Gkicked
+    DEADLOCK: Loot Drama
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

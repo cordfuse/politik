@@ -1,0 +1,27 @@
+# Draft / Fantasy — Constitutional protocol with a Commissioner veto.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: draft-fantasy
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Commissioner
+    DELEGATE: Deputy Commissioner
+    OPERATOR: Team Manager
+    MEMBER: Owner
+    OBSERVER: Fan
+  primitives:
+    SESSION: Draft
+    CHARTER: League Rules
+    RECORD: Draft Board
+    MOTION: Pick
+    DIVISION: Trade Vote
+    ESCALATION: Commissioner Review
+    SUSPENSION: Off Season
+    EXIT: Dropped
+    DEADLOCK: Disputed Trade
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

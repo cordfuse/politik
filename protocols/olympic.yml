@@ -1,0 +1,26 @@
+# Olympic / Multi-Sport — Constitutional protocol with a domain veto.
+# An Anti-Doping authority (DELEGATE) can void results — a domain veto.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: olympic
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Organizing Committee
+    DELEGATE: Anti-Doping Authority
+    OPERATOR: Chef de Mission
+    MEMBER: Athlete
+    OBSERVER: Spectator
+  primitives:
+    SESSION: Games
+    RECORD: Medal Table
+    MOTION: Event
+    DIVISION: Judge Panel Score
+    ESCALATION: CAS Appeal
+    EXIT: Disqualified
+  domain_veto:
+    - DELEGATE
+  no_escalation: false
+  no_record: false
+  immutable_charter: false
