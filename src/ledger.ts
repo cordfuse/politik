@@ -264,7 +264,11 @@ export const appendLedgerRow = (document: string, entry: LedgerEntry): string =>
   const base = document.endsWith('\n') || document === '' ? document : `${document}\n`;
   const hasHeader = base.includes('| Timestamp | Actor |');
   const row = renderRow(entry);
-  return hasHeader ? `${base}${row}\n` : `${base}\n${LEDGER_HEADER}\n${row}\n`;
+  // Trim trailing blank lines before appending. The LEDGER template ends its
+  // header with a blank line; without this the first row lands one line below
+  // the separator, and a blank line inside a markdown table splits it in two —
+  // so the cost record renders as a broken table on the platform that hosts it.
+  return hasHeader ? `${base.replace(/\n+$/, '\n')}${row}\n` : `${base}\n${LEDGER_HEADER}\n${row}\n`;
 };
 
 /* -------------------------------------------------------------------------- */

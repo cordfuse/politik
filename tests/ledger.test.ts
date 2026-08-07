@@ -170,6 +170,16 @@ describe('appending', () => {
     const before = '# LEDGER\n\nPreamble.\n';
     assert.ok(appendLedgerRow(before, entry()).startsWith(before));
   });
+
+  it('lands the first row flush under the header — no blank line splits the table', () => {
+    // The LEDGER template ends its header with a trailing blank line. A blank
+    // line inside a markdown table breaks it into two on the platform that
+    // renders it, so the row must sit directly under the separator.
+    const templated = `${LEDGER_HEADER}\n\n`;
+    const doc = appendLedgerRow(templated, entry());
+    assert.ok(!/\|\n\s*\n\|/.test(doc), 'a blank line separates two table rows');
+    assert.match(doc, /\|---\|[^\n]*\n\| /, 'the first row must follow the separator directly');
+  });
 });
 
 describe('totals', () => {
