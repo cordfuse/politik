@@ -87,7 +87,7 @@ pass that closed eleven integrity bugs across the core loop.
 1. ~~LEDGER rows only from `run`.~~ **Closed** — every governance act (division,
    assent, escalate, rule, actor, crisis, prorogue) now writes a LEDGER row with
    unmeasured cost, so the LEDGER is a complete account of a session.
-2. **Doc overstatements** — "35+ protocols" is now **true**: 52 manifests ship,
+2. ~~Doc overstatements.~~ **Closed** — the README honesty pass corrected the shipped-protocol list (10 exemplars), the cost-agent count (five report usage), the "runs natively on every layer" claim, and the game-theory table; no false capability claim remains in the front door.
    each linting VALID and scaffoldable via `scaffold --protocol <name>`, with real
    mechanics where they fit (jury-deliberation, battle-royale, elimination). Still
    open: "every Hansard entry references a commit hash" (false — no SHA in
