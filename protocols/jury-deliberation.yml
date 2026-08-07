@@ -1,0 +1,32 @@
+# Jury Deliberation — Constitutional protocol. The canonical Jury: it deliberates
+# until unanimous, then delivers a verdict and rises (ADR-0007). Deliberations are
+# sealed in practice; the record toggle is not modelled here.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: jury-deliberation
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Foreperson
+    DELEGATE: Deputy Foreperson
+    OPERATOR: Senior Juror
+    MEMBER: Juror
+    OBSERVER: Court Officer
+  primitives:
+    SESSION: Deliberation
+    CHARTER: Jury Instructions
+    MOTION: Argument
+    DIVISION: Verdict Vote
+    ESCALATION: Note to Judge
+    SUSPENSION: Recess
+    EXIT: Dismissed
+    DEADLOCK: Hung Jury
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false
+  mechanics:
+    resolution: unanimity
+    exit: none
+    termination: verdict

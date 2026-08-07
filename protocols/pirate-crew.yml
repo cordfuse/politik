@@ -1,0 +1,27 @@
+# Pirate Crew — Constitutional protocol (pirate crews were surprisingly democratic).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: pirate-crew
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Captain
+    DELEGATE: First Mate
+    OPERATOR: Quartermaster
+    MEMBER: Crew
+    OBSERVER: Passenger
+  primitives:
+    SESSION: Voyage
+    CHARTER: Articles
+    RECORD: Ship's Log
+    MOTION: Ship's Council Proposal
+    DIVISION: Crew Vote
+    ESCALATION: Mutiny Vote
+    SUSPENSION: Made Port
+    EXIT: Marooned
+    DEADLOCK: Contested Command
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

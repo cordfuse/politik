@@ -1,0 +1,28 @@
+# Adversarial Collaboration — Constitutional + Immutable protocol. Two opposed
+# agents pre-commit to a shared design before data, then interpret the result
+# under an independent arbitrator. Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: adversarial-collaboration
+  version: 1.0.0
+  mode: immutable
+  record_mode: distributed
+  roles:
+    AUTHORITY: Independent Arbitrator
+    DELEGATE: Opponent Agent
+    OPERATOR: Proponent Agent
+    MEMBER: Research Team
+    OBSERVER: Scientific Community
+  primitives:
+    SESSION: Collaboration
+    CHARTER: Pre-registered Agreement
+    RECORD: Joint Report
+    MOTION: Experimental Run
+    DIVISION: Result Interpretation
+    ESCALATION: Arbitrator Ruling
+    SUSPENSION: Joint Publication
+    EXIT: Protocol Violation
+    DEADLOCK: Genuinely Ambiguous Result
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: true

@@ -1,0 +1,27 @@
+# Game Development — Constitutional protocol (drifts authoritarian near ship).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: game-development
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Game Director
+    DELEGATE: Lead Designer
+    OPERATOR: Senior Dev
+    MEMBER: Developer
+    OBSERVER: QA
+  primitives:
+    SESSION: Milestone
+    CHARTER: Game Design Document
+    RECORD: Changelog
+    MOTION: Feature
+    DIVISION: Team Vote
+    ESCALATION: Publisher Review
+    SUSPENSION: Gold
+    EXIT: Left
+    DEADLOCK: Feature Creep Freeze
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

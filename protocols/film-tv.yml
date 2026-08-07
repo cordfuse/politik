@@ -1,0 +1,26 @@
+# Film / TV Production — Authoritarian protocol (the Director decides).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: film-tv
+  version: 1.0.0
+  mode: authoritarian
+  record_mode: anchored
+  roles:
+    AUTHORITY: Director
+    DELEGATE: First AD
+    OPERATOR: Department Head
+    MEMBER: Crew
+    OBSERVER: Studio
+  primitives:
+    SESSION: Production
+    CHARTER: Shot List
+    RECORD: Continuity Notes
+    MOTION: Take
+    ESCALATION: Studio Notes
+    SUSPENSION: Wrap
+    EXIT: Walked Off Set
+    DEADLOCK: Creative Differences
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

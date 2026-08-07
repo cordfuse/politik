@@ -1,0 +1,28 @@
+# Clinical Trial / Research — Constitutional protocol; the IRB can halt the study.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: clinical-trial
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Principal Investigator
+    DELEGATE: Lab Manager
+    OPERATOR: Senior Researcher
+    MEMBER: Graduate Student
+    OBSERVER: IRB
+  primitives:
+    SESSION: Study
+    CHARTER: Protocol
+    RECORD: Lab Notebook
+    MOTION: Hypothesis
+    DIVISION: Peer Review
+    ESCALATION: Protocol Deviation Report
+    SUSPENSION: Publication
+    EXIT: Retracted
+    DEADLOCK: Replication Crisis
+  domain_veto:
+    - OBSERVER
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

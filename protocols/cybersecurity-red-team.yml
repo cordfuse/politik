@@ -1,0 +1,27 @@
+# Cybersecurity / Red Team — Constitutional protocol with a Compliance domain veto.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: cybersecurity-red-team
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Security Director
+    DELEGATE: Red Team Lead
+    OPERATOR: Penetration Tester
+    MEMBER: Analyst
+    OBSERVER: Compliance Officer
+  primitives:
+    SESSION: Engagement
+    CHARTER: Rules of Engagement
+    RECORD: Findings Report
+    MOTION: Attack Vector
+    DIVISION: Severity Vote
+    ESCALATION: Critical Finding
+    SUSPENSION: Engagement Close
+    EXIT: Out of Scope
+  domain_veto:
+    - OBSERVER
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

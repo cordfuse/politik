@@ -1,0 +1,25 @@
+# Startup — Authoritarian protocol (founder decides; no formal escalation).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: startup
+  version: 1.0.0
+  mode: authoritarian
+  record_mode: anchored
+  roles:
+    AUTHORITY: Founder
+    DELEGATE: Co-founder
+    OPERATOR: CTO
+    MEMBER: Employee
+    OBSERVER: Investor
+  primitives:
+    SESSION: Sprint
+    CHARTER: Move Fast Break Things
+    RECORD: Slack Archive
+    MOTION: Shipped Feature
+    SUSPENSION: Pivot
+    EXIT: Quit
+    DEADLOCK: Co-founder Dispute
+  domain_veto: []
+  no_escalation: true
+  no_record: false
+  immutable_charter: false

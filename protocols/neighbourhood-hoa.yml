@@ -1,0 +1,27 @@
+# Neighbourhood / HOA — Constitutional protocol.
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: neighbourhood-hoa
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Board President
+    DELEGATE: Vice President
+    OPERATOR: Committee Chair
+    MEMBER: Homeowner
+    OBSERVER: Renter
+  primitives:
+    SESSION: AGM
+    CHARTER: Bylaws
+    RECORD: Meeting Minutes
+    MOTION: Resolution
+    DIVISION: Member Vote
+    ESCALATION: Legal Counsel Review
+    SUSPENSION: Meeting Adjourned
+    EXIT: Left Community
+    DEADLOCK: Tied Vote
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

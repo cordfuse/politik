@@ -1,0 +1,27 @@
+# Emergency Response / ICS — Authoritarian protocol; the Safety Officer can
+# override the Incident Commander on safety (a domain veto carve-out).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: emergency-response-ics
+  version: 1.0.0
+  mode: authoritarian
+  record_mode: anchored
+  roles:
+    AUTHORITY: Incident Commander
+    DELEGATE: Operations Section Chief
+    OPERATOR: Division Supervisor
+    MEMBER: Unit Leader
+    OBSERVER: Safety Officer
+  primitives:
+    SESSION: Incident
+    CHARTER: ICS Protocol
+    RECORD: Incident Action Plan
+    MOTION: Tactical Assignment
+    ESCALATION: Safety Officer Override
+    SUSPENSION: Demobilization
+    EXIT: Relieved
+  domain_veto:
+    - OBSERVER
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

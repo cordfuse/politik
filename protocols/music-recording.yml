@@ -1,0 +1,27 @@
+# Music Recording — Authoritarian protocol (the Producer decides).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: music-recording
+  version: 1.0.0
+  mode: authoritarian
+  record_mode: anchored
+  roles:
+    AUTHORITY: Producer
+    DELEGATE: Engineer
+    OPERATOR: Session Lead
+    MEMBER: Session Musician
+    OBSERVER: Label
+  primitives:
+    SESSION: Recording Session
+    CHARTER: Creative Brief
+    RECORD: Session Log
+    MOTION: Take
+    DIVISION: Producer Decision
+    ESCALATION: Label Review
+    SUSPENSION: Session End
+    EXIT: Replaced
+    DEADLOCK: Creative Block
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

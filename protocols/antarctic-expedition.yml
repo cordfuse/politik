@@ -1,0 +1,27 @@
+# Antarctic Expedition — Immutable protocol (safety rules non-negotiable).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: antarctic-expedition
+  version: 1.0.0
+  mode: immutable
+  record_mode: anchored
+  roles:
+    AUTHORITY: Expedition Leader
+    DELEGATE: Deputy Leader
+    OPERATOR: Senior Scientist
+    MEMBER: Junior Scientist
+    OBSERVER: Base Commander
+  primitives:
+    SESSION: Expedition Season
+    CHARTER: Station Protocol
+    RECORD: Station Log
+    MOTION: Field Decision
+    DIVISION: Team Vote
+    ESCALATION: Emergency Protocol
+    SUSPENSION: Winter-Over
+    EXIT: Medically Evacuated
+    DEADLOCK: Comms Blackout
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: true

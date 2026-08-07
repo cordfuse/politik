@@ -1,0 +1,27 @@
+# Pre-registration / Open Science — Immutable protocol (protocol frozen after
+# registration). Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: pre-registration
+  version: 1.0.0
+  mode: immutable
+  record_mode: distributed
+  roles:
+    AUTHORITY: Registry
+    DELEGATE: IRB Reviewer
+    OPERATOR: Principal Investigator Agent
+    MEMBER: Research Team Agent
+    OBSERVER: Public
+  primitives:
+    SESSION: Research Study
+    CHARTER: Pre-registered Protocol
+    RECORD: Open Lab Notebook
+    MOTION: Hypothesis
+    DIVISION: IRB Approval
+    ESCALATION: Protocol Deviation Report
+    SUSPENSION: Publication
+    EXIT: Study Terminated
+    DEADLOCK: IRB Review Required
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: true

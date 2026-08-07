@@ -1,0 +1,27 @@
+# Religion / Church — Immutable protocol (Scripture cannot be amended mid-session).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: religion-church
+  version: 1.0.0
+  mode: immutable
+  record_mode: anchored
+  roles:
+    AUTHORITY: Bishop
+    DELEGATE: Vicar
+    OPERATOR: Priest
+    MEMBER: Congregation
+    OBSERVER: Seeker
+  primitives:
+    SESSION: Synod
+    CHARTER: Canon Law
+    RECORD: Encyclical
+    MOTION: Decree
+    DIVISION: Council Vote
+    ESCALATION: Holy See
+    SUSPENSION: Benediction
+    EXIT: Excommunicated
+    DEADLOCK: Schism
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: true

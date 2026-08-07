@@ -1,0 +1,25 @@
+# Arbitration — Authoritarian protocol (binding, no appeal by design).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: arbitration
+  version: 1.0.0
+  mode: authoritarian
+  record_mode: anchored
+  roles:
+    AUTHORITY: Arbitrator Panel
+    DELEGATE: Panel Secretary
+    OPERATOR: Lead Counsel
+    MEMBER: Witness
+    OBSERVER: Interested Party
+  primitives:
+    SESSION: Arbitration
+    CHARTER: Arbitration Agreement
+    RECORD: Award
+    MOTION: Submission
+    DIVISION: Panel Decision
+    SUSPENSION: Recess
+    EXIT: Settled
+  domain_veto: []
+  no_escalation: true
+  no_record: false
+  immutable_charter: false

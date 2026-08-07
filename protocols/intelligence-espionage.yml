@@ -1,0 +1,23 @@
+# Intelligence / Espionage — Ephemeral protocol (no record by design).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: intelligence-espionage
+  version: 1.0.0
+  mode: ephemeral
+  record_mode: ephemeral
+  roles:
+    AUTHORITY: Station Chief
+    DELEGATE: Handler
+    OPERATOR: Field Officer
+    MEMBER: Asset
+    OBSERVER: Cutout
+  primitives:
+    SESSION: Operation
+    CHARTER: Tradecraft
+    MOTION: Tasking
+    ESCALATION: Flash Traffic to Director
+    EXIT: Burned
+  domain_veto: []
+  no_escalation: false
+  no_record: true
+  immutable_charter: false

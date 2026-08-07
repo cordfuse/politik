@@ -1,0 +1,27 @@
+# Theatre — Authoritarian protocol (the Director decides).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: theatre
+  version: 1.0.0
+  mode: authoritarian
+  record_mode: anchored
+  roles:
+    AUTHORITY: Director
+    DELEGATE: Stage Manager
+    OPERATOR: Lead Actor
+    MEMBER: Cast
+    OBSERVER: Audience
+  primitives:
+    SESSION: Production
+    CHARTER: Production Bible
+    RECORD: Prompt Book
+    MOTION: Blocking Note
+    DIVISION: Company Vote
+    ESCALATION: Producer Intervention
+    SUSPENSION: Hiatus
+    EXIT: Recast
+    DEADLOCK: Creative Impasse
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

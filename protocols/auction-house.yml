@@ -1,0 +1,26 @@
+# Auction House — Darwinist protocol (rules pre-baked; the Auctioneer is final).
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: auction-house
+  version: 1.0.0
+  mode: darwinist
+  record_mode: anchored
+  roles:
+    AUTHORITY: Auctioneer
+    DELEGATE: Ringman
+    OPERATOR: Specialist
+    MEMBER: Bidder
+    OBSERVER: Spectator
+  primitives:
+    SESSION: Auction
+    CHARTER: Auction Rules
+    RECORD: Bid Log
+    MOTION: Bid
+    DIVISION: Hammer Fall
+    SUSPENSION: Lot Withdrawn
+    EXIT: Won
+    DEADLOCK: Tied Bids
+  domain_veto: []
+  no_escalation: true
+  no_record: false
+  immutable_charter: false

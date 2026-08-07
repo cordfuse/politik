@@ -1,0 +1,26 @@
+# Improv Theatre — Ephemeral protocol (no record by nature; "Yes, And").
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: improv-theatre
+  version: 1.0.0
+  mode: ephemeral
+  record_mode: ephemeral
+  roles:
+    AUTHORITY: Director
+    DELEGATE: Assistant Director
+    OPERATOR: Ensemble Lead
+    MEMBER: Performer
+    OBSERVER: Audience
+  primitives:
+    SESSION: Show
+    CHARTER: Improv Rules
+    MOTION: Scene Offer
+    DIVISION: Group Acceptance
+    ESCALATION: Director Side-door
+    SUSPENSION: End of Show
+    EXIT: Edited Out
+    DEADLOCK: Scene Stalls
+  domain_veto: []
+  no_escalation: false
+  no_record: true
+  immutable_charter: false
