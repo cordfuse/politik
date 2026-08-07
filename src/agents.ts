@@ -154,20 +154,6 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     stdio_json: false,
     notes: 'MCP-native, Block.',
   },
-  {
-    id: 'copilot',
-    label: 'GitHub Copilot CLI',
-    command: 'copilot',
-    prompt: { kind: 'flag', flag: '-p' },
-    headless_args: ['--allow-all-tools'],
-    auth_local: 'oauth',
-    auth_headless: 'oauth',
-    stdio_json: false,
-    notes:
-      'GitHub. Needs an active Copilot subscription with the CLI policy enabled ' +
-      '(org "Copilot in the CLI" or a personal plan). Usage/cost shape not yet ' +
-      'captured — LEDGER records elapsed only until a real sample lands.',
-  },
 ]);
 
 export const findAgent = (id: string): AgentSpec | null =>
