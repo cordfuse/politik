@@ -61,12 +61,14 @@ truth." What shipped, all on `main`:
 **Process note:** run `npm run lint` (tsc) before every push — `tsx` test runs
 skip typechecking, which silently failed CI on ~30 commits until caught.
 
-**Open / next, ranked:** (1) **Virtues & vices → working code** as a bad-faith
-detector over the Hansard — the on-thesis feature that makes "the record is the
-defence against bad faith" literal. Skills are already coded (`capability.ts`);
-virtues/vices are prose only (RESEARCH.md / RUNTIME.md) and should be *detected*
-from the record, not declared on a profile. Full spec:
-[`docs/plans/virtues-and-vices.md`](docs/plans/virtues-and-vices.md). (2) wire
+**Open / next, ranked:** (1) **Virtues & vices → working code — v1 SHIPPED**
+(`src/integrity.ts` + `politik integrity`): a bad-faith detector reads the Hansard
+for the voluntold signatures (coerced-exit, strategic-withdrawal, serial-voluntold)
+and an honest-concession virtue, surfacing them to the Speaker. Makes "the record
+is the defence against bad faith" a mechanism, not a claim. **v2/v3 open** —
+procedural-abuse patterns, cross-session repeat-target (needs federation), Charter
+knobs. Spec: [`docs/plans/virtues-and-vices.md`](docs/plans/virtues-and-vices.md).
+(2) wire
 `DEADLOCK` auto-suspend on a tie and the `disputed-exit` reinstatement flow into
 the CLI (both constructed + tested, not wired). (3) Backlog: PATH_A auto-recovery,
 scheduled heartbeat/ruling workflows, NATS transport, the `pairing`/`scoring`

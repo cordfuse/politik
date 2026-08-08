@@ -1,7 +1,7 @@
 # Plan — Virtues & Vices as a Bad-Faith Detector
 
 **Attribution:** Steve Krisjanovs, Cordfuse
-**Status:** Proposed — not started
+**Status:** v1 shipped (`src/integrity.ts` + `politik integrity`); v2/v3 open
 **Parent:** [`CLAUDE.md`](../../CLAUDE.md) · builds on [RESEARCH.md](../../RESEARCH.md) (Human Flaw thesis) and [RUNTIME.md](../../RUNTIME.md) (§ Actor Elimination, The Voluntold Problem)
 
 ---
@@ -69,7 +69,7 @@ participation without strategic withdrawal.
 
 ## Phasing
 
-1. **v1 — single-session voluntold detector.** The first three signatures above
+1. **v1 — single-session voluntold detector. ✅ SHIPPED (`c783a24`)** — The first three signatures above
    (serial exits, timing correlation, missing concession). Pure `integrity.ts` +
    tests + `politik integrity`. Highest value, smallest surface.
 2. **v2 — procedural-abuse + virtues.** Point-of-Order abuse patterns and the
