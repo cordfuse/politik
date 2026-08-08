@@ -20,6 +20,7 @@ export * from './projection.ts';
 export * from './prorogation.ts';
 export * from './templates/parliamentary.ts';
 export * from './quorum.ts';
+export * from './integrity.ts';
 export * from './election.ts';
 export * from './envelope.ts';
 export * from './fault.ts';

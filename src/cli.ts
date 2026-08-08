@@ -49,6 +49,7 @@ import {
 import {
   PROTOCOL_MODES, parseProtocol, roleTerm, term, type Protocol, type ProtocolMode,
 } from './protocol.ts';
+import { reviewIntegrity } from './integrity.ts';
 import { checkTermination, isTerminationPolicy, lastStanding, prorogue, type Trigger } from './prorogation.ts';
 import { appendEntry, parseEntries } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
@@ -98,6 +99,7 @@ Usage
   politik ledger [--dir <dir>]
   politik status [--dir <dir>]
   politik hansard [--dir <dir>]           # the record, in the protocol's vocabulary
+  politik integrity [--dir <dir>]         # scan the record for bad-faith patterns
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
 
 Commands
@@ -1497,6 +1499,28 @@ const translateEntryType = (protocol: Protocol | null, type: string): string => 
   return map[type] ?? type.toLowerCase().replace(/_/g, ' ');
 };
 
+/** `politik integrity` — read the record for bad-faith patterns (integrity.ts). */
+const cmdIntegrity = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' } } });
+  const dir = values.dir ?? '.';
+  const { state, hansard } = await loadSession(dir);
+  if (state === null) { err(`integrity: ${dir} is not a session repo`); return EXIT.USAGE; }
+
+  const findings = reviewIntegrity(hansard);
+  if (findings.length === 0) {
+    out('no bad-faith patterns detected — the record is clean');
+    return EXIT.OK;
+  }
+  const vices = findings.filter((f) => f.kind === 'vice');
+  const virtues = findings.filter((f) => f.kind === 'virtue');
+  for (const f of vices) out(`  [${f.severity.toUpperCase()}] ${f.signature} — ${f.evidence}`);
+  for (const f of virtues) out(`  [praise] ${f.signature} — ${f.evidence}`);
+  out('');
+  out(`${vices.length} vice finding(s), ${virtues.length} virtue(s). Surfaced to the Speaker; no action taken — the Speaker rules.`);
+  // A high-severity vice exits non-zero so a watching Speaker/CI is alerted.
+  return vices.some((f) => f.severity === 'high') ? EXIT.REFUSED : EXIT.OK;
+};
+
 /** `politik hansard` — the record, rendered in the protocol's vocabulary. */
 const cmdHansard = async (argv: readonly string[]): Promise<number> => {
   const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' } } });
@@ -1678,6 +1702,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdRun(rest);
     case 'hansard':
       return cmdHansard(rest);
+    case 'integrity':
+      return cmdIntegrity(rest);
     case 'status':
       return cmdStatus(rest);
     case 'prorogue':
