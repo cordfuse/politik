@@ -61,12 +61,18 @@ truth." What shipped, all on `main`:
 **Process note:** run `npm run lint` (tsc) before every push — `tsx` test runs
 skip typechecking, which silently failed CI on ~30 commits until caught.
 
-**Open / next, ranked:** (1) wire `DEADLOCK` auto-suspend on a tie and the
-`disputed-exit` reinstatement flow into the CLI (both constructed + tested, not
-wired). (2) Backlog: PATH_A auto-recovery, scheduled heartbeat/ruling workflows,
-NATS transport, the `pairing`/`scoring` override points (Swiss/tournament). (3)
-A showcase run (real agents, a Jury or Battle Royale deciding something, ledger
-showing real cost) as the launch artifact. Phase 8 (public launch) not started.
+**Open / next, ranked:** (1) **Virtues & vices → working code** as a bad-faith
+detector over the Hansard — the on-thesis feature that makes "the record is the
+defence against bad faith" literal. Skills are already coded (`capability.ts`);
+virtues/vices are prose only (RESEARCH.md / RUNTIME.md) and should be *detected*
+from the record, not declared on a profile. Full spec:
+[`docs/plans/virtues-and-vices.md`](docs/plans/virtues-and-vices.md). (2) wire
+`DEADLOCK` auto-suspend on a tie and the `disputed-exit` reinstatement flow into
+the CLI (both constructed + tested, not wired). (3) Backlog: PATH_A auto-recovery,
+scheduled heartbeat/ruling workflows, NATS transport, the `pairing`/`scoring`
+override points (Swiss/tournament). (4) A showcase run (real agents, a Jury or
+Battle Royale deciding something, ledger showing real cost) as the launch
+artifact. Phase 8 (public launch) not started.
 
 **Implementation stack (decided):** Node + TypeScript, npm `@cordfuse/politik`,
 binary `politik`. Consistent with the namespace reserved in Phase 0 and the
