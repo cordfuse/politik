@@ -163,14 +163,22 @@ overstates this.
 
 ## Missing — specified, no implementation
 
-- **Hard Containment Rule** — traversal above CWD should be logged, escalated and suspend the session. Prompt prose only; nothing detects it.
-- **`CONFLICT` primitive** (ADR-0004) — a string in `canon.ts` and nothing else.
+> **Reconciled 2026-08-10.** Most of this original snapshot has since been built;
+> struck items are annotated with **→ Built** and where. What genuinely remains
+> unbuilt: **scheduled heartbeat / ruling-detection workflows** (need a daemon the
+> architecture deliberately omits), the **three-tier escalation ladder**, **Jira
+> integration**, **`sync-vault`** (Obsidian visualisation), **NATS transport**
+> (additive provider, ADR-0001), and the **`pairing`/`scoring` mechanics override
+> points** (Swiss / tournament). Everything else below is now implemented.
+
+- ~~**Hard Containment Rule** — traversal above CWD should be logged, escalated and suspend the session. Prompt prose only; nothing detects it.~~ **→ Built:** `src/containment.ts` `checkContainment`, wired in `runner.ts` (records a breach and suspends).
+- ~~**`CONFLICT` primitive** (ADR-0004) — a string in `canon.ts` and nothing else.~~ **→ Built:** `src/conflict.ts` + `politik conflict check|resolve`.
 - ~~**`DEADLOCK` auto-suspend** (ADR-0004 Proposal 4) — the tally writes the word into free text; no suspension is ever constructed.~~ **→ Built:** `division tally` auto-suspends; `division break` is AUTHORITY's casting vote.
 - ~~**Disputed Exit flow** — no filing, no auto-suspend, no UPHELD/REVERSED reinstatement.~~ **→ Built:** `actor dispute` / `actor reinstate --ruling UPHELD|REVERSED`.
 - ~~**PATH_A auto-recovery** — no retry config or loop; `FAULT_RESOLVED_AUTO` is an unused constant.~~ **→ Built:** the runner's synchronous retry loop; scheduled retry remains backlog.
-- **`witness_council` / `consensus_suspension` are not parsed from the Charter** — the crisis mechanisms work, but the documented YAML is inert; callers must hand-construct the config.
+- ~~**`witness_council` / `consensus_suspension` are not parsed from the Charter** — the crisis mechanisms work, but the documented YAML is inert; callers must hand-construct the config.~~ **→ Built:** both parsed in `charter.ts` (`governance.witness_council`, `governance.consensus_suspension`).
 - **Scheduled heartbeat and ruling-detection workflows** — only `point-of-order.yml` is emitted.
-- **`stale_action`, `checkpoint_interval_hours`, `cost_warning_usd`, `deadline_action`** — documented Charter keys, never parsed.
+- ~~**`stale_action`, `checkpoint_interval_hours`, `cost_warning_usd`, `deadline_action`** — documented Charter keys, never parsed.~~ **→ Built:** all parsed in `charter.ts` (consistent with the "Built — all parsed" row above; this bullet was the stale one).
 - ~~**DELEGATE challenge verb**~~ (**→ Built:** `politik challenge`), three-tier escalation ladder, ~~GLOBAL layer~~ (**→ Built:** `src/federation.ts`), Jira integration, `politik sync-vault`.
 - **NATS transport** — ADR-0001 frames it as a later additive provider; expected-unbuilt rather than a contradiction.
 
