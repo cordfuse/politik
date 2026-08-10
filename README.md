@@ -37,6 +37,49 @@ Nobody connected these pieces this way before.
 
 ---
 
+## Install
+
+Politik runs on Node with **no build step** — the source is TypeScript, executed
+directly via `tsx`. Requires Node 20+ and git.
+
+```sh
+git clone git@github.com:cordfuse/politik.git
+cd politik
+npm install
+node bin/politik.js doctor        # probe this host: can it run a session, with which agents?
+npm link                          # optional — puts `politik` on your PATH
+```
+
+> The npm package (`@cordfuse/politik`) is not published yet; install from source
+> for now.
+
+## A first session
+
+Every command below is a git commit. `git log` in the session directory is the
+Hansard — the immutable record.
+
+```sh
+politik scaffold --dir ./session --quorum 2                                  # write a Charter to edit
+politik init     --dir ./session --charter ./session/CHARTER.md --speaker you
+politik division call  --dir ./session --motion adopt-standard --actor you --role AUTHORITY
+politik division vote  --dir ./session --motion adopt-standard --actor ada --role MEMBER --vote AYE
+politik division vote  --dir ./session --motion adopt-standard --actor bo  --role MEMBER --vote AYE
+politik division tally --dir ./session --motion adopt-standard               # → Motion CARRIED
+politik assent         --dir ./session --motion adopt-standard --actor you --role AUTHORITY
+```
+
+Seat a real agent to do the work instead of a human vote:
+
+```sh
+politik run --dir ./session --agent claude-code --actor ada --role OPERATOR \
+  --task "Draft and commit a Motion to adopt trunk-based development."
+```
+
+The agent's turn is captured, its cost measured, and the result recorded — see
+`politik ledger --dir ./session`.
+
+---
+
 ## Technical
 
 ### CANON — The Primitive Layer
@@ -45,7 +88,7 @@ The engine speaks in canonical terms. Protocols translate them to domain vocabul
 
 **Roles:** `AUTHORITY` (human only) · `DELEGATE` · `OPERATOR` · `MEMBER` · `OBSERVER`
 
-**Primitives:** `SESSION` · `PROCEEDING` · `CHARTER` · `RECORD` · `MOTION` · `DIVISION` · `ESCALATION` · `SUSPENSION` · `QUORUM` · `CONFLICT` · `DEADLOCK`
+**Primitives:** `SESSION` · `PROCEEDING` · `CHARTER` · `RECORD` · `MOTION` · `DIVISION` · `MATCH` · `ESCALATION` · `SUSPENSION` · `QUORUM` · `CONFLICT` · `DEADLOCK`
 
 **Verbs:** `READ` · `WRITE` · `VOTE` · `ASSENT` · `ESCALATE` · `PROMOTE` · `DEMOTE` · `HIRE` · `FIRE` · `SUSPEND` · `EXPEL` · `VETO` · `SPAWN` · `DISSOLVE` · `EXIT`
 
@@ -85,7 +128,7 @@ The Speaker (human) is constitutionally present, not operationally present. Drop
 
 ### Governance Protocols
 
-**Ten reference protocols ship** — Parliamentary, Republic, Monarchy, Socialism (political archetypes), Jury Deliberation, Elimination Tournament, Emergency Response (ICS), Corporate, Peer Review, and Adversarial Collaboration — spanning constitutional, authoritarian and darwinist modes. Each is a vocabulary translation **plus** a composition of behavioral mechanics — how a decision resolves (majority · supermajority · unanimity), how an actor exits (voted out · elimination · none), and when a session ends (objective · last-standing · verdict) — on top of CANON. You compose your own for anything else; the framework is the product, these are exemplars. Parliamentary is protocol #1, not a privileged mode. A wider catalogue of governance shapes is sketched in [PROTOCOLS.md](PROTOCOLS.md).
+**Eleven reference protocols ship** — Parliamentary, Republic, Monarchy, Socialism (political archetypes), Jury Deliberation, Elimination Tournament, Emergency Response (ICS), Corporate, Peer Review, Adversarial Collaboration, and Solo (single-lead) — spanning constitutional, authoritarian and darwinist modes. Each is a vocabulary translation **plus** a composition of behavioral mechanics — how a decision resolves (majority · supermajority · unanimity), how an actor exits (voted out · elimination · none), and when a session ends (objective · last-standing · verdict) — on top of CANON. You compose your own for anything else; the framework is the product, these are exemplars. Parliamentary is protocol #1, not a privileged mode. A wider catalogue of governance shapes is sketched in [PROTOCOLS.md](PROTOCOLS.md).
 
 ### Hansard and LEDGER
 
