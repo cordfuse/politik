@@ -43,15 +43,23 @@ Politik runs on Node with **no build step** — the source is TypeScript, execut
 directly via `tsx`. Requires Node 20+ and git.
 
 ```sh
-git clone git@github.com:cordfuse/politik.git
-cd politik
-npm install
-node bin/politik.js doctor        # probe this host: can it run a session, with which agents?
-npm link                          # optional — puts `politik` on your PATH
+npm install -g @cordfuse/politik
+politik doctor                    # probe this host: can it run a session, with which agents?
 ```
 
-> The npm package (`@cordfuse/politik`) is not published yet; install from source
-> for now.
+Or run without installing:
+
+```sh
+npx @cordfuse/politik doctor
+```
+
+From source, if you want to hack on it:
+
+```sh
+git clone git@github.com:cordfuse/politik.git
+cd politik && npm install
+node bin/politik.js doctor
+```
 
 ## A first session
 
