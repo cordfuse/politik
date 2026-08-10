@@ -35,8 +35,17 @@ const run = (args: readonly string[], closePipeOnFirstByte = false): Promise<voi
     child.on('error', () => resolve());
   });
 
+const porcelain = (dir: string): Promise<string> =>
+  new Promise((resolve) => {
+    const child = spawn('git', ['status', '--porcelain'], { cwd: dir, stdio: ['ignore', 'pipe', 'ignore'] });
+    let out = '';
+    child.stdout?.on('data', (c: Buffer) => { out += c.toString(); });
+    child.on('close', () => resolve(out.trim()));
+    child.on('error', () => resolve('git-error'));
+  });
+
 describe('Hansard durability under a closed pipe', () => {
-  it('never leaves HANSARD.md truncated when stdout is closed mid-act', async () => {
+  it('never truncates HANSARD.md and always commits, even when stdout closes mid-act', async () => {
     const root = await mkdtemp(join(tmpdir(), 'politik-atomic-'));
     try {
       const dir = join(root, 'session');
@@ -51,10 +60,15 @@ describe('Hansard durability under a closed pipe', () => {
           true,
         );
         const hansard = await readFile(join(dir, 'HANSARD.md'), 'utf8');
-        // The invariant: the record is never empty. It is either the prior
-        // complete content or the new complete content — never a truncated file.
+        // Invariant 1: the record is never empty — either the prior complete
+        // content or the new complete content, never a truncated file.
         assert.ok(hansard.length > 0, `HANSARD.md truncated to empty on iteration ${i}`);
         assert.match(hansard, /^# HANSARD/, `HANSARD.md corrupted on iteration ${i}`);
+        // Invariant 2: the act is committed. "Record, then report" means the
+        // commit precedes the output that the closed pipe interrupts, so the
+        // working tree is clean even though the process took EPIPE mid-run.
+        assert.equal(await porcelain(dir), '',
+          `act left uncommitted on iteration ${i} — the interrupt beat the commit`);
       }
     } finally {
       await rm(root, { recursive: true, force: true });

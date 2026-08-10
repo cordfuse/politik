@@ -26,7 +26,7 @@ import { runTurn } from './runner.ts';
 import { GitTransport } from './transport.ts';
 import { conflictEntry, detectRecordConflicts, openConflicts, resolveConflict } from './conflict.ts';
 import { parseEnvelope, isEligible, type Envelope } from './envelope.ts';
-import { commitRecord } from './git.ts';
+import { commitRecord, type CommitResult } from './git.ts';
 import {
   linkEntry, projectAssent, projectDivision, projectEscalation,
   projectionEntry, resolveProvider,
@@ -543,18 +543,30 @@ const logAct = async (dir: string, actor: string, role: Role, item: string): Pro
   );
 };
 
-const recordAndCommit = async (
+/**
+ * Commit the act and return the result WITHOUT printing — "record, then report."
+ *
+ * The git commit is the durable point and touches no stdout, so a closed pipe
+ * (`… | head`, Ctrl-C) cannot interrupt it. Printing — which *can* fault on a
+ * closed pipe — happens only after this returns, via reportCommit(). So an
+ * interrupt can never land between telling the operator "success" and the record
+ * actually existing: every command writes, commits, then reports.
+ */
+const commitAct = (
   dir: string,
   message: string,
   extra: readonly string[] = [],
-): Promise<void> => {
-  const result = await commitRecord(dir, message, [
+): Promise<CommitResult> =>
+  commitRecord(dir, message, [
     'HANSARD.md',
     'STATE.json',
     'LEDGER.md',
     '.politik/LEDGER.md',
     ...extra,
   ]);
+
+/** Print a commit's outcome. Call only AFTER the commit, as part of the report. */
+const reportCommit = (result: CommitResult): void => {
   if (result.committed) out(`  recorded ${result.sha?.slice(0, 8) ?? ''}`);
   else if (result.reason === 'not a git repository') {
     out('  [WARN] not a git repository — the record is not durable');
@@ -576,14 +588,21 @@ const PROVIDER_OPTS = {
  * carried and its merge did not land — the gap between decision and effect is
  * exactly what a governance record exists to expose.
  */
-const reportProjection = async (
+/**
+ * Write the projection entry to the record and return the line to print later.
+ *
+ * Write-now, report-later: the projection entry must be on the record before the
+ * commit, but its "projected / not projected" line is output and must wait until
+ * after the commit (see commitAct). Callers append this to their report block.
+ */
+const applyProjection = async (
   dir: string,
   act: string,
   result: { projected: boolean; detail: string; ref: string | null },
   hansard: string,
-): Promise<void> => {
-  out(`  ${result.projected ? 'projected' : 'not projected'} — ${result.detail}`);
+): Promise<string> => {
   await writeHansard(dir, appendEntry(hansard, projectionEntry(act, result, nowStamp())));
+  return `  ${result.projected ? 'projected' : 'not projected'} — ${result.detail}`;
 };
 
 /** `politik division call|vote|tally`. */
@@ -620,14 +639,15 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
         state,
       }, hansard);
       await writeHansard(dir, result.hansard);
-      out(`${asTerm(protocol, 'DIVISION')} called on ${values.motion}`);
-
       const { provider } = resolveProvider({ repo: values.repo, token: values.token });
       const reviewers = (values.reviewers ?? '').split(',').filter((r) => r.length > 0);
       const projected = await projectDivision(provider, result.hansard, values.motion, reviewers);
-      await reportProjection(dir, `DIVISION_CALLED ${values.motion}`, projected, result.hansard);
+      const projMsg = await applyProjection(dir, `DIVISION_CALLED ${values.motion}`, projected, result.hansard);
 
-      await recordAndCommit(dir, `DIVISION_CALLED — ${values.motion}`);
+      const rec = await commitAct(dir, `DIVISION_CALLED — ${values.motion}`);
+      out(`${asTerm(protocol, 'DIVISION')} called on ${values.motion}`);
+      out(projMsg);
+      reportCommit(rec);
       return EXIT.OK;
     }
 
@@ -641,8 +661,9 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
         vote: values.vote.toUpperCase() as Vote, state,
       }, hansard);
       await writeHansard(dir, result.hansard);
+      const rec = await commitAct(dir, `VOTE_CAST — ${values.actor} on ${values.motion}`);
       out(`${asTerm(protocol, 'VOTE')} recorded — ${values.actor}: ${values.vote.toUpperCase()}`);
-      await recordAndCommit(dir, `VOTE_CAST — ${values.actor} on ${values.motion}`);
+      reportCommit(rec);
       return EXIT.OK;
     }
 
@@ -698,6 +719,10 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       }
 
       await writeHansard(dir, doc);
+      await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'OPERATOR') as never,
+        `${outcome.carried ? 'MOTION_CARRIED' : 'MOTION_REJECTED'} ${values.motion}`);
+      const rec = await commitAct(dir, `${outcome.carried ? 'MOTION_CARRIED' : 'MOTION_REJECTED'} — ${values.motion}`);
+
       out(outcome.carried ? `${asTerm(protocol, 'MOTION')} CARRIED` : `${asTerm(protocol, 'MOTION')} NOT CARRIED`);
       out(`  ayes ${outcome.ayes}  noes ${outcome.noes}  abstentions ${outcome.abstentions}`);
       out(`  quorum ${outcome.quorum_met ? 'met' : 'NOT MET'}`);
@@ -708,9 +733,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       if (terminationMsg !== null) {
         out(`  TERMINATED — ${terminationMsg} — the Hansard is sealed`);
       }
-      await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'OPERATOR') as never,
-        `${outcome.carried ? 'MOTION_CARRIED' : 'MOTION_REJECTED'} ${values.motion}`);
-      await recordAndCommit(dir, `${outcome.carried ? 'MOTION_CARRIED' : 'MOTION_REJECTED'} — ${values.motion}`);
+      reportCommit(rec);
       return outcome.carried ? EXIT.OK : EXIT.REFUSED;
     }
 
@@ -750,7 +773,6 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
     }, hansard);
     await writeHansard(dir, result.hansard);
     await writeState(dir, result.state);
-    out(`${asTerm(await sessionProtocol(charter.protocol), 'ASSENT')} granted — ${values.motion} is enacted`);
 
     // ADR-0004 defines ASSENT as merging the Motion. This is where the decision
     // reaches the world; until it was wired, assent recorded a decision that
@@ -759,10 +781,13 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
     const merged = await projectAssent(
       provider, result.hansard, values.motion, charter.session.merge_strategy,
     );
-    await reportProjection(dir, `ASSENT ${values.motion}`, merged, result.hansard);
+    const projMsg = await applyProjection(dir, `ASSENT ${values.motion}`, merged, result.hansard);
 
     await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'AUTHORITY') as never, `ASSENT ${values.motion}`);
-    await recordAndCommit(dir, `ASSENT_GRANTED — ${values.motion} enacted`);
+    const rec = await commitAct(dir, `ASSENT_GRANTED — ${values.motion} enacted`);
+    out(`${asTerm(await sessionProtocol(charter.protocol), 'ASSENT')} granted — ${values.motion} is enacted`);
+    out(projMsg);
+    reportCommit(rec);
     return EXIT.OK;
   } catch (error) {
     err(`assent refused: ${error instanceof Error ? error.message : String(error)}`);
@@ -810,9 +835,10 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
           : null,
       }, hansard);
       await writeHansard(dir, result.hansard);
-      out(`CRISIS FILED by ${values.actor} against ${values.against}`);
       await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'OPERATOR') as never, `CRISIS_FILED against ${values.against}`);
-      await recordAndCommit(dir, `CONSTITUTIONAL_CRISIS_FILED — ${values.actor}`);
+      const rec = await commitAct(dir, `CONSTITUTIONAL_CRISIS_FILED — ${values.actor}`);
+      out(`CRISIS FILED by ${values.actor} against ${values.against}`);
+      reportCommit(rec);
 
       // The Charter's own declaration, not a hardcoded default. Until these
       // were parsed, a Speaker could declare a Witness Council and get nothing.
@@ -824,15 +850,18 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
           : null,
         { ...charter.governance.consensus_suspension, resume_requires: 'external_review' as const },
       );
-      out(`  ${check.reason}`);
       if (check.triggered) {
         const suspended = suspendForCrisis(check, nowStamp(), state, result.hansard);
         await writeHansard(dir, suspended.hansard);
         await writeState(dir, suspended.state);
+        const sealed = await commitAct(dir, 'CONSTITUTIONAL_CRISIS — session suspended');
+        out(`  ${check.reason}`);
         out('');
         out('  CONSTITUTIONAL CRISIS — the session is SUSPENDED');
         out('  Resumption requires review by a human outside this session.');
-        await recordAndCommit(dir, 'CONSTITUTIONAL_CRISIS — session suspended');
+        reportCommit(sealed);
+      } else {
+        out(`  ${check.reason}`);
       }
       return EXIT.OK;
     }
@@ -865,10 +894,11 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
       }, hansard);
       await writeHansard(dir, result.hansard);
       await writeState(dir, result.state);
+      await logAct(dir, values.reviewer ?? 'RECORD', 'OBSERVER' as never, `CRISIS_RULING ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
+      const rec = await commitAct(dir, `CONSTITUTIONAL_CRISIS_RULING — ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
       out(`EXTERNAL RULING — ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
       out(`  session is now ${result.state.state}`);
-      await logAct(dir, values.reviewer ?? 'RECORD', 'OBSERVER' as never, `CRISIS_RULING ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
-      await recordAndCommit(dir, `CONSTITUTIONAL_CRISIS_RULING — ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
+      reportCommit(rec);
       return EXIT.OK;
     }
 
@@ -903,8 +933,9 @@ const cmdHeartbeat = async (argv: readonly string[]): Promise<number> => {
       const result = markStale(check, nowStamp(), state, hansard);
       await writeHansard(dir, result.hansard);
       await writeState(dir, result.state);
+      const rec = await commitAct(dir, 'SESSION_STALE — heartbeat window elapsed');
       out(`  session marked STALE — resumable, nothing lost (stale_action: ${charter.session.stale_action})`);
-      await recordAndCommit(dir, 'SESSION_STALE — heartbeat window elapsed');
+      reportCommit(rec);
     } catch (error) {
       err(`heartbeat: ${error instanceof Error ? error.message : String(error)}`);
       return EXIT.REFUSED;
@@ -952,9 +983,10 @@ const cmdSnapshot = async (argv: readonly string[]): Promise<number> => {
   }, nowStamp(), state, hansard);
 
   await writeHansard(dir, result.hansard);
+  const rec = await commitAct(dir, 'STATE_SNAPSHOT');
   out('STATE_SNAPSHOT committed');
   out(`  spent $${spent.cost_usd.toFixed(4)} over ${spent.rows} act(s)`);
-  await recordAndCommit(dir, 'STATE_SNAPSHOT');
+  reportCommit(rec);
   return EXIT.OK;
 };
 
@@ -974,10 +1006,11 @@ const cmdResume = async (argv: readonly string[]): Promise<number> => {
     const result = resume(nowStamp(), values.actor, state, hansard);
     await writeHansard(dir, result.hansard);
     await writeState(dir, result.state);
+    const rec = await commitAct(dir, 'SESSION_RESUMED');
     out('RESUMED — the sitting continues');
     const snap = lastSnapshot(result.hansard);
     out(snap === null ? '  no snapshot; agents resume from the Hansard' : '  agents resume from the last STATE_SNAPSHOT');
-    await recordAndCommit(dir, 'SESSION_RESUMED');
+    reportCommit(rec);
     return EXIT.OK;
   } catch (error) {
     err(`resume refused: ${error instanceof Error ? error.message : String(error)}`);
@@ -1065,9 +1098,10 @@ const cmdActor = async (argv: readonly string[]): Promise<number> => {
     }
 
     await writeHansard(dir, result.hansard);
-    out(message);
     await logAct(dir, by.actor, by.role as never, message);
-    await recordAndCommit(dir, `${message} — by ${by.actor}`);
+    const rec = await commitAct(dir, `${message} — by ${by.actor}`);
+    out(message);
+    reportCommit(rec);
     return EXIT.OK;
   } catch (error) {
     err(`actor refused: ${error instanceof Error ? error.message : String(error)}`);
@@ -1125,20 +1159,22 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
   await writeHansard(dir, filed.hansard);
   await writeState(dir, filed.state);
 
-  out(`${asTerm(await sessionProtocol(charter?.protocol ?? 'parliamentary'), 'ESCALATION')} raised`);
-  out(`  escalation  ${filed.escalation_path}`);
-  out(`  ruling due  ${filed.ruling_path}`);
-  out('  session is SUSPENDED pending a Speaker ruling');
   const { provider } = resolveProvider({ repo: values.repo, token: values.token });
   const opened = await projectEscalation(
     provider, `POINT OF ORDER — ${values.title}`, filed.notification,
   );
-  await reportProjection(dir, `ESCALATION ${values.title}`, opened, filed.hansard);
+  const projMsg = await applyProjection(dir, `ESCALATION ${values.title}`, opened, filed.hansard);
 
   await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'OPERATOR') as never, `POINT_OF_ORDER ${values.title}`);
   // The Hansard cites the escalation file by path as the record; commit it, or
   // the substance of the Point of Order lives only in an untracked file.
-  await recordAndCommit(dir, `POINT_OF_ORDER — ${values.actor}: ${values.title}`, [filed.escalation_path]);
+  const rec = await commitAct(dir, `POINT_OF_ORDER — ${values.actor}: ${values.title}`, [filed.escalation_path]);
+  out(`${asTerm(await sessionProtocol(charter?.protocol ?? 'parliamentary'), 'ESCALATION')} raised`);
+  out(`  escalation  ${filed.escalation_path}`);
+  out(`  ruling due  ${filed.ruling_path}`);
+  out('  session is SUSPENDED pending a Speaker ruling');
+  out(projMsg);
+  reportCommit(rec);
 
   // The notification body is built here; delivery is the provider's job.
   out('');
@@ -1184,14 +1220,15 @@ const cmdRule = async (argv: readonly string[]): Promise<number> => {
     await writeHansard(dir, ruling.hansard);
     await writeState(dir, ruling.state);
 
-    out(`RULING COMMITTED — ${(values.outcome ?? 'UPHELD').toUpperCase()}`);
-    out(`  ${ruling.ruling_path}`);
-    out(`  session is ${ruling.state.state} — the sitting resumes`);
     await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'AUTHORITY') as never,
       `RULING ${(values.outcome ?? 'UPHELD').toUpperCase()}`);
     // The Hansard cites the ruling file by path; commit it so the ruling's
     // reasoning is in the immutable record, not just an untracked file.
-    await recordAndCommit(dir, `RULING — ${(values.outcome ?? 'UPHELD').toUpperCase()}`, [ruling.ruling_path]);
+    const rec = await commitAct(dir, `RULING — ${(values.outcome ?? 'UPHELD').toUpperCase()}`, [ruling.ruling_path]);
+    out(`RULING COMMITTED — ${(values.outcome ?? 'UPHELD').toUpperCase()}`);
+    out(`  ${ruling.ruling_path}`);
+    out(`  session is ${ruling.state.state} — the sitting resumes`);
+    reportCommit(rec);
     return EXIT.OK;
   } catch (error) {
     err(`ruling refused: ${error instanceof Error ? error.message : String(error)}`);
@@ -1229,12 +1266,18 @@ const cmdConflict = async (argv: readonly string[]): Promise<number> => {
     if (conflicts.length === 0) {
       out('no conflicts');
     } else {
+      // Accumulate every conflict entry into one document before writing — a
+      // per-iteration `appendEntry(hansard, …)` against the original would keep
+      // only the last conflict on the record.
+      let doc = hansard;
+      for (const c of conflicts) doc = appendEntry(doc, conflictEntry(c, nowStamp(), 'RECORD', 'OPERATOR'));
+      await writeHansard(dir, doc);
+      const rec = await commitAct(dir, `CONFLICT — ${conflicts.length} detected`);
       for (const c of conflicts) {
         out(`CONFLICT ${c.motions.join(' <-> ')}`);
         out(`  files ${c.files.join(', ')}`);
-        await writeHansard(dir, appendEntry(hansard, conflictEntry(c, nowStamp(), 'RECORD', 'OPERATOR')));
       }
-      await recordAndCommit(dir, `CONFLICT — ${conflicts.length} detected`);
+      reportCommit(rec);
     }
 
     const open = openConflicts(hansard);
@@ -1259,9 +1302,10 @@ const cmdConflict = async (argv: readonly string[]): Promise<number> => {
       }, hansard);
 
       await writeHansard(dir, result.hansard);
+      const rec = await commitAct(dir, `CONFLICT_RESOLVED — ${values.motions}`);
       out(`CONFLICT RESOLVED — ${values.motions}`);
       out('  no Speaker intervention required');
-      await recordAndCommit(dir, `CONFLICT_RESOLVED — ${values.motions}`);
+      reportCommit(rec);
       return EXIT.OK;
     } catch (error) {
       err(`conflict refused: ${error instanceof Error ? error.message : String(error)}`);
@@ -1383,9 +1427,9 @@ const cmdMotion = async (argv: readonly string[]): Promise<number> => {
   const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
   const updated = appendEntry(hansard, linkEntry(values.motion, pr, values.url ?? '', nowStamp()));
   await writeHansard(dir, updated);
-
+  const rec = await commitAct(dir, `MOTION_PROJECTED — ${values.motion} -> #${pr}`);
   out(`LINKED ${values.motion} -> #${pr}`);
-  await recordAndCommit(dir, `MOTION_PROJECTED — ${values.motion} -> #${pr}`);
+  reportCommit(rec);
   return EXIT.OK;
 };
 
@@ -1493,6 +1537,10 @@ const cmdRun = async (argv: readonly string[]): Promise<number> => {
     return EXIT.REFUSED;
   }
 
+  const rec = await commitAct(
+    dir,
+    `${outcome.entry.type} — ${values.actor} (${values.role ?? 'OPERATOR'})`,
+  );
   out('TURN COMPLETE');
   out(`  agent    ${outcome.result.agent}`);
   out(`  elapsed  ${outcome.result.elapsed_ms}ms`);
@@ -1501,10 +1549,7 @@ const cmdRun = async (argv: readonly string[]): Promise<number> => {
   if (outcome.suspended === true) {
     out('  POINT OF ORDER — the agent escalated; the sitting is SUSPENDED pending a Speaker ruling');
   }
-  await recordAndCommit(
-    dir,
-    `${outcome.entry.type} — ${values.actor} (${values.role ?? 'OPERATOR'})`,
-  );
+  reportCommit(rec);
   return EXIT.OK;
 };
 
@@ -1669,7 +1714,7 @@ const cmdProrogue = async (argv: readonly string[]): Promise<number> => {
     // The seal is the one act that most needs to be in the immutable record —
     // "the Hansard is sealed" must be true on git, not just in the working tree.
     // Commit the record and the rendered summary the seal produces.
-    await recordAndCommit(dir, `PROROGUED — ${trigger}`, ['SUMMARY.md']);
+    const rec = await commitAct(dir, `PROROGUED — ${trigger}`, ['SUMMARY.md']);
 
     out('PROROGUED');
     out(`  trigger ${trigger}`);
@@ -1677,6 +1722,7 @@ const cmdProrogue = async (argv: readonly string[]): Promise<number> => {
     if (result.milestone_to_close !== null) {
       out(`  milestone ${result.milestone_to_close} must be closed on the SCM`);
     }
+    reportCommit(rec);
     return EXIT.OK;
   } catch (error) {
     err(`prorogue refused: ${error instanceof Error ? error.message : String(error)}`);

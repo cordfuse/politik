@@ -9,9 +9,12 @@ import { register } from 'tsx/esm/api';
 
 // A reader that closes early — `politik status | head` — makes the next write
 // fail with EPIPE. That is normal Unix behaviour for a pipeline, not an error
-// worth a stack trace, so exit quietly as every other CLI does.
+// worth a stack trace. Swallow it and keep running: calling process.exit() here
+// would terminate synchronously and abort an in-flight commit mid-write, which
+// is exactly how a governance act's record could be lost. Discarding the write
+// lets the remaining work finish and the process exit naturally.
 process.stdout.on('error', (error) => {
-  if (error?.code === 'EPIPE') process.exit(0);
+  if (error?.code === 'EPIPE') return;
   throw error;
 });
 
