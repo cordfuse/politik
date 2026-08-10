@@ -543,12 +543,17 @@ const logAct = async (dir: string, actor: string, role: Role, item: string): Pro
   );
 };
 
-const recordAndCommit = async (dir: string, message: string): Promise<void> => {
+const recordAndCommit = async (
+  dir: string,
+  message: string,
+  extra: readonly string[] = [],
+): Promise<void> => {
   const result = await commitRecord(dir, message, [
     'HANSARD.md',
     'STATE.json',
     'LEDGER.md',
     '.politik/LEDGER.md',
+    ...extra,
   ]);
   if (result.committed) out(`  recorded ${result.sha?.slice(0, 8) ?? ''}`);
   else if (result.reason === 'not a git repository') {
@@ -1131,7 +1136,9 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
   await reportProjection(dir, `ESCALATION ${values.title}`, opened, filed.hansard);
 
   await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'OPERATOR') as never, `POINT_OF_ORDER ${values.title}`);
-  await recordAndCommit(dir, `POINT_OF_ORDER — ${values.actor}: ${values.title}`);
+  // The Hansard cites the escalation file by path as the record; commit it, or
+  // the substance of the Point of Order lives only in an untracked file.
+  await recordAndCommit(dir, `POINT_OF_ORDER — ${values.actor}: ${values.title}`, [filed.escalation_path]);
 
   // The notification body is built here; delivery is the provider's job.
   out('');
@@ -1182,7 +1189,9 @@ const cmdRule = async (argv: readonly string[]): Promise<number> => {
     out(`  session is ${ruling.state.state} — the sitting resumes`);
     await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'AUTHORITY') as never,
       `RULING ${(values.outcome ?? 'UPHELD').toUpperCase()}`);
-    await recordAndCommit(dir, `RULING — ${(values.outcome ?? 'UPHELD').toUpperCase()}`);
+    // The Hansard cites the ruling file by path; commit it so the ruling's
+    // reasoning is in the immutable record, not just an untracked file.
+    await recordAndCommit(dir, `RULING — ${(values.outcome ?? 'UPHELD').toUpperCase()}`, [ruling.ruling_path]);
     return EXIT.OK;
   } catch (error) {
     err(`ruling refused: ${error instanceof Error ? error.message : String(error)}`);
@@ -1657,6 +1666,10 @@ const cmdProrogue = async (argv: readonly string[]): Promise<number> => {
     await writeState(dir, result.state);
     await writeHansard(dir, result.hansard);
     await writeFiles(dir, result.files);
+    // The seal is the one act that most needs to be in the immutable record —
+    // "the Hansard is sealed" must be true on git, not just in the working tree.
+    // Commit the record and the rendered summary the seal produces.
+    await recordAndCommit(dir, `PROROGUED — ${trigger}`, ['SUMMARY.md']);
 
     out('PROROGUED');
     out(`  trigger ${trigger}`);
