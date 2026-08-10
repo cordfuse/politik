@@ -683,3 +683,60 @@ export const resolveDispute = (
     }),
   };
 };
+
+/* -------------------------------------------------------------------------- */
+/* DELEGATE challenge                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A DELEGATE formally challenges an AUTHORITY action (RUNTIME.md § DELEGATE
+ * Challenge Verb).
+ *
+ * The point is attribution, not obstruction: AUTHORITY still prevails, but the
+ * dissent is on the permanent record and names who objected and why. That is the
+ * framework's whole answer to a bad-faith chair — the record is visible to
+ * everyone who can read the repo. It does not suspend or overturn; it records.
+ *
+ * The `window_minutes` a Charter may set is a *pause* a hosted deployment with a
+ * scheduler can enforce; the local engine has no daemon (by design), so the
+ * durable mechanism here is the recorded, attributable challenge — the window is
+ * carried on the entry as the declared intent, not enforced by this function.
+ * Only a DELEGATE may challenge: it is their specific check on AUTHORITY.
+ */
+export const challengeAction = (
+  at: string,
+  challenger: string,
+  challengerRole: Role,
+  against: string,
+  grounds: string,
+  windowMinutes: number,
+  hansard: string,
+): {
+  readonly entry: HansardEntry;
+  readonly hansard: string;
+} => {
+  if (challengerRole !== 'DELEGATE') {
+    throw new ActorError('only a DELEGATE may challenge an AUTHORITY action');
+  }
+  if (against.trim() === '') {
+    throw new ActorError('a challenge must name the AUTHORITY action it disputes');
+  }
+  if (grounds.trim() === '') {
+    throw new ActorError('a challenge must state its grounds');
+  }
+
+  const entry: HansardEntry = {
+    type: 'DELEGATE_CHALLENGE',
+    at,
+    actor: challenger,
+    role: 'DELEGATE',
+    fields: {
+      Against: against,
+      Grounds: grounds,
+      Window: `${windowMinutes} minutes`,
+      Effect: 'the AUTHORITY action stands; this dissent is on the permanent record and attributable',
+    },
+  };
+
+  return { entry, hansard: appendEntry(hansard, entry) };
+};

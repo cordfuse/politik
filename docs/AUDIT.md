@@ -61,7 +61,9 @@ defaults only on absence, so rule 7 rejects a non-CANON assent.
 | DEADLOCK suspension | **Built** — `division tally` auto-suspends on a genuine tie; `division break` (`breakDeadlock`) is AUTHORITY's casting vote, which flows through the ordinary tally so Assent sees a decided Division |
 | Disputed Exit | **Built** — `actor dispute` files (`disputeExit`); `actor reinstate --ruling UPHELD\|REVERSED` (`resolveDispute`) reinstates to the held seat or lets the removal stand, and resumes the sitting |
 | GLOBAL layer (session registry, cascade propagation, roll-up) | **Built** — `src/federation.ts` + `politik registry` / `politik cascade` (ADR-0008 phase 2: the tree of directories is the federation, discovered by local traversal) |
-| PATH_A auto-recovery, scheduled workflows, DELEGATE challenge, Jira, `sync-vault`, NATS | **Still backlog** |
+| PATH_A auto-recovery | **Built** — the runner's synchronous retry loop (`classify` → `shouldRetry` → `faultRecord` → `autoResolvedRecord`); only the *scheduled* (delayed, daemon-driven) retry is backlog |
+| DELEGATE challenge verb | **Built** — `challengeAction` + `politik challenge`: a DELEGATE's attributed, non-binding dissent on the permanent record (RUNTIME.md § DELEGATE Challenge Verb) |
+| Scheduled workflows, Jira, `sync-vault`, NATS | **Still backlog** |
 
 **Capability claims — re-checked:**
 
@@ -163,13 +165,13 @@ overstates this.
 
 - **Hard Containment Rule** — traversal above CWD should be logged, escalated and suspend the session. Prompt prose only; nothing detects it.
 - **`CONFLICT` primitive** (ADR-0004) — a string in `canon.ts` and nothing else.
-- **`DEADLOCK` auto-suspend** (ADR-0004 Proposal 4) — the tally writes the word into free text; no suspension is ever constructed.
-- **Disputed Exit flow** — no filing, no auto-suspend, no UPHELD/REVERSED reinstatement.
-- **PATH_A auto-recovery** — no retry config or loop; `FAULT_RESOLVED_AUTO` is an unused constant.
+- ~~**`DEADLOCK` auto-suspend** (ADR-0004 Proposal 4) — the tally writes the word into free text; no suspension is ever constructed.~~ **→ Built:** `division tally` auto-suspends; `division break` is AUTHORITY's casting vote.
+- ~~**Disputed Exit flow** — no filing, no auto-suspend, no UPHELD/REVERSED reinstatement.~~ **→ Built:** `actor dispute` / `actor reinstate --ruling UPHELD|REVERSED`.
+- ~~**PATH_A auto-recovery** — no retry config or loop; `FAULT_RESOLVED_AUTO` is an unused constant.~~ **→ Built:** the runner's synchronous retry loop; scheduled retry remains backlog.
 - **`witness_council` / `consensus_suspension` are not parsed from the Charter** — the crisis mechanisms work, but the documented YAML is inert; callers must hand-construct the config.
 - **Scheduled heartbeat and ruling-detection workflows** — only `point-of-order.yml` is emitted.
 - **`stale_action`, `checkpoint_interval_hours`, `cost_warning_usd`, `deadline_action`** — documented Charter keys, never parsed.
-- **DELEGATE challenge verb**, three-tier escalation ladder, GLOBAL layer, Jira integration, `politik sync-vault`.
+- ~~**DELEGATE challenge verb**~~ (**→ Built:** `politik challenge`), three-tier escalation ladder, ~~GLOBAL layer~~ (**→ Built:** `src/federation.ts`), Jira integration, `politik sync-vault`.
 - **NATS transport** — ADR-0001 frames it as a later additive provider; expected-unbuilt rather than a contradiction.
 
 ---

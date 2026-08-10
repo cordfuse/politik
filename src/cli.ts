@@ -37,8 +37,8 @@ import { appendLedgerRow, checkCostCeiling, totals } from './ledger.ts';
 import { checkHeartbeat, lastSnapshot, markStale, resume, snapshot } from './heartbeat.ts';
 import { commitRuling, fileEscalation, type RulingOutcome } from './escalation.ts';
 import {
-  demote, disputeExit, exitActor, hire, promote, resolveDispute, seats, spawnChild, veto,
-  vetoOutstanding, type ExitType,
+  challengeAction, demote, disputeExit, exitActor, hire, promote, resolveDispute, seats,
+  spawnChild, veto, vetoOutstanding, type ExitType,
 } from './actors.ts';
 import {
   checkCapture, externalReview, fileCrisis, suspendForCrisis,
@@ -90,6 +90,7 @@ Usage
   politik crisis review --reviewer <h> --accused <speaker> --ruling UPHELD|DISMISSED --reasons <text>
   politik escalate --actor <h> --role <ROLE> --title <t> --body <text> [--seq <n>]
   politik rule --seq <n> --actor <h> --outcome UPHELD|REVERSED|NOTED --body <text>
+  politik challenge --actor <delegate> --against <action> --grounds <text> [--window <min>]
   politik actor hire|promote|demote|exit|veto|spawn ... (see below)
   politik actor dispute --actor <removed> --grounds <text>          # challenge one's own removal
   politik actor reinstate --subject <h> --actor <speaker> --ruling UPHELD|REVERSED
@@ -122,6 +123,7 @@ Commands
   crisis      File, check, or externally review a constitutional crisis.
   escalate    Raise a Point of Order. Suspends the sitting.
   rule        Rule on a Point of Order as AUTHORITY. Resumes the sitting.
+  challenge   A DELEGATE disputes an AUTHORITY action — recorded, attributable, non-binding.
   actor       Seat, move or remove actors; exercise a veto; refer to committee.
   heartbeat   Has the proceeding gone quiet? --suspend marks it STALE.
   snapshot    Commit a STATE_SNAPSHOT so a new agent can continue the work.
@@ -1819,6 +1821,46 @@ const cmdProrogue = async (argv: readonly string[]): Promise<number> => {
   }
 };
 
+/**
+ * `politik challenge` — a DELEGATE formally disputes an AUTHORITY action.
+ *
+ * Attribution, not obstruction (RUNTIME.md § DELEGATE Challenge Verb): the
+ * AUTHORITY action stands, but the dissent is on the permanent record with a
+ * name against it. Records; never suspends or overturns.
+ */
+const cmdChallenge = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: {
+      dir: { type: 'string' }, actor: { type: 'string' }, role: { type: 'string' },
+      against: { type: 'string' }, grounds: { type: 'string' }, window: { type: 'string' },
+    },
+  });
+  const dir = values.dir ?? '.';
+  const { hansard, charter } = await loadSession(dir);
+  if (charter === null) { err(`challenge: ${dir} is not a session repo`); return EXIT.USAGE; }
+  if (values.actor === undefined || values.against === undefined || values.grounds === undefined) {
+    err('challenge: --actor, --against and --grounds are required'); return EXIT.USAGE;
+  }
+  if (badRole(values.role)) { err(`challenge: "${values.role}" is not a CANON role`); return EXIT.USAGE; }
+  const windowMinutes = values.window === undefined ? 30 : Number(values.window);
+
+  try {
+    const result = challengeAction(nowStamp(), values.actor, (values.role ?? 'DELEGATE') as never,
+      values.against, values.grounds, windowMinutes, hansard);
+    await writeHansard(dir, result.hansard);
+    await logAct(dir, values.actor, (values.role ?? 'DELEGATE') as never, `DELEGATE_CHALLENGE against ${values.against}`);
+    const rec = await commitAct(dir, `DELEGATE_CHALLENGE — ${values.actor} vs ${values.against}`);
+    out(`CHALLENGE recorded — ${values.actor} disputes ${values.against}`);
+    out('  the AUTHORITY action stands; the dissent is permanent and attributable');
+    reportCommit(rec);
+    return EXIT.OK;
+  } catch (error) {
+    err(`challenge refused: ${error instanceof Error ? error.message : String(error)}`);
+    return EXIT.REFUSED;
+  }
+};
+
 /** A one-glance mark for a node's state — colour-free, terminal-safe. */
 const stateMark = (state: string): string => {
   switch (state) {
@@ -1976,6 +2018,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdRegistry(rest);
     case 'cascade':
       return cmdCascade(rest);
+    case 'challenge':
+      return cmdChallenge(rest);
     default:
       err(`unknown command: ${command}`);
       err(USAGE);

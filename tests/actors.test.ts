@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   ActorError,
+  challengeAction,
   disputeExit,
   resolveDispute,
   speakerOrder,
@@ -347,5 +348,25 @@ describe('disputed exit', () => {
     it('refuses when the session is not under a disputed exit', () => {
       assert.throws(() => resolveDispute(AT, 'speaker', 'UPHELD', 'alpha', CONVENED, removed()), ActorError);
     });
+  });
+});
+
+describe('DELEGATE challenge', () => {
+  it('records an attributed, non-binding dissent against an AUTHORITY action', () => {
+    const r = challengeAction(AT, 'dep', 'DELEGATE', 'the removal of bob', 'no cause was stated', 30, BASE);
+    assert.equal(r.entry.type, 'DELEGATE_CHALLENGE');
+    assert.equal(r.entry.actor, 'dep');
+    assert.equal(r.entry.fields?.['Against'], 'the removal of bob');
+    assert.match(r.entry.fields?.['Effect'] ?? '', /stands/);
+  });
+
+  it('only a DELEGATE may challenge', () => {
+    assert.throws(() => challengeAction(AT, 'bob', 'MEMBER', 'x', 'y', 30, BASE), /only a DELEGATE/);
+    assert.throws(() => challengeAction(AT, 'steve', 'AUTHORITY', 'x', 'y', 30, BASE), /only a DELEGATE/);
+  });
+
+  it('requires the action named and grounds stated', () => {
+    assert.throws(() => challengeAction(AT, 'dep', 'DELEGATE', '  ', 'y', 30, BASE), ActorError);
+    assert.throws(() => challengeAction(AT, 'dep', 'DELEGATE', 'x', '  ', 30, BASE), ActorError);
   });
 });
