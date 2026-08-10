@@ -56,6 +56,37 @@ Dogfooded **phase-1 monorepo mode** (ADR-0008) end-to-end, all on `main` (89d998
   on-thesis — "the immutable record is the source of truth" now survives an
   interrupt. 669 tests, CI green.
 
+**Then a full-surface dogfood** (every write path + all protocols + the untested
+commands), which flushed out three more bugs, all fixed on `main`:
+
+- **`prorogue` never committed its seal** (07caa4d) — wrote HANSARD/STATE/SUMMARY
+  and printed "the Hansard is sealed" while leaving it in the working tree.
+- **`escalate`/`rule` left the Hansard citing untracked files** (07caa4d) — the
+  Point of Order body and the ruling reasoning lived only in uncommitted
+  `escalations/*.md`. `recordAndCommit` now takes extra paths; every file the
+  record names enters history. Regression: `commit-coverage.test.ts`.
+- **CI smoke broke on the monorepo-init behavior change** (6e04481) — the script's
+  manual `git commit` after `init` now finds nothing to commit (init self-commits).
+  Dropped it.
+
+**Verified behaving, no new bugs:** all 11 protocols convene + resolve with
+**distinct vocabulary** (republic "Bill", monarchy "Petition", socialism "Party
+Directive", peer-review "Submission", ICS "Tactical Assignment", jury "Argument");
+the **jury unanimity boundary is real** (2-AYE/1-NOE → NOT CARRIED, 3-AYE →
+CARRIED). Every previously-untested command works and commits cleanly: `motion
+link`, `actor spawn/veto`, `conflict check/resolve`, `snapshot`, `heartbeat
+--suspend` → STALE, `resume` STALE→CONVENED. 672 tests, CI green.
+
+**Open — a robustness observation (NOT data loss), needs a decision.** The commands
+follow "write file → report success → commit". The atomic-write fix makes the file
+safe under an interrupt, but if the process dies *between* the report and the commit
+(`… tally | head`, a Ctrl-C at the wrong microsecond), the act is written to the
+working tree but not committed — the *last* act before an interrupt may miss git
+history (the next act, or a manual commit, absorbs it). Normal usage is always
+clean. The principled fix is "record **then** report" — commit before the output
+that could trigger SIGPIPE — but it's a systemic reorder across ~10 command
+branches and changes output timing, so it's flagged for a go rather than done.
+
 **Housekeeping noted, not urgent:** GitHub Actions warns `actions/checkout@v4` /
 `setup-node@v4` target the deprecated Node 20 (forced to Node 24). Bump to v5
 when the CI file is next touched.
