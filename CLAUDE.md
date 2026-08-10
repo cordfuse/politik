@@ -22,7 +22,7 @@ enactment), ADR-0005 (Hansard format), ADR-0006 (protocol behavioral
 enforcement — `session.escalation`), ADR-0007 (protocol mechanics — composable
 `resolution`/`exit`/`termination` override points) and ADR-0008 (session storage —
 a session is a git-tracked *directory*; monorepo tree by default, standalone repo
-an opt-in mode; implementation phased/not-yet-built) are all **Accepted**.
+an opt-in mode; **phase 1 — monorepo placement — now built**) are all **Accepted**.
 `POLITIK-ARCHITECTURE.md` was amended only by ADR-0004, which added the `ASSENT`
 verb and the `CONFLICT` primitive.
 
@@ -32,6 +32,33 @@ is now closed; the remaining entries are documentation history.
 
 Phase 1's only remaining item is the arXiv preprint. Phase 8 (public launch) has
 not started.
+
+## Where we left off (2026-08-10)
+
+Dogfooded **phase-1 monorepo mode** (ADR-0008) end-to-end, all on `main` (89d9989):
+
+- **Monorepo placement built.** `initSessionRepo` auto-detects standalone vs
+  monorepo — a session inside an existing repo commits its writ drop to *that*
+  repo rather than nesting a `.git`. `scaffold --parent <dir>` sets
+  `inherits_from` to the child→parent relative path. One clone, one CI, one
+  history for the whole tree. Verified: single / sibling / nested / 3-node trees
+  all persist and commit correctly.
+- **`protocols/solo.yml`** — permissive single-lead protocol for a solo dev or
+  small team; lints VALID.
+- **Durability bug the dogfood surfaced + fixed.** The Hansard could be truncated
+  to **zero bytes** by an interrupt: a governance act writes HANSARD.md then does
+  more work, and when stdout closed early (`… call | head`, Ctrl-C, broken pipe)
+  the process took SIGPIPE mid-act while `writeFile`'s O_TRUNC had the file open —
+  *after* the operator was told the act succeeded. Fix: **atomic writes**
+  (temp + `rename(2)`) for HANSARD.md / STATE.json / ledger, so the record is
+  only ever replaced all-or-nothing; `initSessionRepo` excludes `*.tmp` from its
+  `git add`. Regression test drives the real binary under a closed pipe. This is
+  on-thesis — "the immutable record is the source of truth" now survives an
+  interrupt. 669 tests, CI green.
+
+**Housekeeping noted, not urgent:** GitHub Actions warns `actions/checkout@v4` /
+`setup-node@v4` target the deprecated Node 20 (forced to Node 24). Bump to v5
+when the CI file is next touched.
 
 ## Where we left off (2026-08-07)
 
