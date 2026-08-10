@@ -148,9 +148,11 @@ and an honest-concession virtue, surfacing them to the Speaker. Makes "the recor
 is the defence against bad faith" a mechanism, not a claim. **v2/v3 open** —
 procedural-abuse patterns, cross-session repeat-target (needs federation), Charter
 knobs. Spec: [`docs/plans/virtues-and-vices.md`](docs/plans/virtues-and-vices.md).
-(2) wire
-`DEADLOCK` auto-suspend on a tie and the `disputed-exit` reinstatement flow into
-the CLI (both constructed + tested, not wired). (3) Backlog: PATH_A auto-recovery,
+(2) **DONE** —
+`DEADLOCK` auto-suspend on a tie (`division break`, AUTHORITY's casting vote) and
+the `disputed-exit` reinstatement flow (`actor dispute` / `actor reinstate
+--ruling UPHELD|REVERSED`) are wired into the CLI and tested; both audit Partials
+are now Built. (3) Backlog: PATH_A auto-recovery,
 scheduled heartbeat/ruling workflows, NATS transport, the `pairing`/`scoring`
 override points (Swiss/tournament). (4) A showcase run (real agents, a Jury or
 Battle Royale deciding something, ledger showing real cost) as the launch
