@@ -10,7 +10,7 @@
 
 import { readFileSync } from 'node:fs';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -27,6 +27,8 @@ import { GitTransport } from './transport.ts';
 import { conflictEntry, detectRecordConflicts, openConflicts, resolveConflict } from './conflict.ts';
 import { parseEnvelope, isEligible, type Envelope } from './envelope.ts';
 import { commitRecord, type CommitResult } from './git.ts';
+import { discoverTree, rollUp, detectCascades, type FederationNode } from './federation.ts';
+import { cascadeAlerts, cascadeEntry, recordOnNode } from './tree.ts';
 import {
   linkEntry, projectAssent, projectDivision, projectEscalation,
   projectionEntry, resolveProvider,
@@ -101,6 +103,8 @@ Usage
   politik hansard [--dir <dir>]           # the record, in the protocol's vocabulary
   politik integrity [--dir <dir>]         # scan the record for bad-faith patterns
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
+  politik registry [--dir <root>] [--state <STATE>]   # the whole tree, at a glance
+  politik cascade [--dir <root>]                       # warn where a fault repeats across siblings
 
 Commands
   version     Print the version.
@@ -125,6 +129,8 @@ Commands
   ledger      Total the session's measured cost.
   status      Read STATE.json and summarise the proceeding.
   prorogue    Close a proceeding permanently and seal the Hansard.
+  registry    Walk the tree: every session, its state and cost, with a roll-up.
+  cascade     Warn where a fault repeats across sibling sessions.
 `;
 
 /* -------------------------------------------------------------------------- */
@@ -1730,6 +1736,95 @@ const cmdProrogue = async (argv: readonly string[]): Promise<number> => {
   }
 };
 
+/** A one-glance mark for a node's state — colour-free, terminal-safe. */
+const stateMark = (state: string): string => {
+  switch (state) {
+    case 'CONVENED': return '[OK]';
+    case 'SUSPENDED': return '[!!]';
+    case 'PROROGUED': return '[--]';
+    case 'STALE': return '[~~]';
+    case 'INVALID': return '[XX]';
+    default: return '[??]';
+  }
+};
+
+/**
+ * `politik registry` — the state of everything. Walks the tree (ADR-0008
+ * federation-as-traversal), prints every session with its state, protocol and
+ * cost, and a roll-up. `--state <S>` answers "show all SUSPENDED under here"; the
+ * roll-up always totals the whole tree so the filter never hides the context.
+ */
+const cmdRegistry = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: { dir: { type: 'string' }, state: { type: 'string' } },
+  });
+  const root = resolve(values.dir ?? '.');
+  const nodes = await discoverTree(root);
+  if (nodes.length === 0) {
+    err(`registry: no sessions found under ${values.dir ?? '.'}`);
+    return EXIT.USAGE;
+  }
+
+  const filter = values.state?.toUpperCase();
+  const shown: readonly FederationNode[] = filter === undefined
+    ? nodes
+    : nodes.filter((n) => n.state === filter);
+
+  out(`REGISTRY — ${values.dir ?? '.'}`);
+  for (const node of shown) {
+    const indent = '  '.repeat(node.depth + 1);
+    const cost = node.cost_usd > 0 ? `  $${node.cost_usd.toFixed(4)}` : '';
+    const cause = node.cause === null ? '' : `  (${node.cause})`;
+    out(`${indent}${stateMark(node.state)} ${node.rel}  ·  ${node.protocol}  ·  ${node.state}${cost}${cause}`);
+  }
+  if (filter !== undefined && shown.length === 0) out(`  (no ${filter} sessions)`);
+
+  const summary = rollUp(nodes);
+  out('');
+  out('  -- roll-up (whole tree) --');
+  out(`  nodes         ${summary.nodes}`);
+  out(`  by state      ${Object.entries(summary.by_state).map(([s, c]) => `${s} ${c}`).join('   ')}`);
+  out(`  open motions  ${summary.open_divisions}`);
+  out(`  total cost    $${summary.total_cost_usd.toFixed(4)}`);
+  out(`  total tokens  ${summary.total_tokens.toLocaleString()}`);
+  return EXIT.OK;
+};
+
+/**
+ * `politik cascade` — a fault repeating across siblings is a signal, not a
+ * coincidence. Walks the tree, and where enough siblings share a suspension
+ * cause within the window (tree.ts checkCascade), records a CASCADE_ALERT on
+ * their parent so a Speaker chartering the same configuration is warned. Idempotent:
+ * a parent already carrying the alert is left alone.
+ */
+const cmdCascade = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' } } });
+  const root = resolve(values.dir ?? '.');
+  const nodes = await discoverTree(root);
+  const findings = detectCascades(nodes, nowStamp());
+  if (findings.length === 0) {
+    out('no cascades — no fault repeats across siblings within the window');
+    return EXIT.OK;
+  }
+
+  for (const finding of findings) {
+    const signature = finding.alert.signature ?? 'unknown';
+    if (cascadeAlerts(finding.parent.hansard).includes(signature)) {
+      out(`${finding.parent.rel}: cascade on ${signature} already recorded`);
+      continue;
+    }
+    const updated = recordOnNode(finding.parent.hansard, cascadeEntry(finding.alert, nowStamp()));
+    await writeHansard(finding.parent.dir, updated);
+    const rec = await commitAct(finding.parent.dir,
+      `CASCADE_ALERT — ${signature} across ${finding.alert.nodes.length} siblings`);
+    out(`CASCADE — ${signature} across ${finding.alert.nodes.length} siblings`);
+    out(`  recorded on ${finding.parent.rel}`);
+    reportCommit(rec);
+  }
+  return EXIT.OK;
+};
+
 /* -------------------------------------------------------------------------- */
 /* Entry                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -1794,6 +1889,10 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdStatus(rest);
     case 'prorogue':
       return cmdProrogue(rest);
+    case 'registry':
+      return cmdRegistry(rest);
+    case 'cascade':
+      return cmdCascade(rest);
     default:
       err(`unknown command: ${command}`);
       err(USAGE);
