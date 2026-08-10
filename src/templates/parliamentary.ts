@@ -347,6 +347,66 @@ prorogation workflow surfaces the milestone id for the caller to close.
 /* -------------------------------------------------------------------------- */
 
 /**
+ * Onboarding for any agent that lands in the session directory.
+ *
+ * The workflow this exists for: `cd` into a session, launch an agent, prompt it
+ * in natural language. The agent should become fluent immediately rather than
+ * inferring that this is Politik and discovering the CLI. AGENTS.md is the
+ * cross-agent convention; a one-line CLAUDE.md points Claude Code at it.
+ */
+export const agentsTemplate = (options: CharterTemplateOptions = {}): string => {
+  const protocol = options.protocol ?? 'parliamentary';
+  return `# Agent guide — this is a Politik session
+
+You are inside a **Politik** governance session: a git-tracked directory that *is*
+the proceeding. \`CHARTER.md\` is the constitution, \`HANSARD.md\` is the immutable
+record, \`STATE.json\` is the live state — and the **git history is the Hansard**:
+every governance act is one commit.
+
+This session runs the **${protocol}** protocol. Drive it with the \`politik\` CLI
+(\`npm i -g @cordfuse/politik\`, or \`npx @cordfuse/politik\`). Never hand-edit
+\`HANSARD.md\` or \`STATE.json\` — the record owns them; editing outside the CLI is a
+Standing Orders violation and corrupts the record.
+
+## Read the state before acting
+
+\`\`\`sh
+politik status      # protocol, state, quorum — the live picture
+politik hansard     # the record, in this protocol's own vocabulary
+\`\`\`
+
+## The core loop
+
+\`\`\`sh
+politik division call  --motion <id> --actor <you> --role AUTHORITY          # put a question
+politik division vote   --motion <id> --actor <a> --role MEMBER --vote AYE|NO|ABSTAIN
+politik division tally  --motion <id>                                        # decide it
+politik assent          --motion <id> --actor <you> --role AUTHORITY         # enact a carried motion
+\`\`\`
+
+Seat a working agent instead of a human vote:
+
+\`\`\`sh
+politik run --agent claude-code --actor <a> --role OPERATOR --task "..."
+\`\`\`
+
+More verbs: \`actor hire|promote|demote|exit|dispute|reinstate\`, \`escalate\` /
+\`rule\` (Points of Order), \`crisis\`, \`conflict\`, \`challenge\`, \`pair\` / \`match\`
+(tournaments), \`prorogue\` (seal the session). \`politik --help\` lists everything,
+and the CLI's own errors name the flags each command needs.
+
+## The one rule that matters
+
+\`AUTHORITY\` acts — \`init\`, \`assent\`, \`rule\`, \`veto\`, breaking a deadlock —
+exercise the **human Speaker's** constitutional authority. **Confirm with the human
+before running them.** Draft and propose freely; ratifying is theirs.
+`;
+};
+
+const claudePointerTemplate = (): string =>
+  `# This is a Politik session\n\nSee [AGENTS.md](AGENTS.md) — how to drive this governed session with the \`politik\` CLI.\n`;
+
+/**
  * The full Parliamentary template set, ready to commit into a session repo
  * alongside the files the initializer already writes.
  */
@@ -355,5 +415,7 @@ export const parliamentaryTemplates = (
 ): readonly FileWrite[] => [
   { path: 'CHARTER.md', content: charterTemplate(options) },
   { path: 'ORDER-PAPER.md', content: orderPaperTemplate() },
+  { path: 'AGENTS.md', content: agentsTemplate(options) },
+  { path: 'CLAUDE.md', content: claudePointerTemplate() },
   ...roleTemplates(),
 ];
