@@ -89,8 +89,10 @@ jobs:
           politik doctor || true
           politik scaffold --out . --quorum 2
           politik validate CHARTER.md
+          # `politik init` commits the writ drop itself — standalone (git init)
+          # or, as here where the dir is already a repo, into the enclosing repo
+          # (ADR-0008 monorepo mode). No manual commit needed.
           politik init --charter CHARTER.md --speaker ci --out . --guid ci-001
-          git add -A && git commit -q -m "WRIT_DROP"
 
           politik division call --motion motion-001 --actor ci --role AUTHORITY
           politik division vote --motion motion-001 --actor a --role OPERATOR --vote AYE
