@@ -9,8 +9,8 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -18,7 +18,7 @@ import { isRole, type Role } from './canon.ts';
 import { parseCharter, validateCharter } from './charter.ts';
 import { dropWrit } from './init.ts';
 import { initSessionRepo } from './git.ts';
-import { parseState, serializeState } from './state.ts';
+import { parseState, serializeState, type SessionStateFile } from './state.ts';
 import { parliamentaryTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
@@ -71,7 +71,7 @@ const USAGE = `politik — governed multi-agent sessions on git
 
 Usage
   politik version
-  politik scaffold --dir <dir> [--protocol parliamentary] [--quorum <n>]
+  politik scaffold --dir <dir> [--protocol parliamentary] [--quorum <n>] [--parent <dir>]
   politik doctor
   politik protocol lint <manifest.yml>
   politik protocol new <name> [--mode <mode>] [--out <dir>]
@@ -189,6 +189,7 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
       exit: { type: 'string' },
       termination: { type: 'string' },
       escalation: { type: 'string' },
+      parent: { type: 'string' },
     },
   });
 
@@ -242,8 +243,14 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
   const dir = values.dir ?? values.out ?? '.';
   // Explicit flag > manifest default > template default.
   const m = manifest.protocol.mechanics;
+  // Monorepo placement (ADR-0008): --parent nests this session under a parent
+  // node in the same tree. inherits_from is the child->parent relative path, so
+  // the lineage resolves from within the session's own directory. init detects
+  // the enclosing repo and commits the writ drop there rather than nesting a repo.
+  const inherits_from = values.parent === undefined ? null : (relative(dir, values.parent) || '.');
   const files = parliamentaryTemplates({
     protocol,
+    ...(inherits_from === null ? {} : { inherits_from }),
     ...(quorum === undefined ? {} : { quorum }),
     resolution: values.resolution ?? m.resolution,
     exit: values.exit ?? m.exit,
@@ -484,8 +491,29 @@ const loadSession = async (dir: string) => {
   return { state, hansard, charter: charter?.ok === true ? charter.charter : null };
 };
 
+/**
+ * Atomic file write: land a complete temp file, then rename it over the target.
+ *
+ * The Hansard is the immutable record — the whole point of Politik — and a
+ * half-written record is worse than none. A plain writeFile opens with O_TRUNC:
+ * an interrupt between the truncate and the write (SIGPIPE from a closed `| head`,
+ * Ctrl-C, SIGTERM, a crash) leaves the file at zero bytes, and the operator has
+ * already been told the act succeeded. rename(2) is atomic on a POSIX filesystem,
+ * so the target is only ever replaced by a fully-written file; an interrupted
+ * write orphans a `.tmp` and leaves the record intact. This is the durability the
+ * Standing Orders assume when they say the record is the source of truth.
+ */
+const atomicWrite = async (path: string, content: string): Promise<void> => {
+  const tmp = `${path}.tmp`;
+  await writeFile(tmp, content, 'utf8');
+  await rename(tmp, path);
+};
+
 const writeHansard = (dir: string, hansard: string) =>
-  writeFile(join(dir, 'HANSARD.md'), hansard, 'utf8');
+  atomicWrite(join(dir, 'HANSARD.md'), hansard);
+
+const writeState = (dir: string, state: SessionStateFile) =>
+  atomicWrite(join(dir, 'STATE.json'), serializeState(state));
 
 /**
  * Persist a governance act to the record.
@@ -509,10 +537,9 @@ const logAct = async (dir: string, actor: string, role: Role, item: string): Pro
   if (charter === null || !charter.ledger.enabled) return;
   const path = join(dir, charter.ledger.path);
   const doc = (await readIfPresent(path)) ?? '';
-  await writeFile(
+  await atomicWrite(
     path,
     appendLedgerRow(doc, { at: nowStamp(), actor, role, item, elapsed_ms: 0, usage: null }),
-    'utf8',
   );
 };
 
@@ -645,7 +672,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
           doc,
         );
         doc = end.hansard;
-        await writeFile(join(dir, 'STATE.json'), serializeState(end.state), 'utf8');
+        await writeState(dir, end.state);
         terminationMsg = msg;
       };
       if (charter.mechanics.termination === 'last-standing' && eliminated.length > 0) {
@@ -717,7 +744,7 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
       veto_outstanding: vetoOutstanding(hansard, values.motion),
     }, hansard);
     await writeHansard(dir, result.hansard);
-    await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
+    await writeState(dir, result.state);
     out(`${asTerm(await sessionProtocol(charter.protocol), 'ASSENT')} granted — ${values.motion} is enacted`);
 
     // ADR-0004 defines ASSENT as merging the Motion. This is where the decision
@@ -796,7 +823,7 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
       if (check.triggered) {
         const suspended = suspendForCrisis(check, nowStamp(), state, result.hansard);
         await writeHansard(dir, suspended.hansard);
-        await writeFile(join(dir, 'STATE.json'), serializeState(suspended.state), 'utf8');
+        await writeState(dir, suspended.state);
         out('');
         out('  CONSTITUTIONAL CRISIS — the session is SUSPENDED');
         out('  Resumption requires review by a human outside this session.');
@@ -832,7 +859,7 @@ const cmdCrisis = async (argv: readonly string[]): Promise<number> => {
         reasons: values.reasons, state,
       }, hansard);
       await writeHansard(dir, result.hansard);
-      await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
+      await writeState(dir, result.state);
       out(`EXTERNAL RULING — ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
       out(`  session is now ${result.state.state}`);
       await logAct(dir, values.reviewer ?? 'RECORD', 'OBSERVER' as never, `CRISIS_RULING ${values.ruling?.toUpperCase() ?? 'UPHELD'}`);
@@ -870,7 +897,7 @@ const cmdHeartbeat = async (argv: readonly string[]): Promise<number> => {
     try {
       const result = markStale(check, nowStamp(), state, hansard);
       await writeHansard(dir, result.hansard);
-      await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
+      await writeState(dir, result.state);
       out(`  session marked STALE — resumable, nothing lost (stale_action: ${charter.session.stale_action})`);
       await recordAndCommit(dir, 'SESSION_STALE — heartbeat window elapsed');
     } catch (error) {
@@ -941,7 +968,7 @@ const cmdResume = async (argv: readonly string[]): Promise<number> => {
   try {
     const result = resume(nowStamp(), values.actor, state, hansard);
     await writeHansard(dir, result.hansard);
-    await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
+    await writeState(dir, result.state);
     out('RESUMED — the sitting continues');
     const snap = lastSnapshot(result.hansard);
     out(snap === null ? '  no snapshot; agents resume from the Hansard' : '  agents resume from the last STATE_SNAPSHOT');
@@ -1091,7 +1118,7 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
 
   await writeFiles(dir, filed.files);
   await writeHansard(dir, filed.hansard);
-  await writeFile(join(dir, 'STATE.json'), serializeState(filed.state), 'utf8');
+  await writeState(dir, filed.state);
 
   out(`${asTerm(await sessionProtocol(charter?.protocol ?? 'parliamentary'), 'ESCALATION')} raised`);
   out(`  escalation  ${filed.escalation_path}`);
@@ -1148,7 +1175,7 @@ const cmdRule = async (argv: readonly string[]): Promise<number> => {
 
     await writeFiles(dir, ruling.files);
     await writeHansard(dir, ruling.hansard);
-    await writeFile(join(dir, 'STATE.json'), serializeState(ruling.state), 'utf8');
+    await writeState(dir, ruling.state);
 
     out(`RULING COMMITTED — ${(values.outcome ?? 'UPHELD').toUpperCase()}`);
     out(`  ${ruling.ruling_path}`);
@@ -1627,8 +1654,8 @@ const cmdProrogue = async (argv: readonly string[]): Promise<number> => {
     );
 
     await logAct(dir, values.actor, values.role as never, `PROROGUED ${trigger}`);
-    await writeFile(join(dir, 'STATE.json'), serializeState(result.state), 'utf8');
-    await writeFile(join(dir, 'HANSARD.md'), result.hansard, 'utf8');
+    await writeState(dir, result.state);
+    await writeHansard(dir, result.hansard);
     await writeFiles(dir, result.files);
 
     out('PROROGUED');

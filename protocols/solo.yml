@@ -1,0 +1,32 @@
+# Solo / Casual — the light entry point. Minimal ceremony for one person or a
+# small team: quorum 1, no elimination, escalation available but rarely needed.
+# You get the one thing nobody else gives you — a trustworthy, attributed,
+# cost-tracked record — with as little governance as the moment demands. Scale
+# up to a fuller protocol when the stakes or the numbers do.
+#
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: solo
+  version: 1.0.0
+  mode: constitutional
+  record_mode: distributed
+  roles:
+    AUTHORITY: Lead
+    DELEGATE: Co-lead
+    OPERATOR: Maintainer
+    MEMBER: Contributor
+    OBSERVER: Watcher
+  primitives:
+    SESSION: Session
+    CHARTER: Working Agreement
+    RECORD: Log
+    MOTION: Proposal
+    DIVISION: Vote
+    ESCALATION: Flag
+    SUSPENSION: Paused
+    EXIT: Left
+    DEADLOCK: Stuck
+  domain_veto: []
+  no_escalation: false
+  no_record: false
+  immutable_charter: false

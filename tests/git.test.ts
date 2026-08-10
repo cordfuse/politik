@@ -1,7 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -12,6 +13,15 @@ const sh = (dir: string, args: readonly string[]): Promise<number> =>
     const child = spawn('git', [...args], { cwd: dir, shell: false, stdio: 'ignore' });
     child.on('close', (code) => resolve(code ?? 1));
     child.on('error', () => resolve(1));
+  });
+
+const capture = (dir: string, args: readonly string[]): Promise<string> =>
+  new Promise((resolve) => {
+    const child = spawn('git', [...args], { cwd: dir, shell: false, stdio: ['ignore', 'pipe', 'ignore'] });
+    let out = '';
+    child.stdout?.on('data', (c: Buffer) => { out += c.toString(); });
+    child.on('close', () => resolve(out));
+    child.on('error', () => resolve(''));
   });
 
 const repo = async (): Promise<string> => {
@@ -121,14 +131,54 @@ describe('initializing a session repo', () => {
     }
   });
 
-  it('leaves an existing repo untouched (idempotent)', async () => {
+  it('commits the writ drop into an enclosing repo (monorepo mode)', async () => {
+    const parent = await repo();
+    try {
+      // a session scaffolded as a subtree of an existing repo, not yet committed
+      const dir = join(parent, 'TICKET-1');
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, 'CHARTER.md'), '# Charter\n', 'utf8');
+      await writeFile(join(dir, 'HANSARD.md'), '# HANSARD\n', 'utf8');
+
+      const result = await initSessionRepo(dir, 'steve', 'guid-mono');
+      assert.ok(result.committed, result.reason);
+      assert.ok(result.sha);
+      assert.equal(result.sha.length, 40);
+
+      // no nested repo was created — the writ drop landed in the ONE parent repo
+      assert.equal(existsSync(join(dir, '.git')), false);
+      const log = await capture(parent, ['log', '--oneline']);
+      assert.match(log, /writ drop: session guid-mono/);
+    } finally {
+      await rm(parent, { recursive: true, force: true });
+    }
+  });
+
+  it('no-ops on a clean existing repo (nothing to commit)', async () => {
     const dir = await repo();
     try {
       const result = await initSessionRepo(dir, 'steve', 'guid-abc');
       assert.ok(!result.committed);
-      assert.equal(result.reason, 'existing repository');
+      assert.match(result.reason, /nothing to commit/);
     } finally {
       await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('excludes an orphaned atomic-write .tmp from the writ drop', async () => {
+    const parent = await repo();
+    try {
+      const dir = join(parent, 'TICKET-2');
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, 'HANSARD.md'), '# HANSARD\n', 'utf8');
+      await writeFile(join(dir, 'HANSARD.md.tmp'), 'half-written', 'utf8');
+
+      const result = await initSessionRepo(dir, 'steve', 'guid-tmp');
+      assert.ok(result.committed, result.reason);
+      const tracked = await capture(parent, ['ls-files']);
+      assert.doesNotMatch(tracked, /\.tmp$/m);
+    } finally {
+      await rm(parent, { recursive: true, force: true });
     }
   });
 });

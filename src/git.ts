@@ -97,14 +97,19 @@ export const commitRecord = async (
 };
 
 /**
- * Make a local session directory into a git repository so the record actually
- * persists. Writ Drop "creates the session repo"; on a local session that means
- * a git repo, or `commitRecord` silently no-ops and no governance act is ever
- * recorded. Best-effort and idempotent: an existing repo is left untouched, and
- * a host without git degrades to a plain directory rather than failing the Writ.
+ * Make a session's directory record-bearing. Writ Drop "creates the session
+ * repo"; without a repo, `commitRecord` silently no-ops and no act is recorded.
  *
- * Sets a local identity attributed to the Speaker so later record commits — made
- * headless by the engine — have an author without relying on ambient git config.
+ * Two shapes, auto-detected (ADR-0008 — a session is a git-tracked *directory*,
+ * standalone repo or subtree of one):
+ *  - **Standalone**: the directory is not yet in a repo → `git init` it and land
+ *    the writ drop, attributed to the Speaker.
+ *  - **Monorepo**: the directory already sits inside a repo (a parent tree, or a
+ *    clone) → commit the writ drop *to that repo* rather than nesting a new one.
+ *    Per-commit identity, so the enclosing repo's own config is untouched;
+ *    no-ops if there is nothing to commit (e.g. a re-run on a clone).
+ *
+ * Best-effort: a host without git degrades to a plain directory.
  */
 export const initSessionRepo = async (
   dir: string,
@@ -113,13 +118,31 @@ export const initSessionRepo = async (
   spawnFn: typeof spawn = spawn,
 ): Promise<CommitResult> => {
   const isRepo = await git(dir, ['rev-parse', '--is-inside-work-tree'], spawnFn);
-  if (isRepo.code === 0) return { committed: false, sha: null, reason: 'existing repository' };
+  if (isRepo.code === 0) {
+    // Monorepo: land the writ drop in the enclosing repo. `add .` stages only
+    // this session's subtree; the per-commit identity attributes it to the
+    // Speaker without rewriting the parent repo's config. Exclude `*.tmp` — an
+    // atomic write interrupted mid-flight can orphan one, and it must never enter
+    // the record.
+    await git(dir, ['add', '.', ':(exclude)*.tmp'], spawnFn);
+    const commit = await git(
+      dir,
+      ['-c', `user.name=${speaker}`, '-c', `user.email=${speaker}@politik.local`,
+        'commit', '-m', `writ drop: session ${guid}`],
+      spawnFn,
+    );
+    if (commit.code !== 0) {
+      return { committed: false, sha: null, reason: 'existing repository — nothing to commit' };
+    }
+    const sha = await git(dir, ['rev-parse', 'HEAD'], spawnFn);
+    return { committed: true, sha: sha.out || null, reason: 'writ drop committed to the enclosing repo' };
+  }
   if ((await git(dir, ['init', '-q'], spawnFn)).code !== 0) {
     return { committed: false, sha: null, reason: 'git unavailable — local directory only' };
   }
   await git(dir, ['config', 'user.name', speaker], spawnFn);
   await git(dir, ['config', 'user.email', `${speaker}@politik.local`], spawnFn);
-  await git(dir, ['add', '-A'], spawnFn);
+  await git(dir, ['add', '-A', '.', ':(exclude)*.tmp'], spawnFn);
   const commit = await git(dir, ['commit', '-m', `writ drop: session ${guid}`], spawnFn);
   if (commit.code !== 0) return { committed: false, sha: null, reason: 'repo initialized, nothing to commit' };
   const sha = await git(dir, ['rev-parse', 'HEAD'], spawnFn);
