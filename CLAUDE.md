@@ -19,8 +19,10 @@ composable mechanics — ADR-0007) and **read** differently (vocabulary display)
 Architecture decisions are in [`docs/adr/`](docs/adr/). ADR-0001 (transport),
 ADR-0002 (CHARTER.md schema), ADR-0003 (STATE.json schema), ADR-0004 (motion
 enactment), ADR-0005 (Hansard format), ADR-0006 (protocol behavioral
-enforcement — `session.escalation`) and ADR-0007 (protocol mechanics — composable
-`resolution`/`exit`/`termination` override points) are all **Accepted**.
+enforcement — `session.escalation`), ADR-0007 (protocol mechanics — composable
+`resolution`/`exit`/`termination` override points) and ADR-0008 (session storage —
+a session is a git-tracked *directory*; monorepo tree by default, standalone repo
+an opt-in mode; implementation phased/not-yet-built) are all **Accepted**.
 `POLITIK-ARCHITECTURE.md` was amended only by ADR-0004, which added the `ASSENT`
 verb and the `CONFLICT` primitive.
 
