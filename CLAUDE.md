@@ -14,7 +14,8 @@ framework runs, governs, and has been exercised live — Motions tabled by real
 agents, carried by Division, enacted by Assent, a simulated constitutional
 collapse. Protocols now genuinely **behave** differently (one shared engine,
 composable mechanics — ADR-0007) and **read** differently (vocabulary display).
-~35 modules, 656 tests, CI green.
+~35 modules, 671 tests, CI green. Every command, all 11 protocols, the agent
+turn (`run`), and live SCM projection have been dogfooded end to end.
 
 Architecture decisions are in [`docs/adr/`](docs/adr/). ADR-0001 (transport),
 ADR-0002 (CHARTER.md schema), ADR-0003 (STATE.json schema), ADR-0004 (motion
@@ -34,6 +35,29 @@ Phase 1's only remaining item is the arXiv preprint. Phase 8 (public launch) has
 not started.
 
 ## Where we left off (2026-08-10)
+
+**The whole surface is now dogfooded** — core loop, every command, all 11
+protocols, monorepo mode, the durability story, the agent turn (`run`), and live
+SCM projection. Nine real bugs found and fixed this session, all on `main`, CI
+green throughout. Highlights below.
+
+- **`run` — the agent turn — verified end to end.** elect → compose → spawn →
+  capture → record → **measure**: a seated agent's committed Motion is captured
+  and the ledger reports **real tokens + cost** ($0.0123) parsed from the agent's
+  JSON. Now covered in CI via a shim agent (`tests/run-turn.test.ts`) — the real
+  binary path CI never ran before (no agent installed there).
+- **SCM projection — verified live** against a throwaway GitHub repo (created,
+  exercised, deleted). A Motion carried in Politik **merged its PR on GitHub**
+  (`#1 merged via merge_commit`); a Point of Order **opened a GitHub issue**
+  (`issue #2`); Division→review correctly skipped with no reviewers named. All
+  CANON→GitHub mappings work. (Not a CI test — needs a live token.)
+- **Durability, fully closed.** "Record, then report": every command writes,
+  commits, *then* prints, so no interrupt (closed `| head`, Ctrl-C) can leave an
+  act announced-but-unrecorded. The EPIPE handler in `bin/politik.js` was calling
+  `process.exit(0)` — terminating synchronously and aborting the in-flight commit;
+  it now swallows EPIPE so pending work finishes. Combined with atomic writes
+  (temp+rename), the record survives any interrupt. Regression:
+  `atomic-write.test.ts` asserts a clean tree after each interrupted act.
 
 Dogfooded **phase-1 monorepo mode** (ADR-0008) end-to-end, all on `main` (89d9989):
 
@@ -77,15 +101,10 @@ CARRIED). Every previously-untested command works and commits cleanly: `motion
 link`, `actor spawn/veto`, `conflict check/resolve`, `snapshot`, `heartbeat
 --suspend` → STALE, `resume` STALE→CONVENED. 672 tests, CI green.
 
-**Open — a robustness observation (NOT data loss), needs a decision.** The commands
-follow "write file → report success → commit". The atomic-write fix makes the file
-safe under an interrupt, but if the process dies *between* the report and the commit
-(`… tally | head`, a Ctrl-C at the wrong microsecond), the act is written to the
-working tree but not committed — the *last* act before an interrupt may miss git
-history (the next act, or a manual commit, absorbs it). Normal usage is always
-clean. The principled fix is "record **then** report" — commit before the output
-that could trigger SIGPIPE — but it's a systemic reorder across ~10 command
-branches and changes output timing, so it's flagged for a go rather than done.
+**Resolved — record then report** (was flagged as an open robustness call). Every
+command now commits before it prints; `bin/politik.js` swallows EPIPE instead of
+`process.exit(0)`. An interrupt can no longer leave an act announced-but-unrecorded.
+See the durability bullet at the top of this section.
 
 **Housekeeping noted, not urgent:** GitHub Actions warns `actions/checkout@v4` /
 `setup-node@v4` target the deprecated Node 20 (forced to Node 24). Bump to v5
