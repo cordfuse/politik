@@ -24,7 +24,9 @@ enforcement — `session.escalation`), ADR-0007 (protocol mechanics — composab
 `resolution`/`exit`/`termination` override points) and ADR-0008 (session storage —
 a session is a git-tracked *directory*; monorepo tree by default, standalone repo
 an opt-in mode; **fully built — monorepo placement, federation as local traversal
-(`politik registry`/`cascade`), and explicit mode (`init --standalone`)**) are all **Accepted**.
+(`politik registry`/`cascade`), and explicit mode (`init --standalone`)**) and
+ADR-0009 (the **MATCH primitive** + pairing — `politik pair`/`match`, unblocking
+Swiss/round-robin/single-elimination scoring) are all **Accepted**.
 `POLITIK-ARCHITECTURE.md` was amended only by ADR-0004, which added the `ASSENT`
 verb and the `CONFLICT` primitive.
 

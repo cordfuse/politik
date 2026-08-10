@@ -29,6 +29,9 @@ import { parseEnvelope, isEligible, type Envelope } from './envelope.ts';
 import { commitRecord, type CommitResult } from './git.ts';
 import { discoverTree, rollUp, detectCascades, type FederationNode } from './federation.ts';
 import { standings, type RankBy } from './standings.ts';
+import {
+  isPairingFormat, matchCreatedEntry, matchDecidedEntry, matches, pairRound, reportMatch,
+} from './tournament.ts';
 import { cascadeAlerts, cascadeEntry, recordOnNode } from './tree.ts';
 import {
   linkEntry, projectAssent, projectDivision, projectEscalation,
@@ -109,6 +112,9 @@ Usage
   politik integrity [--dir <dir>]         # scan the record for bad-faith patterns
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
   politik standings [--dir <dir>] [--by win-loss|survival]   # score a competitive protocol
+  politik pair --format swiss|round-robin|single-elim [--dir <dir>]   # pair the next round of MATCHes
+  politik match report --match <id> --winner <contestant> [--actor <referee>]
+  politik match list [--dir <dir>]
   politik registry [--dir <root>] [--state <STATE>]   # the whole tree, at a glance
   politik cascade [--dir <root>]                       # warn where a fault repeats across siblings
 
@@ -137,6 +143,8 @@ Commands
   status      Read STATE.json and summarise the proceeding.
   prorogue    Close a proceeding permanently and seal the Hansard.
   standings   Score a competitive protocol from the record (win-loss or survival).
+  pair        Pair the next round of MATCHes by format (swiss, round-robin, single-elim).
+  match       Report a MATCH result, or list the bracket.
   registry    Walk the tree: every session, its state and cost, with a roll-up.
   cascade     Warn where a fault repeats across sibling sessions.
 `;
@@ -1897,6 +1905,102 @@ const cmdStandings = async (argv: readonly string[]): Promise<number> => {
   return EXIT.OK;
 };
 
+/**
+ * `politik pair` — generate the next round of MATCHes (ADR-0009).
+ *
+ * The field is the seated actors; the format decides who faces whom (swiss by
+ * score, round-robin by unplayed pair, single-elim among the undefeated). A bye
+ * is created already decided. The Speaker then reports each result with
+ * `politik match report`.
+ */
+const cmdPair = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: { dir: { type: 'string' }, format: { type: 'string' }, actor: { type: 'string' }, round: { type: 'string' } },
+  });
+  const dir = values.dir ?? '.';
+  const { hansard, charter } = await loadSession(dir);
+  if (charter === null) { err(`pair: ${dir} is not a session repo`); return EXIT.USAGE; }
+  if (!isPairingFormat(values.format)) {
+    err('pair: --format must be swiss | round-robin | single-elim'); return EXIT.USAGE;
+  }
+
+  const contestants = seats(hansard).map((s) => s.actor);
+  if (contestants.length < 2) { err('pair: fewer than two contestants are seated'); return EXIT.REFUSED; }
+  const played = matches(hansard);
+  const round = values.round !== undefined
+    ? Number(values.round)
+    : Math.max(0, ...played.map((m) => m.round)) + 1;
+
+  const pairings = pairRound(contestants, standings(hansard), values.format, round, played);
+  if (pairings.length === 0) {
+    out(`no pairings for round ${round} — the ${values.format} field is decided`);
+    return EXIT.OK;
+  }
+
+  let doc = hansard;
+  for (const pairing of pairings) {
+    const created = matchCreatedEntry(pairing, round, nowStamp());
+    doc = appendEntry(doc, created);
+    if (pairing.b === null) {
+      // A bye advances unopposed — record it decided so standings count it.
+      doc = appendEntry(doc, matchDecidedEntry(
+        created.fields?.['Match'] ?? '', round, pairing.a, null, nowStamp(), values.actor ?? 'RECORD'));
+    }
+  }
+  await writeHansard(dir, doc);
+  await logAct(dir, values.actor ?? 'RECORD', 'OPERATOR' as never, `PAIRED round ${round} (${values.format})`);
+  const rec = await commitAct(dir, `MATCH_PAIRING — round ${round} (${values.format})`);
+  out(`ROUND ${round} — ${values.format}`);
+  for (const pairing of pairings) out(`  ${pairing.a} vs ${pairing.b ?? 'BYE'}`);
+  out('  report each result: politik match report --match <id> --winner <contestant>');
+  reportCommit(rec);
+  return EXIT.OK;
+};
+
+/** `politik match report|list` — resolve or view MATCHes (ADR-0009). */
+const cmdMatch = async (argv: readonly string[]): Promise<number> => {
+  const [verb, ...rest] = argv;
+  const { values } = parseArgs({
+    args: rest,
+    options: { dir: { type: 'string' }, match: { type: 'string' }, winner: { type: 'string' }, actor: { type: 'string' } },
+  });
+  const dir = values.dir ?? '.';
+  const { hansard, charter } = await loadSession(dir);
+  if (charter === null) { err(`match: ${dir} is not a session repo`); return EXIT.USAGE; }
+
+  if (verb === 'list') {
+    const all = matches(hansard);
+    if (all.length === 0) { out('no matches yet — pair a round first'); return EXIT.OK; }
+    for (const m of all) {
+      const status = m.winner === null ? 'open' : `${m.winner} won`;
+      out(`  [${status.padEnd(12)}] ${m.id}  ·  ${m.a} vs ${m.b ?? 'bye'}`);
+    }
+    return EXIT.OK;
+  }
+
+  if (verb === 'report') {
+    if (values.match === undefined || values.winner === undefined) {
+      err('match report: --match and --winner are required'); return EXIT.USAGE;
+    }
+    try {
+      const result = reportMatch(values.match, values.winner, nowStamp(), values.actor ?? 'RECORD', hansard);
+      await writeHansard(dir, result.hansard);
+      await logAct(dir, values.actor ?? 'RECORD', 'AUTHORITY' as never, `MATCH_DECIDED ${values.match} -> ${values.winner}`);
+      const rec = await commitAct(dir, `MATCH_DECIDED — ${values.match}: ${values.winner}`);
+      out(`MATCH ${values.match} — ${values.winner} won`);
+      reportCommit(rec);
+      return EXIT.OK;
+    } catch (error) {
+      err(`match refused: ${error instanceof Error ? error.message : String(error)}`);
+      return EXIT.REFUSED;
+    }
+  }
+
+  err(`match: unknown verb "${verb ?? ''}" — expected report | list`);
+  return EXIT.USAGE;
+};
+
 /** A one-glance mark for a node's state — colour-free, terminal-safe. */
 const stateMark = (state: string): string => {
   switch (state) {
@@ -2058,6 +2162,10 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdChallenge(rest);
     case 'standings':
       return cmdStandings(rest);
+    case 'pair':
+      return cmdPair(rest);
+    case 'match':
+      return cmdMatch(rest);
     default:
       err(`unknown command: ${command}`);
       err(USAGE);

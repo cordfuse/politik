@@ -56,6 +56,7 @@ export const PRIMITIVES = [
   'RECORD',
   'MOTION',
   'DIVISION',
+  'MATCH',
   'ESCALATION',
   'SUSPENSION',
   'QUORUM',

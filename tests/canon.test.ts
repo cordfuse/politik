@@ -22,8 +22,9 @@ describe('CANON shape', () => {
     assert.equal(ROLES.length, 5);
   });
 
-  it('declares eleven session primitives', () => {
-    assert.equal(PRIMITIVES.length, 11);
+  it('declares twelve session primitives including MATCH', () => {
+    assert.equal(PRIMITIVES.length, 12);
+    assert.ok(PRIMITIVES.includes('MATCH'));
   });
 
   it('declares fifteen verbs including ASSENT', () => {

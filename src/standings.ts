@@ -73,6 +73,15 @@ export const standings = (hansard: string, by: RankBy = 'win-loss'): readonly St
       case 'MOTION_REJECTED':
         if (motion !== undefined) carried.set(motion, false);
         break;
+      case 'MATCH_DECIDED': {
+        // A tournament (ADR-0009) scores the same table: the winner takes a win,
+        // the loser a loss. A bye ('bye') gives its winner a win and no one a loss.
+        const winner = entry.fields['Winner'];
+        const loser = entry.fields['Loser'];
+        if (winner !== undefined) { bump(wins, winner); participants.add(winner); }
+        if (loser !== undefined && loser !== 'bye') { bump(losses, loser); participants.add(loser); }
+        break;
+      }
       case 'ACTOR_HIRED':
         if (subject !== undefined) participants.add(subject);
         break;

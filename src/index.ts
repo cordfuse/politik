@@ -39,4 +39,5 @@ export * from './transport.ts';
 export * from './tree.ts';
 export * from './federation.ts';
 export * from './standings.ts';
+export * from './tournament.ts';
 export * from './providers/github.ts';
