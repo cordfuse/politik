@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   DivisionError,
   suspendForDeadlock,
+  breakDeadlock,
   alreadyEnacted,
   callDivision,
   castVote,
@@ -357,6 +358,33 @@ describe('deadlock suspends rather than silently passing', () => {
       2,
     );
     assert.throws(() => suspendForDeadlock(carried, AT, CONVENED, BASE), DivisionError);
+  });
+
+  describe('AUTHORITY breaks it with a casting vote', () => {
+    const deadlockState = suspendForDeadlock(tied(), AT, CONVENED, BASE).state;
+    const votes = withVotes([{ actor: 'a', vote: 'AYE' }, { actor: 'b', vote: 'NO' }]);
+
+    it('carry casts an AYE, decides the Motion, and resumes', () => {
+      const r = breakDeadlock('motion-001', 'carry', AT, 'speaker', deadlockState, votes, 2);
+      assert.equal(r.outcome.carried, true);
+      assert.equal(r.state.state, 'CONVENED');
+      assert.equal(r.state.suspension, null);
+      // the casting vote is recorded, then the outcome it produces
+      assert.equal(r.entries[0]?.type, 'VOTE_CAST');
+      assert.equal(r.entries[0]?.fields?.['Vote'], 'AYE');
+      assert.equal(r.entries[1]?.type, 'MOTION_CARRIED');
+    });
+
+    it('reject casts a NO and the Motion falls', () => {
+      const r = breakDeadlock('motion-001', 'reject', AT, 'speaker', deadlockState, votes, 2);
+      assert.equal(r.outcome.carried, false);
+      assert.equal(r.entries[0]?.fields?.['Vote'], 'NO');
+      assert.equal(r.entries[1]?.type, 'MOTION_REJECTED');
+    });
+
+    it('refuses on a session that is not deadlocked', () => {
+      assert.throws(() => breakDeadlock('motion-001', 'carry', AT, 'speaker', CONVENED, votes, 2), DivisionError);
+    });
   });
 });
 

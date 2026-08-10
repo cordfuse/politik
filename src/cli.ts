@@ -45,8 +45,8 @@ import {
   type CrisisRuling,
 } from './crisis.ts';
 import {
-  callDivision, castVote, cull, divisionCalled, divisionDecided, grantAssent, isExitPolicy,
-  isResolution, recordOutcome, tallyDivision, type Vote,
+  breakDeadlock, callDivision, castVote, cull, divisionCalled, divisionDecided, grantAssent,
+  isExitPolicy, isResolution, recordOutcome, suspendForDeadlock, tallyDivision, type Vote,
 } from './division.ts';
 import {
   PROTOCOL_MODES, parseProtocol, roleTerm, term, type Protocol, type ProtocolMode,
@@ -83,6 +83,7 @@ Usage
   politik division call --motion <id> --actor <h> --role <ROLE> [--reviewers a,b]
   politik division vote --motion <id> --actor <h> --role <ROLE> --vote AYE|NO|ABSTAIN
   politik division tally --motion <id>
+  politik division break --motion <id> --actor <handle> --decide carry|reject   # break a DEADLOCK
   politik assent --motion <id> --actor <h> --role AUTHORITY
   politik crisis file --actor <h> --role <ROLE> --against <speaker> --grounds <text>
   politik crisis check
@@ -622,6 +623,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
     options: {
       dir: { type: 'string' }, motion: { type: 'string' }, actor: { type: 'string' },
       role: { type: 'string' }, vote: { type: 'string' }, reviewers: { type: 'string' },
+      decide: { type: 'string' },
       ...PROVIDER_OPTS,
     },
   });
@@ -688,6 +690,24 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       const outcome = tallyDivision(
         hansard, values.motion, charter.session.quorum, null, charter.mechanics.resolution,
       );
+
+      // A tie with quorum is a DEADLOCK, not a rejection (ADR-0004 Proposal 4):
+      // the House could not decide, so the sitting suspends for AUTHORITY to
+      // break rather than silently recording a loss. Only genuine ties suspend;
+      // a majority either way falls through to the ordinary outcome below.
+      if (!outcome.carried && outcome.ayes === outcome.noes && outcome.quorum_met) {
+        const deadlock = suspendForDeadlock(outcome, nowStamp(), state, hansard);
+        await writeHansard(dir, deadlock.hansard);
+        await writeState(dir, deadlock.state);
+        await logAct(dir, values.actor ?? 'RECORD', (values.role ?? 'OPERATOR') as never, `DEADLOCK ${values.motion}`);
+        const rec = await commitAct(dir, `DEADLOCK — ${values.motion}`);
+        out(`${asTerm(protocol, 'MOTION')} DEADLOCKED — tied ${outcome.ayes} all, no majority`);
+        out('  the session is SUSPENDED — AUTHORITY must break the tie:');
+        out(`    politik division break --motion ${values.motion} --actor <speaker> --decide carry|reject`);
+        reportCommit(rec);
+        return EXIT.REFUSED;
+      }
+
       const result = recordOutcome(outcome, nowStamp(), values.actor ?? 'RECORD',
         (values.role ?? 'OPERATOR') as never, hansard);
       // exit: elimination culls the losing side (ADR-0007). The outcome is
@@ -746,7 +766,28 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
       return outcome.carried ? EXIT.OK : EXIT.REFUSED;
     }
 
-    err(`division: unknown verb "${verb ?? ''}" — expected call | vote | tally`);
+    if (verb === 'break') {
+      if (values.actor === undefined || values.decide === undefined) {
+        err('division break: --actor and --decide (carry|reject) are required'); return EXIT.USAGE;
+      }
+      const decision = values.decide.toLowerCase();
+      if (decision !== 'carry' && decision !== 'reject') {
+        err('division break: --decide must be carry or reject'); return EXIT.USAGE;
+      }
+      const result = breakDeadlock(values.motion, decision, nowStamp(), values.actor, state, hansard,
+        charter.session.quorum, charter.mechanics.resolution);
+      await writeHansard(dir, result.hansard);
+      await writeState(dir, result.state);
+      await logAct(dir, values.actor, 'AUTHORITY' as never, `DEADLOCK_BROKEN ${values.motion} ${decision}`);
+      const rec = await commitAct(dir, `DEADLOCK_BROKEN — ${values.motion} ${decision}`);
+      out(`${asTerm(protocol, 'MOTION')} ${result.outcome.carried ? 'CARRIED' : 'NOT CARRIED'} — AUTHORITY broke the deadlock`);
+      out(`  casting vote ${decision === 'carry' ? 'AYE' : 'NO'} — ${result.outcome.reason}`);
+      out('  the sitting resumes');
+      reportCommit(rec);
+      return result.outcome.carried ? EXIT.OK : EXIT.REFUSED;
+    }
+
+    err(`division: unknown verb "${verb ?? ''}" — expected call | vote | tally | break`);
     return EXIT.USAGE;
   } catch (error) {
     err(`division refused: ${error instanceof Error ? error.message : String(error)}`);

@@ -542,3 +542,68 @@ export const suspendForDeadlock = (
     }),
   };
 };
+
+/**
+ * AUTHORITY breaks a DEADLOCK with a casting vote.
+ *
+ * The tie suspended the sitting because the House could not decide; only
+ * AUTHORITY can supply the decision it could not reach (suspendForDeadlock:
+ * "AUTHORITY must rule; the House could not decide"). The casting vote decides
+ * the Motion — carried or rejected — and the sitting resumes. Refuses unless the
+ * session is actually deadlocked, so a casting vote can never override a Division
+ * the House did decide.
+ */
+export const breakDeadlock = (
+  motion: string,
+  decision: 'carry' | 'reject',
+  at: string,
+  authority: string,
+  state: SessionStateFile,
+  hansard: string,
+  quorumRequired: number,
+  resolution: Resolution = 'majority',
+): {
+  /** The casting vote, then the outcome it produces. */
+  readonly entries: readonly HansardEntry[];
+  readonly hansard: string;
+  readonly outcome: DivisionOutcome;
+  readonly state: SessionStateFile;
+} => {
+  if (state.state !== 'SUSPENDED' || state.suspension?.cause !== 'DEADLOCK') {
+    throw new DivisionError('the session is not deadlocked — there is no tie for a casting vote to break');
+  }
+
+  // The casting vote is a real vote: AYE to carry, NO to reject. It flows through
+  // the ordinary tally, so every downstream reader (Assent included) sees a
+  // decided Division, not a special case only this command understands.
+  const casting: HansardEntry = {
+    type: 'VOTE_CAST',
+    at,
+    actor: authority,
+    role: 'AUTHORITY',
+    fields: {
+      Motion: motion,
+      Vote: decision === 'carry' ? 'AYE' : 'NO',
+      Note: 'AUTHORITY casting vote to break a DEADLOCK',
+    },
+  };
+  const withVote = appendEntry(hansard, casting);
+  const outcome = tallyDivision(withVote, motion, quorumRequired, null, resolution);
+  const recorded = recordOutcome(outcome, at, authority, 'AUTHORITY', withVote);
+
+  return {
+    entries: [casting, recorded.entry],
+    hansard: recorded.hansard,
+    outcome,
+    state: createState({
+      session_guid: state.session_guid,
+      protocol: state.protocol,
+      state: 'CONVENED',
+      quorum: state.quorum,
+      hansard_head: state.hansard_head,
+      updated_at: at,
+      updated_by: authority,
+      suspension: null,
+    }),
+  };
+};
