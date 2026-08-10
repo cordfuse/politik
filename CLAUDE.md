@@ -23,7 +23,8 @@ enactment), ADR-0005 (Hansard format), ADR-0006 (protocol behavioral
 enforcement — `session.escalation`), ADR-0007 (protocol mechanics — composable
 `resolution`/`exit`/`termination` override points) and ADR-0008 (session storage —
 a session is a git-tracked *directory*; monorepo tree by default, standalone repo
-an opt-in mode; **phase 1 — monorepo placement — now built**) are all **Accepted**.
+an opt-in mode; **phases 1–2 built — monorepo placement + federation as local
+traversal** (`politik registry`/`cascade`)) are all **Accepted**.
 `POLITIK-ARCHITECTURE.md` was amended only by ADR-0004, which added the `ASSENT`
 verb and the `CONFLICT` primitive.
 
@@ -242,7 +243,17 @@ and testable without a network):
 `status` · `run` · `broadcast` · `motion link` · `division call|vote|tally` ·
 `assent` · `escalate` · `rule` · `crisis file|check|review` ·
 `actor hire|promote|demote|exit|veto|spawn|list` · `heartbeat` · `snapshot` ·
-`resume` · `ledger` · `prorogue`
+`resume` · `ledger` · `prorogue` · `registry` · `cascade`
+
+### Federation — the tree, at a glance
+
+A Politik tree is a 1:N hierarchy of sessions (EXECUTION.md § The Politik Tree).
+In monorepo mode (ADR-0008) the whole tree is one repository of nested
+directories, and federation is **local traversal**, not a separate federation
+repo: `src/federation.ts` walks the tree and `politik registry` prints every
+session with its state and cost plus a roll-up (`--state <S>` filters). `politik
+cascade` records a CASCADE_ALERT on the parent where a fault repeats across
+siblings. This is the GLOBAL layer the audit had listed as backlog.
 
 ### Local and hosted sessions
 

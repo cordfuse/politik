@@ -2,7 +2,8 @@
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
-**Status:** Accepted (implementation phased — not yet built)
+**Status:** Accepted — phase 1 (monorepo placement) and phase 2 (federation as
+local traversal) built; phase 3 (mode as a Charter default) pending.
 
 ---
 
@@ -96,8 +97,9 @@ federation orchestration differ by mode.
 1. **`scaffold --tree <parent-dir>` / monorepo placement.** Init a session as a
    subdirectory of a parent node, `inherits_from` resolved to the parent
    directory rather than a repo. Standalone remains the current behavior.
-2. **Federation as local traversal.** The registry ("all sessions and their
-   state"), cascade propagation, and scoped-Hansard roll-up implemented as reads
-   over the monorepo tree — the GLOBAL layer the audit lists as backlog.
+2. **Federation as local traversal — built.** The registry ("all sessions and
+   their state"), cascade propagation, and roll-up implemented as reads over the
+   monorepo tree in `src/federation.ts`, surfaced as `politik registry` and
+   `politik cascade` — the GLOBAL layer the audit listed as backlog.
 3. **Mode is a Charter/CLI setting**, defaulting to monorepo; standalone opt-in
    for GitHub-native or per-node-ACL deployments.

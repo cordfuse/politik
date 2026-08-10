@@ -60,7 +60,8 @@ defaults only on absence, so rule 7 rejects a non-CANON assent.
 | `stale_action`, `checkpoint_interval_hours`, `cost_warning_usd`, `deadline_action` | **Built** — all parsed |
 | DEADLOCK suspension | **Partial** — `suspendForDeadlock` constructs it and is tested, but the CLI tally does not auto-suspend on a tie (reports it in prose only) |
 | Disputed Exit | **Partial** — `disputeExit` constructs `DISPUTED_EXIT`; no CLI filing or UPHELD/REVERSED reinstatement flow |
-| PATH_A auto-recovery, scheduled workflows, DELEGATE challenge, GLOBAL layer, Jira, `sync-vault`, NATS | **Still backlog** |
+| GLOBAL layer (session registry, cascade propagation, roll-up) | **Built** — `src/federation.ts` + `politik registry` / `politik cascade` (ADR-0008 phase 2: the tree of directories is the federation, discovered by local traversal) |
+| PATH_A auto-recovery, scheduled workflows, DELEGATE challenge, Jira, `sync-vault`, NATS | **Still backlog** |
 
 **Capability claims — re-checked:**
 
