@@ -12,6 +12,9 @@
   "bin": {
     "politik": "./bin/politik.js"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "bin/",
     "src/",
