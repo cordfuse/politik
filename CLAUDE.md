@@ -23,8 +23,8 @@ enactment), ADR-0005 (Hansard format), ADR-0006 (protocol behavioral
 enforcement — `session.escalation`), ADR-0007 (protocol mechanics — composable
 `resolution`/`exit`/`termination` override points) and ADR-0008 (session storage —
 a session is a git-tracked *directory*; monorepo tree by default, standalone repo
-an opt-in mode; **phases 1–2 built — monorepo placement + federation as local
-traversal** (`politik registry`/`cascade`)) are all **Accepted**.
+an opt-in mode; **fully built — monorepo placement, federation as local traversal
+(`politik registry`/`cascade`), and explicit mode (`init --standalone`)**) are all **Accepted**.
 `POLITIK-ARCHITECTURE.md` was amended only by ADR-0004, which added the `ASSENT`
 verb and the `CONFLICT` primitive.
 

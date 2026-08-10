@@ -78,7 +78,7 @@ Usage
   politik protocol lint <manifest.yml>
   politik protocol new <name> [--mode <mode>] [--out <dir>]
   politik validate <charter.md> [--protocol <name>]
-  politik init --charter <path> --speaker <handle> [--dir <dir>] [--guid <id>]
+  politik init --charter <path> --speaker <handle> [--dir <dir>] [--guid <id>] [--standalone]
   politik run --agent <id> --actor <h> --role <ROLE> (--task <text> | --claim)
   politik division call --motion <id> --actor <h> --role <ROLE> [--reviewers a,b]
   politik division vote --motion <id> --actor <h> --role <ROLE> --vote AYE|NO|ABSTAIN
@@ -409,6 +409,7 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
       out: { type: 'string' },
       guid: { type: 'string' },
       protocol: { type: 'string' },
+      standalone: { type: 'boolean' },
     },
   });
 
@@ -449,7 +450,9 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
   // Writ Drop creates the session repo. On a local session that means making
   // `dir` a git repo, or the record silently never commits. Idempotent — an
   // existing (e.g. cloned GitHub) repo is left alone.
-  const repo = await initSessionRepo(dir, values.speaker, result.state.session_guid);
+  const repo = await initSessionRepo(dir, values.speaker, result.state.session_guid, undefined, {
+    standalone: values.standalone === true,
+  });
 
   out('WRIT DROPPED');
   out(`  session  ${result.state.session_guid}`);

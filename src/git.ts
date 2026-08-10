@@ -116,9 +116,14 @@ export const initSessionRepo = async (
   speaker: string,
   guid: string,
   spawnFn: typeof spawn = spawn,
+  opts: { readonly standalone?: boolean } = {},
 ): Promise<CommitResult> => {
   const isRepo = await git(dir, ['rev-parse', '--is-inside-work-tree'], spawnFn);
-  if (isRepo.code === 0) {
+  // Default is auto-detect (monorepo when already inside a repo). `standalone`
+  // is the explicit opt-out (ADR-0008 phase 3): give this session its own repo
+  // even inside an enclosing tree — for per-session GitHub projection or a
+  // per-node permission boundary, the two cases standalone mode exists for.
+  if (isRepo.code === 0 && opts.standalone !== true) {
     // Monorepo: land the writ drop in the enclosing repo. `add .` stages only
     // this session's subtree; the per-commit identity attributes it to the
     // Speaker without rewriting the parent repo's config. Exclude `*.tmp` — an
@@ -137,6 +142,10 @@ export const initSessionRepo = async (
     const sha = await git(dir, ['rev-parse', 'HEAD'], spawnFn);
     return { committed: true, sha: sha.out || null, reason: 'writ drop committed to the enclosing repo' };
   }
+  // A forced standalone inside an enclosing repo nests a fresh repo here — a
+  // deliberate isolation boundary, not the accidental nested `.git` the
+  // auto-detect exists to avoid. Name it so the operator knows it was on purpose.
+  const nested = isRepo.code === 0;
   if ((await git(dir, ['init', '-q'], spawnFn)).code !== 0) {
     return { committed: false, sha: null, reason: 'git unavailable — local directory only' };
   }
@@ -146,5 +155,9 @@ export const initSessionRepo = async (
   const commit = await git(dir, ['commit', '-m', `writ drop: session ${guid}`], spawnFn);
   if (commit.code !== 0) return { committed: false, sha: null, reason: 'repo initialized, nothing to commit' };
   const sha = await git(dir, ['rev-parse', 'HEAD'], spawnFn);
-  return { committed: true, sha: sha.out || null, reason: 'session repo initialized' };
+  return {
+    committed: true,
+    sha: sha.out || null,
+    reason: nested ? 'standalone repo initialized (isolated inside an enclosing tree)' : 'session repo initialized',
+  };
 };

@@ -154,6 +154,27 @@ describe('initializing a session repo', () => {
     }
   });
 
+  it('forces an isolated repo inside an enclosing tree with { standalone: true }', async () => {
+    const parent = await repo();
+    try {
+      const dir = join(parent, 'ISO');
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, 'HANSARD.md'), '# HANSARD\n', 'utf8');
+
+      const result = await initSessionRepo(dir, 'steve', 'guid-iso', undefined, { standalone: true });
+      assert.ok(result.committed, result.reason);
+      // it nested its own .git — the deliberate isolation boundary...
+      assert.equal(existsSync(join(dir, '.git')), true);
+      // ...and the writ drop is in the node's own history, not the parent's.
+      const parentLog = await capture(parent, ['log', '--oneline']);
+      assert.doesNotMatch(parentLog, /guid-iso/);
+      const nodeLog = await capture(dir, ['log', '--oneline']);
+      assert.match(nodeLog, /guid-iso/);
+    } finally {
+      await rm(parent, { recursive: true, force: true });
+    }
+  });
+
   it('no-ops on a clean existing repo (nothing to commit)', async () => {
     const dir = await repo();
     try {

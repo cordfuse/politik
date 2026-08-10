@@ -2,8 +2,9 @@
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
-**Status:** Accepted — phase 1 (monorepo placement) and phase 2 (federation as
-local traversal) built; phase 3 (mode as a Charter default) pending.
+**Status:** Accepted — **fully built.** Phase 1 (monorepo placement, auto-detected),
+phase 2 (federation as local traversal — `politik registry`/`cascade`), and phase 3
+(explicit mode: `init --standalone` overrides the default) all implemented.
 
 ---
 
@@ -101,5 +102,7 @@ federation orchestration differ by mode.
    their state"), cascade propagation, and roll-up implemented as reads over the
    monorepo tree in `src/federation.ts`, surfaced as `politik registry` and
    `politik cascade` — the GLOBAL layer the audit listed as backlog.
-3. **Mode is a Charter/CLI setting**, defaulting to monorepo; standalone opt-in
-   for GitHub-native or per-node-ACL deployments.
+3. **Mode is a CLI setting — built.** The default is auto-detect (monorepo when
+   already inside a repo); `politik init --standalone` is the explicit opt-out,
+   nesting the session its own repo even inside an enclosing tree — for the
+   GitHub-native-projection and per-node-ACL cases standalone mode exists for.
