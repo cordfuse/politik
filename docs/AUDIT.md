@@ -58,8 +58,8 @@ defaults only on absence, so rule 7 rejects a non-CANON assent.
 | Hard Containment Rule | **Built** — `containment.ts`, wired into `runTurn`, tested |
 | `witness_council` / `consensus_suspension` parsing | **Built** — parsed in `charter.ts` |
 | `stale_action`, `checkpoint_interval_hours`, `cost_warning_usd`, `deadline_action` | **Built** — all parsed |
-| DEADLOCK suspension | **Partial** — `suspendForDeadlock` constructs it and is tested, but the CLI tally does not auto-suspend on a tie (reports it in prose only) |
-| Disputed Exit | **Partial** — `disputeExit` constructs `DISPUTED_EXIT`; no CLI filing or UPHELD/REVERSED reinstatement flow |
+| DEADLOCK suspension | **Built** — `division tally` auto-suspends on a genuine tie; `division break` (`breakDeadlock`) is AUTHORITY's casting vote, which flows through the ordinary tally so Assent sees a decided Division |
+| Disputed Exit | **Built** — `actor dispute` files (`disputeExit`); `actor reinstate --ruling UPHELD\|REVERSED` (`resolveDispute`) reinstates to the held seat or lets the removal stand, and resumes the sitting |
 | GLOBAL layer (session registry, cascade propagation, roll-up) | **Built** — `src/federation.ts` + `politik registry` / `politik cascade` (ADR-0008 phase 2: the tree of directories is the federation, discovered by local traversal) |
 | PATH_A auto-recovery, scheduled workflows, DELEGATE challenge, Jira, `sync-vault`, NATS | **Still backlog** |
 

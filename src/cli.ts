@@ -37,8 +37,8 @@ import { appendLedgerRow, checkCostCeiling, totals } from './ledger.ts';
 import { checkHeartbeat, lastSnapshot, markStale, resume, snapshot } from './heartbeat.ts';
 import { commitRuling, fileEscalation, type RulingOutcome } from './escalation.ts';
 import {
-  demote, exitActor, hire, promote, seats, spawnChild, veto, vetoOutstanding,
-  type ExitType,
+  demote, disputeExit, exitActor, hire, promote, resolveDispute, seats, spawnChild, veto,
+  vetoOutstanding, type ExitType,
 } from './actors.ts';
 import {
   checkCapture, externalReview, fileCrisis, suspendForCrisis,
@@ -91,6 +91,8 @@ Usage
   politik escalate --actor <h> --role <ROLE> --title <t> --body <text> [--seq <n>]
   politik rule --seq <n> --actor <h> --outcome UPHELD|REVERSED|NOTED --body <text>
   politik actor hire|promote|demote|exit|veto|spawn ... (see below)
+  politik actor dispute --actor <removed> --grounds <text>          # challenge one's own removal
+  politik actor reinstate --subject <h> --actor <speaker> --ruling UPHELD|REVERSED
   politik actor list
   politik heartbeat [--dir <dir>] [--suspend]
   politik snapshot [--dir <dir>] [--completed a,b] [--in-flight a] [--pending a]
@@ -1078,6 +1080,7 @@ const cmdActor = async (argv: readonly string[]): Promise<number> => {
       subject: { type: 'string' }, seat: { type: 'string' }, to: { type: 'string' },
       reason: { type: 'string' }, type: { type: 'string' }, motion: { type: 'string' },
       child: { type: 'string' }, mandate: { type: 'string' },
+      grounds: { type: 'string' }, ruling: { type: 'string' },
     },
   });
 
@@ -1106,6 +1109,42 @@ const cmdActor = async (argv: readonly string[]): Promise<number> => {
   const protocol = await sessionProtocol(charter.protocol);
 
   try {
+    // Disputed exit files and rulings change the session's state (suspend, then
+    // resume), unlike the seat verbs below which only touch the record — so they
+    // write STATE.json and return here rather than falling through the shared tail.
+    if (verb === 'dispute') {
+      if (values.grounds === undefined) { err('actor dispute: --grounds is required'); return EXIT.USAGE; }
+      const disputed = disputeExit(nowStamp(), by.actor, values.grounds, state, hansard);
+      await writeHansard(dir, disputed.hansard);
+      await writeState(dir, disputed.state);
+      await logAct(dir, by.actor, by.role, `EXIT_DISPUTED ${by.actor}`);
+      const rec = await commitAct(dir, `EXIT_DISPUTED — ${by.actor}`);
+      out(`EXIT DISPUTED by ${by.actor}`);
+      out('  the sitting is SUSPENDED pending a Speaker ruling:');
+      out(`    politik actor reinstate --subject ${by.actor} --actor <speaker> --ruling UPHELD|REVERSED`);
+      reportCommit(rec);
+      return EXIT.OK;
+    }
+
+    if (verb === 'reinstate') {
+      if (values.subject === undefined || values.ruling === undefined) {
+        err('actor reinstate: --subject and --ruling (UPHELD|REVERSED) are required'); return EXIT.USAGE;
+      }
+      const ruling = values.ruling.toUpperCase();
+      if (ruling !== 'UPHELD' && ruling !== 'REVERSED') {
+        err('actor reinstate: --ruling must be UPHELD or REVERSED'); return EXIT.USAGE;
+      }
+      const resolved = resolveDispute(nowStamp(), by.actor, ruling, values.subject, state, hansard);
+      await writeHansard(dir, resolved.hansard);
+      await writeState(dir, resolved.state);
+      await logAct(dir, by.actor, by.role, `EXIT_RULING ${ruling} ${values.subject}`);
+      const rec = await commitAct(dir, `EXIT_RULING — ${ruling} on ${values.subject}`);
+      out(`DISPUTED EXIT ${ruling} — ${resolved.reinstated ? `${values.subject} reinstated` : 'the removal stands'}`);
+      out('  the sitting resumes');
+      reportCommit(rec);
+      return EXIT.OK;
+    }
+
     let result: { hansard: string } | null = null;
     let message = '';
 
@@ -1143,7 +1182,7 @@ const cmdActor = async (argv: readonly string[]): Promise<number> => {
       result = spawnChild({ ...by, child: values.child, mandate: values.mandate ?? '' }, hansard);
       message = `REFERRED to committee ${values.child}`;
     } else {
-      err(`actor: unknown verb "${verb ?? ''}" — expected hire | promote | demote | exit | veto | spawn | list`);
+      err(`actor: unknown verb "${verb ?? ''}" — expected hire | promote | demote | exit | veto | spawn | dispute | reinstate | list`);
       return EXIT.USAGE;
     }
 

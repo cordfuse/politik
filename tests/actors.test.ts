@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   ActorError,
   disputeExit,
+  resolveDispute,
   speakerOrder,
   EXIT_TYPES,
   demote,
@@ -317,5 +318,34 @@ describe('disputed exit', () => {
 
   it('requires stated grounds', () => {
     assert.throws(() => disputeExit(AT, 'alpha', '  ', CONVENED, removed()), ActorError);
+  });
+
+  describe('AUTHORITY rules on the dispute', () => {
+    const filed = () => disputeExit(AT, 'alpha', 'no cause was given', CONVENED, removed());
+
+    it('UPHELD reinstates the actor to their seat and resumes', () => {
+      const d = filed();
+      const r = resolveDispute(AT, 'speaker', 'UPHELD', 'alpha', d.state, d.hansard);
+      assert.equal(r.reinstated, true);
+      assert.equal(r.state.state, 'CONVENED');
+      assert.equal(r.state.suspension, null);
+      assert.equal(r.entries[0]?.type, 'EXIT_RULING');
+      assert.equal(r.entries[1]?.type, 'ACTOR_HIRED');
+      // the actor is seated again, at the seat they held
+      assert.ok(seats(r.hansard).some((s) => s.actor === 'alpha'));
+    });
+
+    it('REVERSED lets the removal stand and resumes', () => {
+      const d = filed();
+      const r = resolveDispute(AT, 'speaker', 'REVERSED', 'alpha', d.state, d.hansard);
+      assert.equal(r.reinstated, false);
+      assert.equal(r.state.state, 'CONVENED');
+      assert.equal(r.entries.length, 1);
+      assert.equal(seats(r.hansard).some((s) => s.actor === 'alpha'), false);
+    });
+
+    it('refuses when the session is not under a disputed exit', () => {
+      assert.throws(() => resolveDispute(AT, 'speaker', 'UPHELD', 'alpha', CONVENED, removed()), ActorError);
+    });
   });
 });

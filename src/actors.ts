@@ -590,3 +590,96 @@ export const disputeExit = (
     }),
   };
 };
+
+/**
+ * AUTHORITY rules on a disputed exit, and the sitting resumes.
+ *
+ * The dispute suspended the sitting pending a ruling; this supplies it. UPHELD
+ * overturns the removal and reinstates the actor to the seat they held; REVERSED
+ * lets the removal stand. Either way the ruling lifts the suspension — the record
+ * carries the decision and the House goes back to work. Only AUTHORITY rules
+ * (the CLI gates the role); a bad-faith ruling is visible to everyone who can
+ * read the repo, which is the only check on a captured chair the framework claims.
+ */
+export const resolveDispute = (
+  at: string,
+  ruler: string,
+  ruling: 'UPHELD' | 'REVERSED',
+  subject: string,
+  state: SessionStateFile,
+  hansard: string,
+): {
+  readonly entries: readonly HansardEntry[];
+  readonly hansard: string;
+  readonly reinstated: boolean;
+  readonly state: SessionStateFile;
+} => {
+  if (state.state !== 'SUSPENDED' || state.suspension?.cause !== 'DISPUTED_EXIT') {
+    throw new ActorError('the session is not under a disputed exit — there is nothing to rule on');
+  }
+  const entries = parseEntries(hansard);
+  const dispute = entries
+    .filter((e) => e.type === 'EXIT_DISPUTED' && e.fields['Actor affected'] === subject)
+    .at(-1);
+  if (dispute === undefined) {
+    throw new ActorError(`${subject} has no disputed exit on the record`);
+  }
+  const removal = entries
+    .filter((e) => e.type === 'ACTOR_EXITED' && e.fields['Actor affected'] === subject)
+    .at(-1);
+  const seat = (removal?.fields['Seat held'] ?? 'MEMBER') as Role;
+  const upheld = ruling === 'UPHELD';
+
+  const rulingEntry: HansardEntry = {
+    type: 'EXIT_RULING',
+    at,
+    actor: ruler,
+    role: 'AUTHORITY',
+    fields: {
+      'Actor affected': subject,
+      Ruling: ruling,
+      Seat: seat,
+      Outcome: upheld
+        ? `the removal is overturned — ${subject} is reinstated to ${seat}`
+        : `the removal stands — ${subject} remains out`,
+      'Session status': 'CONVENED — the sitting resumes',
+    },
+  };
+
+  const out: HansardEntry[] = [rulingEntry];
+  if (upheld) {
+    // Re-seat with a fresh ACTOR_HIRED so seats() counts the actor again. Not
+    // the hire() helper — that requires a CONVENED session, and we are resolving
+    // the suspension; the ruling itself is what lifts it.
+    out.push({
+      type: 'ACTOR_HIRED',
+      at,
+      actor: ruler,
+      role: seat,
+      fields: {
+        'Actor affected': subject,
+        Role: seat,
+        Reason: 'reinstated after a disputed exit was upheld',
+      },
+    });
+  }
+
+  let doc = hansard;
+  for (const entry of out) doc = appendEntry(doc, entry);
+
+  return {
+    entries: out,
+    hansard: doc,
+    reinstated: upheld,
+    state: createState({
+      session_guid: state.session_guid,
+      protocol: state.protocol,
+      state: 'CONVENED',
+      quorum: state.quorum,
+      hansard_head: state.hansard_head,
+      updated_at: at,
+      updated_by: ruler,
+      suspension: null,
+    }),
+  };
+};
