@@ -168,8 +168,12 @@ overstates this.
 > unbuilt: **scheduled heartbeat / ruling-detection workflows** (need a daemon the
 > architecture deliberately omits), the **three-tier escalation ladder**, **Jira
 > integration**, **`sync-vault`** (Obsidian visualisation), **NATS transport**
-> (additive provider, ADR-0001), and the **`pairing`/`scoring` mechanics override
-> points** (Swiss / tournament). Everything else below is now implemented.
+> (additive provider, ADR-0001). **Scoring is built** — `src/standings.ts` +
+> `politik standings` (win-loss / survival, read from the record). **Pairing is
+> not**, and deliberately: Swiss / round-robin / single-elimination are 1v1-match
+> formats, and a Politik Division is an N-actor vote on a Motion — there is no
+> match to pair. Matchmaking needs an additive *match primitive*, a design
+> question rather than a scoring read. Everything else below is now implemented.
 
 - ~~**Hard Containment Rule** — traversal above CWD should be logged, escalated and suspend the session. Prompt prose only; nothing detects it.~~ **→ Built:** `src/containment.ts` `checkContainment`, wired in `runner.ts` (records a breach and suspends).
 - ~~**`CONFLICT` primitive** (ADR-0004) — a string in `canon.ts` and nothing else.~~ **→ Built:** `src/conflict.ts` + `politik conflict check|resolve`.

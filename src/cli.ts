@@ -28,6 +28,7 @@ import { conflictEntry, detectRecordConflicts, openConflicts, resolveConflict } 
 import { parseEnvelope, isEligible, type Envelope } from './envelope.ts';
 import { commitRecord, type CommitResult } from './git.ts';
 import { discoverTree, rollUp, detectCascades, type FederationNode } from './federation.ts';
+import { standings, type RankBy } from './standings.ts';
 import { cascadeAlerts, cascadeEntry, recordOnNode } from './tree.ts';
 import {
   linkEntry, projectAssent, projectDivision, projectEscalation,
@@ -107,6 +108,7 @@ Usage
   politik hansard [--dir <dir>]           # the record, in the protocol's vocabulary
   politik integrity [--dir <dir>]         # scan the record for bad-faith patterns
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
+  politik standings [--dir <dir>] [--by win-loss|survival]   # score a competitive protocol
   politik registry [--dir <root>] [--state <STATE>]   # the whole tree, at a glance
   politik cascade [--dir <root>]                       # warn where a fault repeats across siblings
 
@@ -134,6 +136,7 @@ Commands
   ledger      Total the session's measured cost.
   status      Read STATE.json and summarise the proceeding.
   prorogue    Close a proceeding permanently and seal the Hansard.
+  standings   Score a competitive protocol from the record (win-loss or survival).
   registry    Walk the tree: every session, its state and cost, with a roll-up.
   cascade     Warn where a fault repeats across sibling sessions.
 `;
@@ -1861,6 +1864,39 @@ const cmdChallenge = async (argv: readonly string[]): Promise<number> => {
   }
 };
 
+/**
+ * `politik standings` — score a competitive protocol from the record.
+ *
+ * A read over the Hansard (like `integrity`): who won the most divisions
+ * (win-loss) or who lasted longest (survival). Neutral on protocol — a
+ * parliamentary session simply shows how each actor's votes fared.
+ */
+const cmdStandings = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: { dir: { type: 'string' }, by: { type: 'string' } },
+  });
+  const dir = values.dir ?? '.';
+  const { hansard, charter } = await loadSession(dir);
+  if (charter === null) { err(`standings: ${dir} is not a session repo`); return EXIT.USAGE; }
+
+  const by: RankBy = values.by === 'survival' ? 'survival' : 'win-loss';
+  const table = standings(hansard, by);
+  if (table.length === 0) { out('no standings — no actor has taken part yet'); return EXIT.OK; }
+
+  const protocol = await sessionProtocol(charter.protocol);
+  out(`STANDINGS — by ${by}`);
+  let rankNo = 0;
+  for (const row of table) {
+    rankNo += 1;
+    const seat = row.seat === null
+      ? (row.eliminated ? 'eliminated' : 'out')
+      : asRoleTerm(protocol, row.seat);
+    out(`  ${String(rankNo).padStart(2)}. ${row.actor.padEnd(14)} ${row.wins}–${row.losses}  ·  ${seat}`);
+  }
+  return EXIT.OK;
+};
+
 /** A one-glance mark for a node's state — colour-free, terminal-safe. */
 const stateMark = (state: string): string => {
   switch (state) {
@@ -2020,6 +2056,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdCascade(rest);
     case 'challenge':
       return cmdChallenge(rest);
+    case 'standings':
+      return cmdStandings(rest);
     default:
       err(`unknown command: ${command}`);
       err(USAGE);
