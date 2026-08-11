@@ -141,6 +141,7 @@ This design enables the Human Flaw research thesis: the same protocol can be run
 | `RECORD` | Hansard — append-only attributed log |
 | `MOTION` | Tabled business — a PR |
 | `DIVISION` | Vote — PR review |
+| `MATCH` | A contest between two contestants that resolves to a single winner — what a Division (an N-actor vote on a Motion) cannot model. Pairs the 1v1 tournament formats: Swiss, round-robin, single-elimination. ADR-0009. |
 | `ESCALATION` | Point of Order — an Issue |
 | `SUSPENSION` | Session pause — proceeding open, agents stopped, resumable |
 | `QUORUM` | Minimum actors for valid session |
