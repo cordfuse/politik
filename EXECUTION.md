@@ -280,21 +280,21 @@ every one lint-clean.
 [x] Solo (single-lead)                                          solo.yml
 ```
 
-The eleven were curated from a much wider design catalogue (PROTOCOLS.md): 52
-shapes down to eleven professional exemplars — fascism and organized-crime cut as
-liabilities, games and toys trimmed. Modes represented: constitutional
-(parliamentary, republic, corporate, peer-review), a unanimity Jury, a darwinist
-elimination Tournament, and an authoritarian ICS incident command.
+The eleven were curated from a much wider design exploration — 52 shapes down to
+eleven professional exemplars, with fascism and organized-crime cut as liabilities
+and games and toys trimmed. Modes represented: constitutional (parliamentary,
+republic, corporate, peer-review), a unanimity Jury, a darwinist elimination
+Tournament, and an authoritarian ICS incident command. PROTOCOLS.md documents the
+eleven.
 
 **Power inversions are declared, never inferred.** `jury-deliberation.yml` and
 `peer-review.yml` let a lower-trust role — a juror, a reviewer — override the
 final Division on domain grounds. Both contradict the trust hierarchy, which is
 exactly why CANON models them as `domain_veto` rather than deriving them.
 
-**Compose your own.** Beyond the eleven, PROTOCOLS.md sketches governance shapes
-across a dozen domains — software, sports, healthcare, business, academia and
-more — as illustration. The framework is the product; any of them, or a new one,
-is a Charter away.
+**Compose your own.** The eleven are exemplars, not a fixed set: CANON plus a
+vocabulary and a mechanics triple (resolution / exit / termination) expresses any
+governance shape. The framework is the product; a new protocol is a Charter away.
 
 **Community contribution protocols (documented, PRs welcome):**
 ```
