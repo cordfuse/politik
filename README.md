@@ -31,6 +31,7 @@ Politik is a **governed multi-agent operating system** where:
 - **Agents** are stateless CLI workers that spawn, do work, and dispose
 - A **git repository IS the session** — charter, record, state, and invite in one
 - **Pluggable governance protocols** translate the framework to any industry vocabulary
+- **A governed tree, not a single machine** — sessions nest into an Org → Team → Ticket hierarchy in one repository; `politik registry` reports the state of everything, across machines and teams
 - **No new infrastructure required** — git already built it
 
 Nobody connected these pieces this way before.
@@ -122,6 +123,17 @@ and correct on git alone. *Run local, run free.*
 | Repo access | Taking a Seat |
 | git history | Hansard (immutable record) |
 
+### The Politik Tree
+
+A session is either a standalone repository or a **node in a tree** — an
+organisation's Org → Team → Sprint → Ticket hierarchy as nested directories in
+one repository, each node inheriting its parent's Charter. Federation is **local
+traversal over that one working tree**, not cross-repository orchestration: no new
+service, no registry server. `politik registry` walks the tree and reports every
+session's state and cost with a roll-up; `politik cascade` flags a fault repeating
+across sibling sessions. `politik init --standalone` opts a node out into its own
+repository when it needs per-session pull requests or a hard permission boundary.
+
 ### Agent Model
 
 Agents are stateless. No persistent processes. State lives in git.
@@ -138,9 +150,13 @@ The Speaker (human) is constitutionally present, not operationally present. Drop
 
 **Eleven reference protocols ship** — Parliamentary, Republic, Monarchy, Socialism (political archetypes), Jury Deliberation, Elimination Tournament, Emergency Response (ICS), Corporate, Peer Review, Adversarial Collaboration, and Solo (single-lead) — spanning constitutional, authoritarian and darwinist modes. Each is a vocabulary translation **plus** a composition of behavioral mechanics — how a decision resolves (majority · supermajority · unanimity), how an actor exits (voted out · elimination · none), and when a session ends (objective · last-standing · verdict) — on top of CANON. You compose your own for anything else; the framework is the product, these are exemplars. Parliamentary is protocol #1, not a privileged mode. A wider catalogue of governance shapes is sketched in [PROTOCOLS.md](PROTOCOLS.md).
 
+Competitive protocols run on the `MATCH` primitive — a real 1v1 contest that a Motion-and-vote Division cannot model. `politik pair` generates a round (Swiss, round-robin, or single-elimination), `politik match report` settles a result, and `politik standings` scores the field from the record.
+
 ### Hansard and LEDGER
 
 **Hansard** — append-only session record. Every motion, vote, escalation, and commit. Attributed, timestamped, immutable. Cannot be edited. Cannot be gamed.
+
+Because the record is the defence against bad faith, `politik integrity` reads the Hansard for the signatures of coercion — a coerced exit, a serial "voluntold" — and surfaces them to the Speaker. Detect and report; it never auto-punishes. The record catches what a naive log would hide.
 
 **LEDGER** — cost accounting per act: elapsed time, token count, dollar cost, model. Every governance act writes a row; agent turns carry measured spend, and the human-driven acts (division, assent, escalation, ruling) carry `unmeasured` cost, so the ledger is a complete account of a session. No story points.
 
