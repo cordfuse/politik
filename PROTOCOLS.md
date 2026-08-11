@@ -103,21 +103,6 @@ Mode: Constitutional (AUTHORITY holds strong VETO)
 | DEADLOCK | Party Purge |
 Mode: Authoritarian (collective in theory, party in practice)
 
-**Protocol: Fascism**
-| CANON | Term |
-|---|---|
-| AUTHORITY | The Leader |
-| OPERATOR | Reich Minister |
-| MEMBER | Party Member |
-| OBSERVER | Subject |
-| SESSION | The State |
-| RECORD | State Propaganda |
-| MOTION | Decree |
-| ESCALATION | None — routes back to Leader |
-| EXIT | Disappeared / Purged |
-| DEADLOCK | Not permitted |
-Mode: Authoritarian — no DIVISION, no ESCALATION, AUTHORITY is terminal
-
 **Protocol: Monarchy**
 | CANON | Term |
 |---|---|
@@ -659,7 +644,7 @@ Mode: Constitutional
 | SUSPENSION | Pivot |
 | EXIT | Quit / Acqui-hired |
 | DEADLOCK | Co-founder Dispute |
-Mode: Authoritarian (structurally close to Fascism)
+Mode: Authoritarian
 
 **Protocol: Investment / Trading**
 | CANON | Term |
@@ -741,24 +726,6 @@ Mode: Constitutional
 ---
 
 ### DOMAIN: COMMUNITY & SOCIAL
-
-**Protocol: Organized Crime / Syndicate**
-| CANON | Term |
-|---|---|
-| AUTHORITY | Boss / Don |
-| DELEGATE | Underboss |
-| OPERATOR | Capo |
-| MEMBER | Soldier |
-| OBSERVER | Associate |
-| SESSION | Job / Operation |
-| CHARTER | The Code / Omertà |
-| RECORD | None — ever |
-| MOTION | Order |
-| DIVISION | None — Boss decides |
-| ESCALATION | None |
-| EXIT | Whacked / Flipped |
-| DEADLOCK | War |
-Mode: Authoritarian + Ephemeral
 
 **Protocol: Religion / Church**
 | CANON | Term |

@@ -315,7 +315,7 @@ A CANON role cannot map to two terms. Resolved by rendering both side-neutrally
 
 **Community contribution protocols (documented, PRs welcome):**
 ```
-Politics:     Socialism, Fascism, Monarchy
+Politics:     Socialism, Monarchy
 Sports:       Double Elimination, Round Robin, Swiss System,
               Draft/Fantasy, Olympic/Multi-Sport, Motorsport/F1,
               eSports Match
@@ -325,8 +325,7 @@ Healthcare:   Clinical Trial/Research
 Business:     Investment/Trading, Auction House
 Education:    Academic/University, Debate Competition
 Creative:     Theatre, Music Recording, Game Development
-Community:    Organized Crime (ephemeral), Religion (immutable),
-              Neighbourhood/HOA, Pirate Crew
+Community:    Religion (immutable), Neighbourhood/HOA, Pirate Crew
 Novel:        Improv Theatre (ephemeral), Archaeological Dig,
               Antarctic Expedition
 Game Theory:  Formal analytical structures (Zero-Sum, Cooperative,

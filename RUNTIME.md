@@ -1328,7 +1328,7 @@ Session resumes
 |---|---|---|
 | Distributed (default) | Every Constituency keeps local log | Most sessions |
 | Anchored | Designated RECORD agent aggregates | Enterprise, audit |
-| Ephemeral | No record kept | Intelligence, Organized Crime protocols |
+| Ephemeral | No record kept | Short-lived, no-audit sessions |
 
 Charter declares mode. Framework respects it.
 
