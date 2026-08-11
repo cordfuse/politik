@@ -139,7 +139,7 @@ voluntary_exit_during_division:
                                        # within the cooling-off window
 ```
 
-None of these catch a determined coercer operating entirely outside the session. But they create friction that makes the pattern visible over time. If the same OPERATOR repeatedly has MEMBERs "voluntarily" withdraw during active Divisions, the Hansard pattern speaks for itself. The audit trail is the deterrent.
+None of these catch a determined coercer operating entirely outside the session. But they create friction that makes the pattern visible over time. If the same OPERATOR repeatedly has MEMBERs "voluntarily" withdraw during active Divisions, the Hansard pattern speaks for itself. The audit trail is the deterrent — and it is no longer only passive: `politik integrity` reads the Hansard for exactly these signatures (a coerced exit, a strategic withdrawal during an open Division, a serial "voluntold") and an honest-concession virtue, and surfaces them to the Speaker. Detect and report; it never auto-punishes.
 
 **What the Hansard can detect:**
 
@@ -157,22 +157,22 @@ None of these catch a determined coercer operating entirely outside the session.
 Any actor facing removal may file a **Disputed Exit** before their session access is revoked. This is the machine equivalent of due process.
 
 ```
-Actor receives EXPEL motion
+Actor is removed (an involuntary exit is on the record)
     ↓
-Actor commits escalation to /escalations/disputed-exit-[timestamp].md
-    (must happen before session access revoked — Charter defines window)
+The removed actor files:
+    politik actor dispute --actor <them> --grounds <text>
+    (only the removed actor may file — a third party cannot dispute on their behalf)
     ↓
-Session pauses automatically
+The sitting auto-suspends, cause DISPUTED_EXIT
     ↓
-Speaker receives notification
+Speaker reviews the Hansard — was the removal procedurally valid?
     ↓
-Speaker reviews Hansard — was the elimination procedurally valid?
+Speaker rules:
+    politik actor reinstate --subject <them> --ruling UPHELD|REVERSED
+    UPHELD   → the removal is overturned; the actor is reinstated to the seat they held
+    REVERSED → the removal stands; the actor remains out
     ↓
-Two possible rulings:
-    ruling: UPHELD   → EXIT_PROTOCOL or EXIT_DIVISION confirmed
-    ruling: REVERSED → Actor reinstated, expelling actor flagged
-
-Ruling committed to Hansard permanently — immutable record either way
+Either ruling resumes the sitting and is committed to the Hansard permanently
 ```
 
 ### The Hansard as Integrity Layer
@@ -406,6 +406,22 @@ Works on Linux and macOS. Windows requires WSLg (Windows 11 only, untested).
 
 ## SESSION QUORUM, MINIMUM CAST AND SINGLE-PLAYER SESSIONS
 
+### Deadlock — a tie is the absence of a decision
+
+A Division that ties with quorum met is a **DEADLOCK**, not a rejection: the House
+could not decide, so recording a loss would be false. `politik division tally`
+detects the tie and **auto-suspends** the sitting with cause `DEADLOCK` (ADR-0004
+Proposal 4) rather than passing silently. Only AUTHORITY can supply the decision
+the House could not reach:
+
+```sh
+politik division break --motion <id> --actor <speaker> --decide carry|reject
+```
+
+The casting vote is a real vote — it flows through the ordinary tally, so the
+Motion is decided (carried or rejected) and every downstream reader, Assent
+included, sees a decided Division. The sitting resumes.
+
 ### Session Termination Conditions
 
 A proceeding ends when **any one** of the following conditions is met first — first-one-wins OR logic. All conditions are monitored simultaneously. All are optional and independently configurable. Any combination is valid.
@@ -539,7 +555,7 @@ For long-running proceedings across multiple days — or proceedings interrupted
 
 **Heartbeat detection:**
 
-A GitHub Actions scheduled workflow runs hourly. It checks the timestamp of the last Hansard commit. If no commit has occurred within `heartbeat_timeout_hours` the proceeding is considered stale.
+The built mechanism is the CLI: `politik heartbeat` checks the timestamp of the last Hansard commit, and `politik heartbeat --suspend` marks the proceeding STALE once no commit has occurred within `heartbeat_timeout_hours`. Running that check on a schedule — a GitHub Actions workflow, hourly — is future automation (a scheduled-workflow layer is backlog; the architecture has no daemon of its own).
 
 ```yaml
 session:
@@ -547,7 +563,7 @@ session:
   stale_action: suspend           # auto-suspend, not dissolve
 ```
 
-On stale detection the engine commits `STATE.json → suspended: true` and a `SESSION_STALE` Hansard record. Agents check STATE.json before every action — they see suspended and stop immediately.
+On stale detection the engine commits `STATE.json → state: STALE` (STALE is a state, not a suspension cause — ADR-0003) and a `SESSION_STALE` Hansard record. Agents check STATE.json before every action — they see STALE and stop immediately; `politik resume --actor <handle>` brings a stale sitting back to CONVENED.
 
 **State snapshots:**
 
@@ -589,7 +605,16 @@ The tool reads the last `STATE_SNAPSHOT` from Hansard, reconstructs the session 
 
 ---
 
-### CROSS-SESSION MEMORY AND THE GLOBAL LAYER — ROADMAP TARGET: v0.9.x
+### CROSS-SESSION MEMORY AND THE GLOBAL LAYER — PARTLY SHIPPED
+
+> **Status (0.3.0):** the *structural* half of the GLOBAL layer shipped early via
+> ADR-0008 (federation as local traversal). `politik registry` walks the tree and
+> reports every session's state and cost — the "state of everything" registry —
+> and `politik cascade` records a `CASCADE_ALERT` where a fault repeats across
+> siblings. So the registry and CASCADE_ALERT below are **built**, not roadmap.
+> What remains future is cross-session *memory* — actor profiles, org-wide
+> constraints, sprint meta-context — described next. The version ladder below
+> predates that split; read it as the original intent, not current status.
 
 Each Politik node starts cold — no knowledge of prior sessions by default. For multi-session sprints this creates a problem: an agent in session 12 may propose something already tried and rejected in session 4.
 
@@ -673,7 +698,7 @@ Writ Drop validation:
         ↓
     Minimum cast checked against assigned constituencies
         ↓
-    PASS → session opens, STATE.json → active
+    PASS → session opens, STATE.json → state: CONVENED
     FAIL → SESSION_INVALID committed to Hansard
             session never opens
             error specifies which roles are missing
@@ -1233,7 +1258,7 @@ Historical examples span every governance domain: republics where executive powe
 
 A corrupt OPERATOR can be expelled. A corrupt MEMBER can be demoted. The appeal path runs upward to AUTHORITY. When AUTHORITY is the corruptor there is no appeal path. The system has no mechanism above AUTHORITY by design — that is what makes the role constitutional.
 
-**Three mitigations — all optional Charter declarations:**
+**Three mitigations — declared in the Charter and enforced by the engine.** The Witness Council and consensus-suspension declarations are parsed from the Charter and enforced through `politik crisis file | check | review`; the DELEGATE challenge through `politik challenge`:
 
 **1. Witness Council**
 
@@ -1249,15 +1274,11 @@ Designated OBSERVER actors who can commit a `CONSTITUTIONAL_CRISIS` Hansard reco
 
 **2. DELEGATE Challenge Verb**
 
-```yaml
-governance:
-  delegate_challenge:
-    enabled: true
-    challenge_window_minutes: 30    # AUTHORITY action paused for 30 minutes
-    challenge_committed_to_hansard: true
+```sh
+politik challenge --actor <delegate> --against <action> --grounds <text> [--window <min>]
 ```
 
-DELEGATE can formally dispute an AUTHORITY action before it takes effect. The challenged action is logged and paused. AUTHORITY still wins after the window — but the challenge is on the permanent record. Makes bad faith AUTHORITY actions visible and attributable.
+Built (ADR-0009 era). A DELEGATE formally disputes an AUTHORITY action: the dissent is recorded, attributed, and permanent. It is **non-binding** — the AUTHORITY action stands and the sitting does not suspend. The local engine has no scheduler, so the `--window` is a declared intent carried on the record, not an enforced pause; the durable mechanism is the attributable challenge itself, which makes a bad-faith AUTHORITY action visible and answerable to everyone who can read the repo.
 
 **3. Prorogation by Consensus**
 

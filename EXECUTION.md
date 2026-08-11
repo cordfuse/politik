@@ -44,7 +44,7 @@ recorded **and** nothing blocks it.
 [x] Finalize CHARTER.md spec                      — ADR-0002 (Accepted)
 [x] Finalize STATE.json schema                    — ADR-0003 (Accepted)
 [x] Finalize SCM provider interface spec          — return types settled in src/scm.ts
-[x] Document all decisions in ADRs                — 0001, 0002, 0003 Accepted
+[x] Document all decisions in ADRs                — 0001–0009 Accepted
 [ ] Draft arXiv preprint — unified paper (framework + experiment)
 ```
 
@@ -543,11 +543,31 @@ meaningless `quorum.present`, and three unreachable suspension causes —
 One audit finding was **rejected**: rule 3 counting declared slots rather than
 seated actors is correct, because Writ Drop runs before any actor is seated.
 
+### Shipped since — 0.3.0 (2026-08-10)
+
+Much has landed since that audit, and the phase plan above predates it:
+
+- **Protocols behave, not just read** (ADR-0006, ADR-0007). `session.escalation` is
+  enforced, and each protocol composes resolution / exit / termination mechanics —
+  a Jury needs unanimity and seals on a verdict; an elimination protocol culls.
+- **The MATCH primitive + tournaments** (ADR-0009). A 12th CANON primitive; `politik
+  pair` / `match` / `standings` run Swiss / round-robin / single-elimination.
+- **Federation — the GLOBAL layer built** (ADR-0008). `politik registry` and
+  `politik cascade` as local traversal over a monorepo tree; `init --standalone`
+  for the per-repo mode.
+- **Constitutional depth wired.** DEADLOCK now auto-suspends and is broken by a
+  casting vote (`division break`); the disputed-exit flow (`actor dispute` /
+  `reinstate`), the DELEGATE challenge (`politik challenge`), and bad-faith
+  detection (`politik integrity`) all ship.
+- **Published.** `@cordfuse/politik@0.3.0` is live on npm.
+
+The full source-vs-docs reconciliation is in [`docs/AUDIT.md`](docs/AUDIT.md).
+
 **Provider is optional, not mandatory.** The spec pulls both ways — "Run local,
 run free" against "the motion system (Pull Requests)". Resolved as: git is the
 mandatory substrate, the platform is an optional projection over it.
 
-Phase 8 remains unstarted.
+Phase 8 is not meaningfully started — the npm package is published (`@cordfuse/politik@0.3.0`, with a tag-to-npm release workflow), but the rest of the launch surface (README hero, Docker/Homebrew distribution, the announcement, the arXiv preprint) is not.
 
 ---
 
@@ -560,7 +580,7 @@ Phase 8 remains unstarted.
 [ ] At least 5 agents tested
 [ ] GitHub template repo configured
 [ ] Docker images published
-[ ] npm package published
+[x] npm package published                         — @cordfuse/politik@0.3.0 live (2026-08-10); tag-to-npm via release.yml
 [ ] Homebrew tap (macOS/Linux)
 [ ] Announcement — TBD channel
 ```
@@ -687,7 +707,9 @@ org/politik-root                          ← constitutional layer
                 └── org/politik-PROJ-112a ← sub-ticket (if scope expands)
 ```
 
-Every node has a Charter (inheriting from parent), a Hansard (scoped to its level), a STATE.json, and a LEDGER. The moment a leaf gains a child it becomes a parent — no special migration, no architectural change, just a new repo with `inherits_from` pointing at it.
+Every node has a Charter (inheriting from parent), a Hansard (scoped to its level), a STATE.json, and a LEDGER. The moment a leaf gains a child it becomes a parent — no special migration, no architectural change, just a new node with `inherits_from` pointing at its parent.
+
+> **Storage model (ADR-0008, shipped).** The example above draws each node as its own repository, but that is now the *opt-in* mode. The **default is a monorepo tree**: nodes are nested directories in one repository, `inherits_from` is a relative path to the parent directory, and the whole hierarchy shares one clone, one CI, one history. A node opts out into its own repository with `politik init --standalone` when it needs per-session pull requests or a hard permission boundary. And the GLOBAL / federation layer below is **built, not roadmap** — `politik registry` is the "session open/close registry" and state-of-everything roll-up; `politik cascade` records the `CASCADE_ALERT`. Federation is local traversal over the one tree (`src/federation.ts`), not cross-repo orchestration.
 
 ### Actors Are Mobile Across the Tree
 

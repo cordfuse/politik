@@ -19,15 +19,24 @@ conflated:
   (a protocol declaring no escalation refuses a Point of Order — see
   [ADR-0006](docs/adr/0006-protocol-behavioral-enforcement.md)). `no_record` and
   `immutable_charter` are declared on the manifests but not yet enforced.
-- **Game-theory mechanics** — *not built*. Elimination, tournament brackets,
-  scoring, and the Nash-equilibrium behaviors analysed below are the research
-  agenda ([RESEARCH.md](RESEARCH.md)), not engine features. A `mode: darwinist`
-  protocol differs from Parliament today only in its enforced behavioral flags,
-  not in any elimination engine. Read the "Mode" and "Nash Eq" lines below as the
-  *intended* design, not a description of current runtime behavior.
+- **Mechanics** — enforced (ADR-0007). Each protocol composes how a decision
+  resolves (majority · supermajority · unanimity), how an actor exits (division ·
+  elimination · none), and when a session ends (objective · last-standing ·
+  verdict). A Jury needs unanimity and seals on a verdict; an `exit: elimination`
+  protocol genuinely culls the losing side of a Division. `mode: darwinist` is no
+  longer just a flag.
+- **Tournament mechanics** — built. The **MATCH** primitive (ADR-0009) supplies
+  the 1v1 contest a Division cannot model; `politik pair` generates Swiss /
+  round-robin / single-elimination rounds, `politik match` settles them, and
+  `politik standings` scores the field (win-loss · survival). Still on the
+  research agenda ([RESEARCH.md](RESEARCH.md)): seeding, tie-breaks, best-of-N,
+  and the Nash-equilibrium *behaviors* the "Mode"/"Nash Eq" lines below predict —
+  the engine records what emerges; it does not force agents to play equilibrium.
 
-Ten protocols ship as manifests in `protocols/*.yml`; only `parliamentary` has a
-full scaffoldable Charter. The rest of this document is the design catalogue.
+Eleven protocols ship as manifests in `protocols/*.yml`, and `scaffold --protocol
+<name>` scaffolds a Charter for any of them (inheriting its mechanics); the
+scaffolded role and Order-Paper templates are still parliamentary-flavored. The
+rest of this document is the design catalogue.
 
 ---
 
