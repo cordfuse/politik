@@ -284,7 +284,7 @@ Model pinning is per-constituency because different seats have different cogniti
 
 - Does complementary personality composition outperform homogeneous composition?
 - Does model pinning to domain-specialist fine-tunes reduce fault rate?
-- What is the optimal personality mix for Parliamentary vs Battle Royale protocols?
+- What is the optimal personality mix for Parliamentary vs Elimination Tournament protocols?
 - Can Hansard performance history predict future actor quality better than declared profiles?
 - Does a CREATIVE OPERATOR in an ANALYST-heavy session improve output or introduce noise?
 
@@ -468,7 +468,7 @@ protocol:
 |---|---|---|
 | Constitutional | Checks and balances, escalation paths, human override | Parliamentary, Legal, Corporate, Academic |
 | Authoritarian | Single authority, no Division, escalation routes back to top | Startup, Film |
-| Darwinist | No AUTHORITY during session, pure statute, no appeals | Battle Royale, Hackathon, Auction |
+| Darwinist | No AUTHORITY during session, pure statute, no appeals | Elimination Tournament, Hackathon, Auction |
 | Ephemeral | No RECORD by design, session evaporates on close | Whistleblower, short-lived ops |
 | Immutable | Standing Orders cannot be amended mid-session | Religion, Emergency Services, Aviation |
 
