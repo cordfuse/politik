@@ -242,22 +242,6 @@ Same as Single Elimination with:
 | DEADLOCK | Points Tie → Tiebreaker |
 Mode: Constitutional — everyone plays everyone, standings decide
 
-**Protocol: Battle Royale**
-| CANON | Term |
-|---|---|
-| AUTHORITY | None during session (Server / Host pre-bakes rules) |
-| SESSION | Match |
-| CHARTER | Zone Rules / Match Config |
-| RECORD | Kill Feed |
-| MOTION | Engagement |
-| DIVISION | None — no appeals |
-| ESCALATION | None — no appeals |
-| SUSPENSION | Zone Collapse |
-| EXIT | Eliminated |
-| QUORUM | Players Remaining |
-| DEADLOCK | Final Circle |
-Mode: Darwinist — pure statute, no AUTHORITY, no ESCALATION
-
 **Protocol: Swiss System (Chess / Competitive)**
 | CANON | Term |
 |---|---|
@@ -273,132 +257,9 @@ Mode: Darwinist — pure statute, no AUTHORITY, no ESCALATION
 | DEADLOCK | Draw |
 Mode: Constitutional — no elimination, standings accumulate
 
-**Protocol: Draft / Fantasy**
-| CANON | Term |
-|---|---|
-| AUTHORITY | Commissioner |
-| SESSION | Draft / Season |
-| CHARTER | League Rules |
-| RECORD | Draft Board / Roster |
-| MOTION | Pick / Trade |
-| DIVISION | Trade Vote (if league votes) |
-| ESCALATION | Commissioner Review |
-| SUSPENSION | Off Season |
-| EXIT | Dropped |
-| DEADLOCK | Disputed Trade |
-Mode: Constitutional with Commissioner VETO
-
-**Protocol: Olympic / Multi-Sport**
-| CANON | Term |
-|---|---|
-| AUTHORITY | IOC / Organizing Committee |
-| OPERATOR | Team Chef de Mission |
-| MEMBER | Athlete |
-| OBSERVER | Press / Spectator |
-| SESSION | Games |
-| RECORD | Medal Table / Results |
-| MOTION | Event |
-| DIVISION | Judge Panel Score |
-| ESCALATION | Protest / CAS Appeal |
-| EXIT | Disqualified / DNF |
-| DOMAIN_VETO | Anti-Doping Authority (can void results) |
-Mode: Constitutional with DOMAIN_VETO
-
-**Protocol: Motorsport / F1**
-| CANON | Term |
-|---|---|
-| AUTHORITY | Race Director |
-| DELEGATE | Deputy Race Director |
-| OPERATOR | Team Principal |
-| MEMBER | Driver |
-| OBSERVER | Spectator / Press |
-| SESSION | Race Weekend |
-| CHARTER | Sporting Regulations |
-| RECORD | Lap Times / Race Results |
-| MOTION | Pit Strategy Call |
-| DIVISION | Stewards Decision |
-| ESCALATION | Protest to Stewards |
-| SUSPENSION | Safety Car / Red Flag |
-| EXIT | DNF / DSQ |
-| DEADLOCK | Stewards Under Review |
-Mode: Constitutional
-
-**Protocol: eSports Match**
-| CANON | Term |
-|---|---|
-| AUTHORITY | Referee / Admin |
-| OPERATOR | Team Captain |
-| MEMBER | Player |
-| OBSERVER | Caster / Viewer |
-| SESSION | Series / Match |
-| CHARTER | Ruleset |
-| RECORD | Match History / VOD |
-| MOTION | In-game call |
-| DIVISION | Admin Ruling |
-| ESCALATION | Pause / Admin Call |
-| SUSPENSION | Technical Pause |
-| EXIT | Forfeit / Disqualified |
-| DEADLOCK | Remake |
-Mode: Constitutional
-
-**Protocol: MMO Raid / Guild**
-| CANON | Term |
-|---|---|
-| AUTHORITY | Guild Master |
-| DELEGATE | Officer |
-| OPERATOR | Class Lead / Role Lead |
-| MEMBER | Member |
-| OBSERVER | Trial / Applicant |
-| SESSION | Raid / Campaign |
-| CHARTER | Guild Rules / Loot Council |
-| RECORD | DPS Logs / Raid Report |
-| MOTION | Raid Call |
-| DIVISION | Loot Vote |
-| ESCALATION | Officer Ticket |
-| SUSPENSION | Reset / Off Week |
-| EXIT | Gkicked |
-| DEADLOCK | Loot Drama |
-Mode: Constitutional
-
 ---
 
-### DOMAIN: MILITARY & SECURITY
-
-**Protocol: Military Operation**
-| CANON | Term |
-|---|---|
-| AUTHORITY | Commanding Officer |
-| DELEGATE | Executive Officer |
-| OPERATOR | Field Commander |
-| MEMBER | Enlisted |
-| OBSERVER | Intelligence Liaison |
-| SESSION | Operation |
-| CHARTER | Rules of Engagement |
-| RECORD | After Action Report |
-| MOTION | Order |
-| DIVISION | None — CO decides |
-| ESCALATION | Challenge Up Chain |
-| SUSPENSION | Stand Down |
-| EXIT | KIA / Relieved of Duty |
-| DEADLOCK | Comms Blackout |
-Mode: Authoritarian
-
-**Protocol: Intelligence / Espionage**
-| CANON | Term |
-|---|---|
-| AUTHORITY | Station Chief |
-| DELEGATE | Handler |
-| OPERATOR | Field Officer |
-| MEMBER | Asset |
-| OBSERVER | None — compartmentalized |
-| SESSION | Operation |
-| CHARTER | Tradecraft |
-| RECORD | None — burn after reading |
-| MOTION | Tasking |
-| DIVISION | None — unilateral |
-| ESCALATION | Flash Traffic to Director |
-| EXIT | Burned / Extracted / Eliminated |
-Mode: Authoritarian + Ephemeral (no RECORD by design)
+### DOMAIN: SECURITY
 
 **Protocol: Cybersecurity / Red Team**
 | CANON | Term |
@@ -858,25 +719,6 @@ Mode: Constitutional + Ephemeral (record sealed)
 | EXIT | Medically Evacuated |
 | DEADLOCK | Comms Blackout Protocol |
 Mode: Immutable (safety rules non-negotiable, no amendment mid-session)
-
-**Protocol: Pirate Crew**
-| CANON | Term |
-|---|---|
-| AUTHORITY | Captain |
-| DELEGATE | First Mate |
-| OPERATOR | Quartermaster |
-| MEMBER | Crew |
-| OBSERVER | Prisoner / Passenger |
-| SESSION | Voyage |
-| CHARTER | Articles (crew contract) |
-| RECORD | Ship's Log |
-| MOTION | Ship's Council Proposal |
-| DIVISION | Crew Vote |
-| ESCALATION | Mutiny Vote |
-| SUSPENSION | Made Port |
-| EXIT | Marooned / Walked the Plank |
-| DEADLOCK | Contested Command |
-Mode: Constitutional (historically pirates were surprisingly democratic)
 
 ---
 

@@ -467,9 +467,9 @@ protocol:
 | Mode | Description | Example protocols |
 |---|---|---|
 | Constitutional | Checks and balances, escalation paths, human override | Parliamentary, Legal, Corporate, Academic |
-| Authoritarian | Single authority, no Division, escalation routes back to top | Military, Startup, Film, Fascism |
+| Authoritarian | Single authority, no Division, escalation routes back to top | Startup, Film |
 | Darwinist | No AUTHORITY during session, pure statute, no appeals | Battle Royale, Hackathon, Auction |
-| Ephemeral | No RECORD by design, session evaporates on close | Intelligence, Organized Crime, Whistleblower |
+| Ephemeral | No RECORD by design, session evaporates on close | Whistleblower, short-lived ops |
 | Immutable | Standing Orders cannot be amended mid-session | Religion, Emergency Services, Aviation |
 
 ---
