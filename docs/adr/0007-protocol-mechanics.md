@@ -10,7 +10,7 @@
 
 ADR-0006 wired the first protocol behavioral flag (`session.escalation`) into the
 engine. It closed a credibility gap but not the central one: protocols still
-share one set of *mechanics*. A Battle Royale and a Jury run the same Division
+share one set of *mechanics*. An Elimination Tournament and a Jury run the same Division
 tally, the same exit rules, the same termination — they differ only in vocabulary
 and whether appeals are allowed. The framework's thesis is that different
 governance structures produce different behavior; a protocol layer that only
@@ -38,7 +38,7 @@ The correct model separates the **referee** (deterministic code) from the
 - Each point is filled by a named, deterministic **strategy** from a built-in
   registry. A protocol is unique because it *composes* a unique set of strategies.
 - Composition, not inheritance: protocols mix independent rules (a tribunal may
-  want a Jury's unanimity with a Battle Royale's no-appeals), which a class
+  want a Jury's unanimity with an Elimination Tournament's no-appeals), which a class
   hierarchy cannot express cleanly and composition can.
 - Functional, not class trees: a strategy is a pure function selected by name,
   matching this codebase's pure, table-driven core.
@@ -67,7 +67,7 @@ Each strategy is a pure function with the same signature as its siblings, unit
 tested in isolation. The engine dispatches by name; adding a strategy is a table
 entry, not an engine change. Adding an override point is an ADR.
 
-Battle Royale is then `{resolution: majority, exit: elimination, termination:
+Elimination Tournament is then `{resolution: majority, exit: elimination, termination:
 last-standing, escalation: disabled}`. A Jury is `{resolution: unanimity, exit:
 none, termination: verdict}`. Parliament is the default of every slot. Same
 engine, genuinely different behavior — every one still writing to the same Hansard.

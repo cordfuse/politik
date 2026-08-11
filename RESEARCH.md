@@ -244,7 +244,7 @@ Politik empirically tests whether agents converge on it.
 |---|---|---|
 | Parliamentary Democracy | Cooperative with veto players | Stable coalition at quorum threshold |
 | Military Operation | Stackelberg (leader-follower) | Full compliance, zero deviation |
-| Battle Royale | All-pay elimination auction | Aggressive early, conservative late |
+| Elimination Tournament | All-pay elimination auction | Aggressive early, conservative late |
 | Legal/Adversarial | Two-player zero-sum argument | Maximum evidence disclosure |
 | Agile/Scrum | Cooperative, shared payoff | Consensus-seeking, slow convergence |
 | Auction | Mechanism design | Truthful bidding at reservation value |
@@ -258,7 +258,7 @@ These are not user-selectable protocols in the Charter. They are the formal game
 **Protocol: Zero-Sum**
 - One winner, all others lose
 - No cooperation equilibrium
-- Battle Royale is a real-world implementation
+- Elimination Tournament is a real-world implementation
 - Agents optimize purely for individual survival
 
 **Protocol: Cooperative Game**
@@ -344,7 +344,7 @@ At session end Politik generates an analytical report committed to Hansard autom
 
 ```yaml
 protocol:
-  name: battle-royale
+  name: elimination-tournament
   domain: sports
   mode: darwinist
   

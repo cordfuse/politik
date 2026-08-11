@@ -82,7 +82,7 @@ defaults only on absence, so rule 7 rejects a non-CANON assent.
 **New since the audit** (not defects — capability added): ADR-0006 (the
 `session.escalation` flag is enforced), ADR-0007 (the mechanics framework —
 `resolution` / `exit` / `termination` as composable override points, with a Jury
-and a Battle Royale behaving distinctly and scaffoldable turnkey), and a dogfood
+and an Elimination Tournament behaving distinctly and scaffoldable turnkey), and a dogfood
 pass that closed eleven integrity bugs across the core loop.
 
 **Genuinely still open, ranked by value:**

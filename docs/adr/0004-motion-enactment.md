@@ -154,7 +154,7 @@ The original text of each ruling is preserved below for the record.
 - *Banned:* the Charter validator rejects `merge_strategy: squash` outright.
   Consistent with the Hansard's immutability claim; a squashed Motion cannot
   produce a per-actor forensic record. Costs flexibility for protocols that
-  genuinely do not care (Hackathon, Battle Royale).
+  genuinely do not care (Hackathon, Elimination Tournament).
 - *Off by default:* permitted where a protocol declares it, with the attribution
   loss recorded at Writ Drop. Preserves protocol-agnosticism, which is a stated
   design principle ("Parliamentary is protocol #1, not a privileged mode").

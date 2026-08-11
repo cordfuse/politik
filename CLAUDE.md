@@ -121,7 +121,7 @@ truth." What shipped, all on `main`:
 - **ADR-0007 — protocol mechanics.** One engine, composable override points a
   protocol declares: `resolution` (majority/supermajority/unanimity), `exit`
   (division/elimination/none), `termination` (objective/last-standing/verdict).
-  A Jury (unanimity+verdict) and a Battle Royale (elimination+last-standing)
+  A Jury (unanimity+verdict) and an Elimination Tournament (elimination+last-standing)
   behave distinctly. `scaffold --protocol <name>` inherits a manifest's mechanics
   turnkey. Charter is the runtime authority (like `domain_veto`); manifests
   declare for coherence.
@@ -157,7 +157,7 @@ the `disputed-exit` reinstatement flow (`actor dispute` / `actor reinstate
 are now Built. (3) Backlog: PATH_A auto-recovery,
 scheduled heartbeat/ruling workflows, NATS transport, the `pairing`/`scoring`
 override points (Swiss/tournament). (4) A showcase run (real agents, a Jury or
-Battle Royale deciding something, ledger showing real cost) as the launch
+Elimination Tournament deciding something, ledger showing real cost) as the launch
 artifact. Phase 8 (public launch) not started.
 
 **Implementation stack (decided):** Node + TypeScript, npm `@cordfuse/politik`,

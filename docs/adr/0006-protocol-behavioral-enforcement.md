@@ -11,9 +11,9 @@
 A protocol is a vocabulary-translation manifest over CANON, plus a small set of
 behavioral flags: `mode` (`constitutional` | `authoritarian` | `darwinist` |
 `ephemeral` | `immutable`), and `no_escalation`, `no_record`,
-`immutable_charter`, `domain_veto`. Ten protocol manifests ship in
-`protocols/*.yml`, five of them game-theory shapes (Battle Royale, Elimination
-Tournament, League Season, Red/Blue Team, Peer Review).
+`immutable_charter`, `domain_veto`. Eleven protocol manifests ship in
+`protocols/*.yml`, several game-theory shapes among them (Elimination Tournament,
+Jury Deliberation, Peer Review, Adversarial Collaboration).
 
 The vocabulary half works: `roleTerm`/`term` translate CANON into a protocol's
 words for the interface and the record. The behavioral half did not. The flags
@@ -22,7 +22,7 @@ linter, and shipped in every manifest — but **no engine module ever read them*
 The predicates written for exactly this purpose (`allowsEscalation`,
 `keepsRecord`, `allowsCharterAmendment`) were exported and never called.
 
-The consequence: a `battle-royale` session and a `parliamentary` session ran
+The consequence: an `elimination-tournament` session and a `parliamentary` session ran
 byte-for-byte identical mechanics, differing only in the words written to the
 Hansard. A Darwinist protocol that declares "no appeals" still accepted them.
 The thesis that different governance structures change how a chamber behaves was,

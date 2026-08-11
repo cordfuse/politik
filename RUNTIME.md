@@ -107,7 +107,7 @@ The following EXIT classifications must be declared in the Hansard at the point 
 | Voluntary — Concession | `EXIT_VOLUNTARY_CONCESSION` | Actor evaluated the evidence, accepted they lost on merit, withdrew with integrity |
 | Voluntary — Strategic | `EXIT_VOLUNTARY_STRATEGIC` | Actor withdrew before a Division to deny quorum, deprive rival of formal win, or avoid a recorded defeat |
 | Voluntary — Coerced | `EXIT_VOLUNTARY_COERCED` | Actor was pressured, threatened, or manipulated into withdrawing. On paper voluntary. In practice expulsion by other means. Also known as "voluntold." |
-| Darwinist | `EXIT_DARWINIST` | Protocol-mandated elimination (Battle Royale, Elimination Tournament) |
+| Darwinist | `EXIT_DARWINIST` | Protocol-mandated elimination (Elimination Tournament) |
 | Speaker | `EXIT_SPEAKER` | AUTHORITY ruled removal — Speaker ruling committed to Hansard |
 | Disputed | `EXIT_DISPUTED` | Actor filed a Point of Order challenging their own removal |
 
@@ -717,16 +717,16 @@ minimum_cast:
   OBSERVER: 0       # Optional
 quorum: 2           # Minimum actors for a valid Division
 
-# Battle Royale
+# Elimination Tournament
 minimum_cast:
   OPERATOR: 2       # Cannot have last-one-standing with one player
 quorum: 2
 
-# Military Operation
+# Monarchy
 minimum_cast:
-  AUTHORITY: 1      # Commanding Officer required
-  OPERATOR: 1       # At least one field agent
-quorum: 1           # CO alone can issue orders
+  AUTHORITY: 1      # The Monarch required
+  OPERATOR: 1       # At least one minister
+quorum: 1           # The Monarch alone can decree
 
 # Peer Review
 minimum_cast:
