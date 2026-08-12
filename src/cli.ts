@@ -19,7 +19,7 @@ import { parseCharter, validateCharter } from './charter.ts';
 import { dropWrit } from './init.ts';
 import { initSessionRepo } from './git.ts';
 import { parseState, serializeState, type SessionStateFile } from './state.ts';
-import { parliamentaryTemplates } from './templates/parliamentary.ts';
+import { scaffoldTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
@@ -270,7 +270,7 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
   // the lineage resolves from within the session's own directory. init detects
   // the enclosing repo and commits the writ drop there rather than nesting a repo.
   const inherits_from = values.parent === undefined ? null : (relative(dir, values.parent) || '.');
-  const files = parliamentaryTemplates({
+  const files = scaffoldTemplates(manifest.protocol, {
     protocol,
     ...(inherits_from === null ? {} : { inherits_from }),
     ...(quorum === undefined ? {} : { quorum }),

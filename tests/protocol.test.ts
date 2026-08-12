@@ -17,8 +17,9 @@ import { ROLES } from '../src/canon.ts';
 import {
   LABEL_TAXONOMY,
   charterTemplate,
-  parliamentaryTemplates,
+  scaffoldTemplates,
   roleTemplates,
+  orderPaperTemplate,
 } from '../src/templates/parliamentary.ts';
 import { parseCharter, validateCharter } from '../src/charter.ts';
 
@@ -27,6 +28,11 @@ const PARLIAMENTARY = readFileSync(
   join(here, '..', 'protocols', 'parliamentary.yml'),
   'utf8',
 );
+const parliamentaryProtocol: Protocol = (() => {
+  const parsed = parseProtocol(PARLIAMENTARY);
+  if (!parsed.ok) throw new Error('parliamentary.yml did not parse');
+  return parsed.protocol;
+})();
 
 const parseOk = (source: string): Protocol => {
   const result = parseProtocol(source);
@@ -190,7 +196,7 @@ describe('Parliamentary templates', () => {
   });
 
   it('writes one role file per CANON role, each naming its mapping', () => {
-    const files = roleTemplates();
+    const files = roleTemplates(parliamentaryProtocol);
     assert.equal(files.length, ROLES.length);
     for (const role of ROLES) {
       assert.ok(
@@ -201,16 +207,49 @@ describe('Parliamentary templates', () => {
   });
 
   it('states that the Speaker must be human', () => {
-    const speaker = roleTemplates().find((f) => f.path.endsWith('speaker.md'));
+    const speaker = roleTemplates(parliamentaryProtocol).find((f) => f.path.endsWith('speaker.md'));
     assert.match(speaker?.content ?? '', /Always human/);
   });
 
   it('bundles Charter, Order Paper and roles', () => {
-    const files = parliamentaryTemplates();
+    const files = scaffoldTemplates(parliamentaryProtocol);
     const paths = files.map((f) => f.path);
     assert.ok(paths.includes('CHARTER.md'));
     assert.ok(paths.includes('ORDER-PAPER.md'));
     assert.equal(paths.filter((p) => p.startsWith('roles/')).length, ROLES.length);
+  });
+});
+
+describe('per-protocol scaffold templates', () => {
+  const monarchy = parseOk(
+    readFileSync(join(here, '..', 'protocols', 'monarchy.yml'), 'utf8'),
+  );
+
+  it('renders role docs in the protocol\'s own vocabulary, not parliamentary', () => {
+    const files = roleTemplates(monarchy);
+    const crown = files.find((f) => f.path === 'roles/the-crown.md');
+    assert.ok(crown, 'no monarchy AUTHORITY role file');
+    assert.match(crown.content, /`AUTHORITY`/);
+    assert.match(crown.content, /Protocol:\*\* monarchy/);
+    // and none of the parliamentary filenames leak in
+    assert.ok(!files.some((f) => f.path === 'roles/speaker.md'));
+    assert.ok(!files.some((f) => f.path === 'roles/minister.md'));
+  });
+
+  it('generates one role file per CANON role the protocol names', () => {
+    const files = roleTemplates(monarchy);
+    const named = Object.keys(monarchy.roles).length;
+    assert.equal(files.length, named);
+  });
+
+  it('the Order Paper speaks the protocol vocabulary', () => {
+    assert.match(orderPaperTemplate(monarchy), /Royal Court/); // SESSION term
+    assert.match(orderPaperTemplate(monarchy), /Petition/); // MOTION term
+  });
+
+  it('parliamentary keeps its hand-written role prose', () => {
+    const files = roleTemplates(parliamentaryProtocol);
+    assert.ok(files.some((f) => f.path === 'roles/speaker.md'));
   });
 });
 

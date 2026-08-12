@@ -1,18 +1,22 @@
 /**
- * Parliamentary protocol templates.
+ * Scaffold templates.
  *
- * Charter, role definitions, Standing Orders and the GitHub label taxonomy for
- * protocol #1. These are what a Speaker starts from — editable prose, not
- * engine configuration.
+ * Charter, role definitions, Order Paper and the GitHub label taxonomy a Speaker
+ * starts from — editable prose, not engine configuration. Parliamentary (protocol
+ * #1) keeps its hand-written constituency prose; every other protocol renders its
+ * role docs and Order Paper in its *own* vocabulary via `roleTemplates(protocol)`
+ * and `orderPaperTemplate(protocol)`, so `scaffold --protocol monarchy` produces a
+ * monarchy session, not a parliamentary one wearing a monarchy Charter.
  *
- * Role files describe a *constituency* in Parliamentary vocabulary while naming
- * the CANON role they map to. The engine reads the CANON role; the human reads
- * the title. That separation is the whole point of the protocol layer.
+ * Role files name the CANON role they map to: the engine reads the CANON role;
+ * the human reads the title. That separation is the whole point of the protocol
+ * layer.
  *
  * Attribution: Steve Krisjanovs, Cordfuse
  */
 
-import type { Role } from '../canon.ts';
+import { ROLE_PRECEDENCE, type Role } from '../canon.ts';
+import { roleTerm, term, type Protocol } from '../protocol.ts';
 import type { FileWrite } from '../scm.ts';
 
 /* -------------------------------------------------------------------------- */
@@ -267,7 +271,7 @@ outside it.
 ];
 
 /** Role definition files for a Parliamentary session repo. */
-export const roleTemplates = (): readonly FileWrite[] =>
+const parliamentaryRoleTemplates = (): readonly FileWrite[] =>
   ROLE_TEMPLATES.map((role) => ({
     path: `roles/${role.file}`,
     content: `# ${role.title}
@@ -278,6 +282,61 @@ export const roleTemplates = (): readonly FileWrite[] =>
 ${role.body}
 `,
   }));
+
+/**
+ * Generic CANON-role descriptions — the protocol-independent truth of what each
+ * role *is*. A protocol supplies only the vocabulary (the title); the powers of
+ * an AUTHORITY or an OPERATOR hold across every protocol, so these are written
+ * once and rendered under each protocol's term.
+ */
+const CANON_ROLE_BODY: Readonly<Record<Role, string>> = {
+  AUTHORITY: `The constitutional authority of this session — **always human**. The Charter cannot declare a machine here, and one that does fails Writ Drop validation. Present, not operational: defines the Standing Orders, rules on escalations, grants Assent to carried Motions, and prorogues the session. Does not do the substantive work.
+
+**Verbs:** all, including ASSENT, VETO, PROMOTE, DEMOTE, HIRE, FIRE, EXPEL, SUSPEND, DISSOLVE.
+
+**Why human.** A corrupt authority requires accountability only a person can bear; a machine that captures a session cannot be held responsible for it.`,
+  DELEGATE: `A pre-delegated proxy for the authority — human or machine. Acts with the authority the Charter grants, and only there. May formally challenge an AUTHORITY action (\`politik challenge\`): the dissent is recorded and attributable, though the authority still prevails — which is what makes bad faith visible.
+
+**Verbs:** as granted by the Charter; typically all but DISSOLVE.`,
+  OPERATOR: `Elevated trust, broad portfolio — human or machine. Does the substantive work of the session: tables business, carries out the Order Paper, and votes in Divisions. Raise a Point of Order rather than act beyond your verbs.
+
+**Verbs:** READ, WRITE, VOTE, ESCALATE, SPAWN. Not ASSENT — the Division decides, the authority enacts.`,
+  MEMBER: `The base participant — human or machine. Votes and speaks; does not table business unless the Charter grants it. Raise a Point of Order rather than act beyond your verbs.
+
+**Verbs:** READ, VOTE, ESCALATE.`,
+  OBSERVER: `Present but non-voting — human or machine. Reads the record and follows the proceeding; does not vote or table business.
+
+**Verbs:** READ.`,
+};
+
+/** A filesystem-safe slug from a protocol's role term (e.g. "The Crown" -> "the-crown"). */
+const slug = (title: string): string =>
+  title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'role';
+
+/**
+ * Role definition files in the protocol's own vocabulary. Parliamentary keeps its
+ * hand-written constituency prose; every other protocol gets one role doc per
+ * CANON role it names, titled with the protocol's term and carrying the generic
+ * CANON body — so `scaffold --protocol monarchy` no longer drops Speaker/Minister.
+ */
+export const roleTemplates = (protocol: Protocol): readonly FileWrite[] => {
+  if (protocol.name === 'parliamentary') return parliamentaryRoleTemplates();
+  return ROLE_PRECEDENCE
+    .filter((role) => protocol.roles[role] !== undefined)
+    .map((role) => {
+      const title = roleTerm(protocol, role);
+      return {
+        path: `roles/${slug(title)}.md`,
+        content: `# ${title}
+
+**CANON role:** \`${role}\`
+**Protocol:** ${protocol.name}
+
+${CANON_ROLE_BODY[role]}
+`,
+      };
+    });
+};
 
 /* -------------------------------------------------------------------------- */
 /* Label taxonomy                                                              */
@@ -318,29 +377,35 @@ export const LABEL_TAXONOMY: readonly LabelSpec[] = Object.freeze([
  * A Milestone is a sitting: the business intended for one continuous stretch of
  * the proceeding. Closing the Milestone is part of prorogation.
  */
-export const orderPaperTemplate = (): string => `# ORDER PAPER
+export const orderPaperTemplate = (protocol: Protocol): string => {
+  const session = term(protocol, 'SESSION');
+  const motion = term(protocol, 'MOTION');
+  const division = term(protocol, 'DIVISION');
+  const escalation = term(protocol, 'ESCALATION');
+  return `# ORDER PAPER
 
-The business before this Parliament, in the order it is to be taken.
+The business before this ${session}, in the order it is to be taken. Mirrored as
+a GitHub Project board — columns map to CANON Motion state, shown in this
+protocol's vocabulary.
 
-Mirrored as a GitHub Project board. Columns map to Motion state:
-
-| Column | Meaning | CANON |
+| Column | CANON | This protocol |
 |---|---|---|
-| Notice Paper | Proposed, not yet tabled | — |
-| Tabled | Motion open | MOTION |
-| In Division | Review requested | DIVISION |
-| Awaiting Assent | Carried, not yet enacted | ASSENT pending |
-| Enacted | Merged | ASSENT |
-| Withdrawn | Closed without enactment | — |
-| Point of Order | Suspended pending a ruling | ESCALATION |
+| Proposed | — (not yet tabled) | — |
+| Tabled | MOTION open | ${motion} |
+| In Division | DIVISION requested | ${division} |
+| Awaiting Assent | carried, not yet enacted | ASSENT pending |
+| Enacted | ASSENT | enacted |
+| Withdrawn | closed without enactment | — |
+| Point of Order | ESCALATION — suspended pending a ruling | ${escalation} |
 
-A **Milestone** is a sitting. Its closure is part of prorogation, and the
-prorogation workflow surfaces the milestone id for the caller to close.
+A **Milestone** is a sitting; its closure is part of prorogation, and the
+prorogation flow surfaces the milestone id for the caller to close.
 
 ## Business
 
 1. _Add the first item of business here._
 `;
+};
 
 /* -------------------------------------------------------------------------- */
 /* Bundle                                                                      */
@@ -410,12 +475,13 @@ const claudePointerTemplate = (): string =>
  * The full Parliamentary template set, ready to commit into a session repo
  * alongside the files the initializer already writes.
  */
-export const parliamentaryTemplates = (
+export const scaffoldTemplates = (
+  protocol: Protocol,
   options: CharterTemplateOptions = {},
 ): readonly FileWrite[] => [
   { path: 'CHARTER.md', content: charterTemplate(options) },
-  { path: 'ORDER-PAPER.md', content: orderPaperTemplate() },
+  { path: 'ORDER-PAPER.md', content: orderPaperTemplate(protocol) },
   { path: 'AGENTS.md', content: agentsTemplate(options) },
   { path: 'CLAUDE.md', content: claudePointerTemplate() },
-  ...roleTemplates(),
+  ...roleTemplates(protocol),
 ];
