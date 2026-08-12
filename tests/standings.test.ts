@@ -20,6 +20,8 @@ const outcome = (h: string, motion: string, carried: boolean) =>
   appendEntry(h, { type: carried ? 'MOTION_CARRIED' : 'MOTION_REJECTED', at: T, actor: 'RECORD', role: 'OPERATOR', fields: { Motion: motion } });
 const exited = (h: string, actor: string, when: string) =>
   appendEntry(h, { type: 'ACTOR_EXITED', at: when, actor: 'RECORD', role: 'MEMBER', fields: { 'Actor affected': actor, 'Exit type': 'EXIT_DARWINIST' } });
+const decided = (h: string, winner: string, loser: string) =>
+  appendEntry(h, { type: 'MATCH_DECIDED', at: T, actor: 'ref', role: 'AUTHORITY', fields: { Match: `m-${winner}-${loser}`, Round: '1', Winner: winner, Loser: loser } });
 
 const find = (rows: readonly Standing[], a: string): Standing | undefined => rows.find((r) => r.actor === a);
 
@@ -53,6 +55,34 @@ describe('standings — win-loss', () => {
     h = hired(h, 'a');
     h = vote(h, 'a', 'open', 'AYE'); // never tallied
     assert.deepEqual([find(standings(h), 'a')?.wins, find(standings(h), 'a')?.losses], [0, 0]);
+  });
+});
+
+describe('standings — Buchholz tie-break', () => {
+  it('sums opponents\' wins as strength of schedule, and it breaks equal records', () => {
+    // a beats d; b beats c; then c beats d. a and b both finish 1-0, but b beat
+    // c (1 win) while a beat d (0 wins), so b has the tougher schedule.
+    let h = '# HANSARD\n';
+    h = decided(h, 'a', 'd');
+    h = decided(h, 'b', 'c');
+    h = decided(h, 'c', 'd');
+
+    const table = standings(h, 'win-loss');
+    assert.deepEqual([find(table, 'a')?.wins, find(table, 'a')?.losses], [1, 0]);
+    assert.deepEqual([find(table, 'b')?.wins, find(table, 'b')?.losses], [1, 0]);
+    assert.equal(find(table, 'a')?.buchholz, 0, 'a beat d, who has no wins');
+    assert.equal(find(table, 'b')?.buchholz, 1, 'b beat c, who has one win');
+
+    // Equal 1-0 record → Buchholz decides → b ranks above a.
+    const aRank = table.findIndex((r) => r.actor === 'a');
+    const bRank = table.findIndex((r) => r.actor === 'b');
+    assert.ok(bRank < aRank, 'the tougher schedule ranks higher on an equal record');
+  });
+
+  it('a bye contributes no opponent to Buchholz', () => {
+    let h = '# HANSARD\n';
+    h = appendEntry(h, { type: 'MATCH_DECIDED', at: T, actor: 'ref', role: 'AUTHORITY', fields: { Match: 'm1', Round: '1', Winner: 'a', Loser: 'bye' } });
+    assert.equal(find(standings(h), 'a')?.buchholz, 0);
   });
 });
 

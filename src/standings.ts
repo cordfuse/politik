@@ -30,6 +30,12 @@ export interface Standing {
   readonly eliminated: boolean;
   /** When the actor was removed, for survival ranking. Null if still standing. */
   readonly eliminated_at: string | null;
+  /**
+   * Buchholz score — the sum of this actor's match opponents' win totals, i.e.
+   * strength of schedule. Zero for a session with no MATCHes. Breaks win-loss
+   * ties: on equal record, whoever beat the tougher field ranks higher.
+   */
+  readonly buchholz: number;
 }
 
 export type RankBy = 'win-loss' | 'survival';
@@ -49,9 +55,14 @@ export const standings = (hansard: string, by: RankBy = 'win-loss'): readonly St
   const losses = new Map<string, number>();
   const eliminatedAt = new Map<string, string>();
   const participants = new Set<string>();
+  // Match opponents, for Buchholz (strength of schedule).
+  const opponents = new Map<string, string[]>();
 
   const bump = (map: Map<string, number>, key: string): void => {
     map.set(key, (map.get(key) ?? 0) + 1);
+  };
+  const faced = (x: string, y: string): void => {
+    opponents.set(x, [...(opponents.get(x) ?? []), y]);
   };
 
   for (const entry of entries) {
@@ -80,6 +91,10 @@ export const standings = (hansard: string, by: RankBy = 'win-loss'): readonly St
         const loser = entry.fields['Loser'];
         if (winner !== undefined) { bump(wins, winner); participants.add(winner); }
         if (loser !== undefined && loser !== 'bye') { bump(losses, loser); participants.add(loser); }
+        if (winner !== undefined && loser !== undefined && loser !== 'bye') {
+          faced(winner, loser);
+          faced(loser, winner);
+        }
         break;
       }
       case 'ACTOR_HIRED':
@@ -117,6 +132,8 @@ export const standings = (hansard: string, by: RankBy = 'win-loss'): readonly St
     // reinstated actor is back in, not eliminated).
     eliminated: eliminatedAt.has(actor) && !seated.has(actor),
     eliminated_at: seated.has(actor) ? null : (eliminatedAt.get(actor) ?? null),
+    // Strength of schedule: the total wins of everyone this actor faced.
+    buchholz: (opponents.get(actor) ?? []).reduce((sum, opp) => sum + (wins.get(opp) ?? 0), 0),
   }));
 
   return rank(rows, by);
@@ -136,8 +153,11 @@ const rank = (rows: readonly Standing[], by: RankBy): readonly Standing[] => {
       return (b.wins - a.wins) || a.actor.localeCompare(b.actor);
     });
   } else {
+    // Win-loss, then Buchholz (tougher schedule ranks higher on an equal
+    // record), then name for a stable order.
     sorted.sort((a, b) =>
-      (b.wins - a.wins) || (a.losses - b.losses) || a.actor.localeCompare(b.actor));
+      (b.wins - a.wins) || (a.losses - b.losses)
+      || (b.buchholz - a.buchholz) || a.actor.localeCompare(b.actor));
   }
   return sorted;
 };

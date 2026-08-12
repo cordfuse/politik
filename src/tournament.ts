@@ -35,10 +35,17 @@ export interface Match {
   readonly a: string;
   readonly b: string | null;
   readonly winner: string | null;
+  /** Games needed to win: 1 for a single game, 3 for best-of-three, etc. */
+  readonly best_of: number;
+  /** Games won so far, per side — only ever above zero for a best-of-N match. */
+  readonly games: { readonly a: number; readonly b: number };
 }
 
 class TournamentError extends Error {}
 export { TournamentError };
+
+/** Games one side must win to take a best-of-N match. */
+export const gamesToWin = (bestOf: number): number => Math.floor(bestOf / 2) + 1;
 
 const pairKey = (a: string, b: string): string => [a, b].sort().join('|');
 const matchId = (round: number, a: string, b: string | null): string => `r${round}-${a}-${b ?? 'bye'}`;
@@ -49,8 +56,9 @@ const matchId = (round: number, a: string, b: string | null): string => `r${roun
 
 /** Every MATCH on the record, with its result if one has been reported. */
 export const matches = (hansard: string): readonly Match[] => {
-  const created = new Map<string, { round: number; a: string; b: string | null }>();
+  const created = new Map<string, { round: number; a: string; b: string | null; bestOf: number }>();
   const winners = new Map<string, string>();
+  const gameWinners = new Map<string, string[]>();
 
   for (const entry of parseEntries(hansard)) {
     const id = entry.fields['Match'];
@@ -61,16 +69,25 @@ export const matches = (hansard: string): readonly Match[] => {
         round: Number(entry.fields['Round'] ?? '0'),
         a: entry.fields['A'] ?? '',
         b: b === undefined || b === 'bye' ? null : b,
+        bestOf: Math.max(1, Number(entry.fields['Best of'] ?? '1')),
       });
     } else if (entry.type === 'MATCH_DECIDED') {
       const w = entry.fields['Winner'];
       if (w !== undefined) winners.set(id, w);
+    } else if (entry.type === 'MATCH_GAME') {
+      const w = entry.fields['Winner'];
+      if (w !== undefined) gameWinners.set(id, [...(gameWinners.get(id) ?? []), w]);
     }
   }
 
-  return [...created.entries()].map(([id, m]) => ({
-    id, round: m.round, a: m.a, b: m.b, winner: winners.get(id) ?? null,
-  }));
+  return [...created.entries()].map(([id, m]) => {
+    const gw = gameWinners.get(id) ?? [];
+    return {
+      id, round: m.round, a: m.a, b: m.b, best_of: m.bestOf,
+      games: { a: gw.filter((w) => w === m.a).length, b: gw.filter((w) => w === m.b).length },
+      winner: winners.get(id) ?? null,
+    };
+  });
 };
 
 /** Pairs already contested, so a format never rematches them. */
@@ -91,6 +108,13 @@ const playedPairs = (played: readonly Match[]): Set<string> => {
  *    again. One left undefeated is the champion (returns no pairings).
  *  - swiss: everyone, seeded by score, adjacent pairs, no rematches.
  *  - round-robin: everyone, greedily paired with an opponent not yet played.
+ *
+ * `seed` is an optional strength order (strongest first). When given, the first
+ * round of a swiss or single-elim event pairs by the *fold* method — the top
+ * half against the bottom half (#1 vs the first of the lower half), so strong
+ * seeds meet late rather than by luck of the name sort — and in every later
+ * round the seed breaks ties within an equal-score group. A contestant absent
+ * from `seed` is treated as the weakest, ranked after every seeded one.
  */
 export const pairRound = (
   contestants: readonly string[],
@@ -98,19 +122,32 @@ export const pairRound = (
   format: PairingFormat,
   round: number,
   played: readonly Match[],
+  seed: readonly string[] = [],
 ): readonly Pairing[] => {
   const score = new Map(table.map((s) => [s.actor, s]));
   const losses = (a: string): number => score.get(a)?.losses ?? 0;
   const wins = (a: string): number => score.get(a)?.wins ?? 0;
+  const seedRank = new Map(seed.map((a, i) => [a, i] as const));
+  const bySeed = (a: string): number => seedRank.get(a) ?? Number.MAX_SAFE_INTEGER;
 
   let pool = [...contestants];
   if (format === 'single-elim') pool = pool.filter((a) => losses(a) === 0);
   if (pool.length < 2) return [];
 
-  // Seed the order: by score for swiss/single-elim, by name for round-robin.
+  // Seed the order: by score for swiss/single-elim (seed, then name, break
+  // ties), by seed-or-name for round-robin.
   pool.sort((a, b) => format === 'round-robin'
-    ? a.localeCompare(b)
-    : (wins(b) - wins(a)) || (losses(a) - losses(b)) || a.localeCompare(b));
+    ? (bySeed(a) - bySeed(b)) || a.localeCompare(b)
+    : (wins(b) - wins(a)) || (losses(a) - losses(b)) || (bySeed(a) - bySeed(b)) || a.localeCompare(b));
+
+  // First round of a seeded bracket: fold the ordered field, top half against
+  // bottom half. An odd field gives the lowest top-half seed a bye.
+  if (seed.length > 0 && format !== 'round-robin' && played.length === 0) {
+    const mid = Math.ceil(pool.length / 2);
+    const top = pool.slice(0, mid);
+    const bottom = pool.slice(mid);
+    return top.map((a, i) => ({ a, b: bottom[i] ?? null }));
+  }
 
   const done = playedPairs(played);
   const used = new Set<string>();
@@ -135,8 +172,17 @@ export const pairRound = (
   return pairings;
 };
 
-/** Record a created MATCH. A bye is created already decided in the caller. */
-export const matchCreatedEntry = (pairing: Pairing, round: number, at: string): HansardEntry => ({
+/**
+ * Record a created MATCH. A bye is created already decided in the caller.
+ * `bestOf` above 1 records a best-of-N match; the field is omitted for a plain
+ * single game so the common record is unchanged.
+ */
+export const matchCreatedEntry = (
+  pairing: Pairing,
+  round: number,
+  at: string,
+  bestOf = 1,
+): HansardEntry => ({
   type: 'MATCH_CREATED',
   at,
   actor: 'RECORD',
@@ -146,6 +192,26 @@ export const matchCreatedEntry = (pairing: Pairing, round: number, at: string): 
     Round: String(round),
     A: pairing.a,
     B: pairing.b ?? 'bye',
+    ...(bestOf > 1 ? { 'Best of': String(bestOf) } : {}),
+  },
+});
+
+/** Record one game of a best-of-N match. The match is decided separately. */
+export const matchGameEntry = (
+  id: string,
+  round: number,
+  winner: string,
+  at: string,
+  by: string,
+): HansardEntry => ({
+  type: 'MATCH_GAME',
+  at,
+  actor: by,
+  role: 'AUTHORITY',
+  fields: {
+    Match: id,
+    Round: String(round),
+    Winner: winner,
   },
 });
 
@@ -170,9 +236,28 @@ export const matchDecidedEntry = (
   },
 });
 
+export interface MatchReport {
+  /** The terminal entry appended — MATCH_DECIDED when the match is settled, the
+   *  MATCH_GAME otherwise. Kept for callers that only need the last act. */
+  readonly entry: HansardEntry;
+  /** Every entry appended, in order (a game, optionally its deciding entry). */
+  readonly entries: readonly HansardEntry[];
+  readonly hansard: string;
+  /** True when this report settled the match. */
+  readonly decided: boolean;
+  readonly winner: string;
+  /** Game wins per side after this report — {a,b} both 0 for a settled best-of-1. */
+  readonly games: { readonly a: number; readonly b: number };
+}
+
 /**
  * Report a result. Validates the match exists, is undecided, and the winner is
  * one of its contestants — a referee cannot crown a party that never played.
+ *
+ * A best-of-1 match settles on the single report (MATCH_DECIDED). A best-of-N
+ * match records the reported game (MATCH_GAME) and settles only once a side has
+ * won a majority — so `match report` is called per game and the caller sees the
+ * running tally until the deciding game lands.
  */
 export const reportMatch = (
   matchRef: string,
@@ -180,7 +265,7 @@ export const reportMatch = (
   at: string,
   referee: string,
   hansard: string,
-): { readonly entry: HansardEntry; readonly hansard: string } => {
+): MatchReport => {
   const match = matches(hansard).find((m) => m.id === matchRef);
   if (match === undefined) throw new TournamentError(`no match ${matchRef} on the record`);
   if (match.winner !== null) throw new TournamentError(`match ${matchRef} is already decided — ${match.winner} won`);
@@ -188,8 +273,35 @@ export const reportMatch = (
     throw new TournamentError(`${winner} is not in match ${matchRef} (${match.a} vs ${match.b ?? 'bye'})`);
   }
   const loser = winner === match.a ? match.b : match.a;
-  const entry = matchDecidedEntry(match.id, match.round, winner, loser, at, referee);
-  return { entry, hansard: appendEntry(hansard, entry) };
+
+  // Best-of-1: one report decides it, exactly as before.
+  if (match.best_of <= 1) {
+    const decided = matchDecidedEntry(match.id, match.round, winner, loser, at, referee);
+    return {
+      entry: decided, entries: [decided], hansard: appendEntry(hansard, decided),
+      decided: true, winner, games: { a: 0, b: 0 },
+    };
+  }
+
+  // Best-of-N: this game counts toward the winner; the match settles on a majority.
+  const games = winner === match.a
+    ? { a: match.games.a + 1, b: match.games.b }
+    : { a: match.games.a, b: match.games.b + 1 };
+  const game = matchGameEntry(match.id, match.round, winner, at, referee);
+  const entries: HansardEntry[] = [game];
+  let doc = appendEntry(hansard, game);
+
+  const wonEnough = (winner === match.a ? games.a : games.b) >= gamesToWin(match.best_of);
+  if (wonEnough) {
+    const decided = matchDecidedEntry(match.id, match.round, winner, loser, at, referee);
+    entries.push(decided);
+    doc = appendEntry(doc, decided);
+  }
+
+  return {
+    entry: entries[entries.length - 1] as HansardEntry,
+    entries, hansard: doc, decided: wonEnough, winner, games,
+  };
 };
 
 /** The undefeated contestants — for single-elim, the ones still in the bracket. */

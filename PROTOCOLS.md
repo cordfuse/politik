@@ -31,10 +31,14 @@ mechanics. What the engine enforces:
 - **Tournament mechanics** — built. The **MATCH** primitive (ADR-0009) supplies
   the 1v1 contest a Division cannot model; `politik pair` generates Swiss /
   round-robin / single-elimination rounds, `politik match` settles them, and
-  `politik standings` scores the field (win-loss · survival). Still on the
-  research agenda ([RESEARCH.md](RESEARCH.md)): seeding, tie-breaks, best-of-N,
-  and the Nash-equilibrium *behaviors* the "Nash Eq" lines below predict — the
-  engine records what emerges; it does not force agents to play equilibrium.
+  `politik standings` scores the field (win-loss · survival). Seeding
+  (`pair --seed` folds the field so strong seeds meet late, and breaks equal-score
+  ties in later rounds), best-of-N series (`pair --best-of 3`, reported game by
+  game), and Buchholz tie-breaks (strength of schedule, applied to the win-loss
+  ranking) are all built. What stays on the research agenda
+  ([RESEARCH.md](RESEARCH.md)) is the Nash-equilibrium *behaviors* the "Nash Eq"
+  lines below predict — the engine records what emerges; it does not force agents
+  to play equilibrium.
 
 Parliamentary is protocol #1, not a privileged mode. `scaffold --protocol <name>`
 scaffolds a Charter for any of the eleven, inheriting its mechanics. **Compose

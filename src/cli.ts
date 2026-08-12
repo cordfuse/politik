@@ -1958,14 +1958,18 @@ const cmdStandings = async (argv: readonly string[]): Promise<number> => {
   if (table.length === 0) { out('no standings — no actor has taken part yet'); return EXIT.OK; }
 
   const protocol = await sessionProtocol(charter.protocol);
-  out(`STANDINGS — by ${by}`);
+  // Buchholz only means something once matches have been played; show it when
+  // any actor has a non-zero strength of schedule.
+  const showBuchholz = by === 'win-loss' && table.some((r) => r.buchholz > 0);
+  out(`STANDINGS — by ${by}${showBuchholz ? ' (ties broken on Buchholz)' : ''}`);
   let rankNo = 0;
   for (const row of table) {
     rankNo += 1;
     const seat = row.seat === null
       ? (row.eliminated ? 'eliminated' : 'out')
       : asRoleTerm(protocol, row.seat);
-    out(`  ${String(rankNo).padStart(2)}. ${row.actor.padEnd(14)} ${row.wins}–${row.losses}  ·  ${seat}`);
+    const buch = showBuchholz ? `  ·  B ${row.buchholz}` : '';
+    out(`  ${String(rankNo).padStart(2)}. ${row.actor.padEnd(14)} ${row.wins}–${row.losses}${buch}  ·  ${seat}`);
   }
   return EXIT.OK;
 };
@@ -1981,7 +1985,10 @@ const cmdStandings = async (argv: readonly string[]): Promise<number> => {
 const cmdPair = async (argv: readonly string[]): Promise<number> => {
   const { values } = parseArgs({
     args: [...argv],
-    options: { dir: { type: 'string' }, format: { type: 'string' }, actor: { type: 'string' }, round: { type: 'string' } },
+    options: {
+      dir: { type: 'string' }, format: { type: 'string' }, actor: { type: 'string' },
+      round: { type: 'string' }, seed: { type: 'string' }, 'best-of': { type: 'string' },
+    },
   });
   const dir = values.dir ?? '.';
   const { hansard, charter } = await loadSession(dir);
@@ -1990,6 +1997,11 @@ const cmdPair = async (argv: readonly string[]): Promise<number> => {
   if (!isPairingFormat(values.format)) {
     err('pair: --format must be swiss | round-robin | single-elim'); return EXIT.USAGE;
   }
+  const bestOf = values['best-of'] === undefined ? 1 : Number(values['best-of']);
+  if (!Number.isInteger(bestOf) || bestOf < 1 || bestOf % 2 === 0) {
+    err('pair: --best-of must be a positive odd integer (1, 3, 5, …) — no draws'); return EXIT.USAGE;
+  }
+  const seed = (values.seed ?? '').split(',').map((s) => s.trim()).filter((s) => s.length > 0);
 
   const contestants = seats(hansard).map((s) => s.actor);
   if (contestants.length < 2) { err('pair: fewer than two contestants are seated'); return EXIT.REFUSED; }
@@ -1998,7 +2010,7 @@ const cmdPair = async (argv: readonly string[]): Promise<number> => {
     ? Number(values.round)
     : Math.max(0, ...played.map((m) => m.round)) + 1;
 
-  const pairings = pairRound(contestants, standings(hansard), values.format, round, played);
+  const pairings = pairRound(contestants, standings(hansard), values.format, round, played, seed);
   if (pairings.length === 0) {
     out(`no pairings for round ${round} — the ${values.format} field is decided`);
     return EXIT.OK;
@@ -2006,7 +2018,7 @@ const cmdPair = async (argv: readonly string[]): Promise<number> => {
 
   let doc = hansard;
   for (const pairing of pairings) {
-    const created = matchCreatedEntry(pairing, round, nowStamp());
+    const created = matchCreatedEntry(pairing, round, nowStamp(), bestOf);
     doc = appendEntry(doc, created);
     if (pairing.b === null) {
       // A bye advances unopposed — record it decided so standings count it.
@@ -2017,9 +2029,13 @@ const cmdPair = async (argv: readonly string[]): Promise<number> => {
   await writeHansard(dir, doc);
   await logAct(dir, values.actor ?? 'RECORD', 'OPERATOR' as never, `PAIRED round ${round} (${values.format})`);
   const rec = await commitAct(dir, `MATCH_PAIRING — round ${round} (${values.format})`);
-  out(`ROUND ${round} — ${values.format}`);
+  const suffix = bestOf > 1 ? `, best of ${bestOf}` : '';
+  const seededNote = seed.length > 0 && played.length === 0 ? ', seeded' : '';
+  out(`ROUND ${round} — ${values.format}${suffix}${seededNote}`);
   for (const pairing of pairings) out(`  ${pairing.a} vs ${pairing.b ?? 'BYE'}`);
-  out('  report each result: politik match report --match <id> --winner <contestant>');
+  out(bestOf > 1
+    ? `  report each game: politik match report --match <id> --winner <contestant> (first to ${Math.floor(bestOf / 2) + 1})`
+    : '  report each result: politik match report --match <id> --winner <contestant>');
   reportCommit(rec);
   return EXIT.OK;
 };
@@ -2043,7 +2059,8 @@ const cmdMatch = async (argv: readonly string[]): Promise<number> => {
     if (all.length === 0) { out('no matches yet — pair a round first'); return EXIT.OK; }
     for (const m of all) {
       const status = m.winner === null ? 'open' : `${m.winner} won`;
-      out(`  [${status.padEnd(12)}] ${m.id}  ·  ${m.a} vs ${m.b ?? 'bye'}`);
+      const tally = m.best_of > 1 ? `  (best of ${m.best_of}: ${m.games.a}–${m.games.b})` : '';
+      out(`  [${status.padEnd(12)}] ${m.id}  ·  ${m.a} vs ${m.b ?? 'bye'}${tally}`);
     }
     return EXIT.OK;
   }
@@ -2055,9 +2072,16 @@ const cmdMatch = async (argv: readonly string[]): Promise<number> => {
     try {
       const result = reportMatch(values.match, values.winner, nowStamp(), values.actor ?? 'RECORD', hansard);
       await writeHansard(dir, result.hansard);
-      await logAct(dir, values.actor ?? 'RECORD', 'AUTHORITY' as never, `MATCH_DECIDED ${values.match} -> ${values.winner}`);
-      const rec = await commitAct(dir, `MATCH_DECIDED — ${values.match}: ${values.winner}`);
-      out(`MATCH ${values.match} — ${values.winner} won`);
+      const kind = result.decided ? 'MATCH_DECIDED' : 'MATCH_GAME';
+      await logAct(dir, values.actor ?? 'RECORD', 'AUTHORITY' as never, `${kind} ${values.match} -> ${values.winner}`);
+      const rec = await commitAct(dir, `${kind} — ${values.match}: ${values.winner}`);
+      if (result.decided) {
+        const score = result.games.a + result.games.b > 0
+          ? ` (${result.games.a}–${result.games.b})` : '';
+        out(`MATCH ${values.match} — ${values.winner} won${score}`);
+      } else {
+        out(`GAME to ${values.winner} — ${values.match} stands at ${result.games.a}–${result.games.b}`);
+      }
       reportCommit(rec);
       return EXIT.OK;
     } catch (error) {
