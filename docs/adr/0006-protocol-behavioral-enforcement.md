@@ -71,9 +71,16 @@ actor that dislikes it exits rather than appeals.
 - **`immutable_charter`** has no Charter field and no runtime charter-amendment
   command to guard. There is nothing to refuse yet.
 
-Both remain protocol-manifest metadata consumed only by the SDK's coherence
-linter until a design exists. Recording them here keeps the gap explicit rather
-than silent.
+  *Superseded:* `immutable_charter` is now enforced without a Charter field or an
+  amend command. The engine records the Charter's fingerprint on the WRIT_DROP
+  entry and refuses a governance act when a protocol whose mechanics forbid
+  amendment has had its CHARTER.md edited since Writ Drop — the tamper *is* the
+  amendment, and the immutable record catches it. `no_record` remains metadata
+  only.
+
+`no_record` remains protocol-manifest metadata consumed only by the SDK's
+coherence linter until a design exists. Recording it here keeps the gap explicit
+rather than silent.
 
 ## Consequences
 

@@ -17,6 +17,7 @@
 import {
   validateCharter,
   parseCharter,
+  charterFingerprint,
   type Charter,
   type CharterIssue,
   type ProtocolContext,
@@ -94,6 +95,7 @@ const hansard = (input: WritDropInput, guid: string): string =>
     at: input.now,
     actor: input.speaker,
     role: 'AUTHORITY',
+    fields: { 'Charter SHA256': charterFingerprint(input.charter_source) },
     body: `Writ dropped. Session ${guid} convened under the attached Charter.`,
   });
 

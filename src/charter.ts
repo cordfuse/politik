@@ -12,6 +12,8 @@
  * Attribution: Steve Krisjanovs, Cordfuse
  */
 
+import { createHash } from 'node:crypto';
+
 import { parse as parseYaml } from 'yaml';
 
 import {
@@ -23,6 +25,19 @@ import {
 import type { ProtocolRecordMode } from './protocol.ts';
 import { isResolution, isExitPolicy, type Resolution, type ExitPolicy } from './division.ts';
 import { isTerminationPolicy, type TerminationPolicy } from './prorogation.ts';
+
+/**
+ * A content fingerprint of a Charter's source text.
+ *
+ * Recorded on the WRIT_DROP entry at session open so an immutable-charter
+ * protocol (ADR-0007 `immutable_charter`) can prove its constitution has not
+ * been edited since. The raw CHARTER.md bytes are hashed — not the parsed
+ * object — so any change the operator makes to the file, meaningful or not, is
+ * detectable; the immutability contract is about the text on disk, not its
+ * interpretation.
+ */
+export const charterFingerprint = (source: string): string =>
+  createHash('sha256').update(source, 'utf8').digest('hex');
 
 /* -------------------------------------------------------------------------- */
 /* Schema                                                                      */

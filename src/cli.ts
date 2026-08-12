@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { isRole, type Role } from './canon.ts';
-import { parseCharter, validateCharter } from './charter.ts';
+import { charterFingerprint, parseCharter, validateCharter } from './charter.ts';
 import { dropWrit } from './init.ts';
 import { initSessionRepo } from './git.ts';
 import { parseState, serializeState, type SessionStateFile } from './state.ts';
@@ -53,11 +53,12 @@ import {
   isExitPolicy, isResolution, recordOutcome, suspendForDeadlock, tallyDivision, type Vote,
 } from './division.ts';
 import {
-  PROTOCOL_MODES, parseProtocol, roleTerm, term, type Protocol, type ProtocolMode,
+  PROTOCOL_MODES, allowsCharterAmendment, parseProtocol, roleTerm, term,
+  type Protocol, type ProtocolMode,
 } from './protocol.ts';
 import { reviewIntegrity } from './integrity.ts';
 import { checkTermination, isTerminationPolicy, lastStanding, prorogue, type Trigger } from './prorogation.ts';
-import { appendEntry, parseEntries } from './hansard.ts';
+import { RECORD_TYPES, appendEntry, parseEntries } from './hansard.ts';
 import type { FileWrite } from './scm.ts';
 
 /**
@@ -516,6 +517,63 @@ const loadSession = async (dir: string) => {
   return { state, hansard, charter: charter?.ok === true ? charter.charter : null };
 };
 
+/** The Charter fingerprint recorded on the WRIT_DROP entry, or null if none. */
+const writDropFingerprint = (hansard: string): string | null => {
+  for (const entry of parseEntries(hansard)) {
+    if (entry.type === RECORD_TYPES.WRIT_DROP) {
+      return entry.fields['Charter SHA256'] ?? null;
+    }
+  }
+  return null;
+};
+
+/**
+ * Refuse a governance act when an immutable-charter protocol's Charter has been
+ * edited since Writ Drop.
+ *
+ * A protocol whose mechanics forbid mid-session amendment (ADR-0007
+ * `immutable_charter` — adversarial-collaboration, elimination-tournament)
+ * commits its Charter at Writ Drop and records that text's fingerprint on the
+ * WRIT_DROP entry. If CHARTER.md no longer matches, the constitution was
+ * amended after the session opened, which this class of protocol exists to
+ * forbid. Returns an operator-facing refusal, or null when the act may proceed:
+ * a mutable protocol, a legacy session with no recorded fingerprint (cannot be
+ * enforced retroactively), or an intact Charter.
+ */
+const immutableCharterViolation = async (
+  dir: string,
+  protocolName: string,
+): Promise<string | null> => {
+  const protocol = await sessionProtocol(protocolName);
+  if (protocol === null || allowsCharterAmendment(protocol)) return null;
+  const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
+  const recorded = writDropFingerprint(hansard);
+  if (recorded === null) return null;
+  const current = await readIfPresent(join(dir, 'CHARTER.md'));
+  if (current === null) return null;
+  const now = charterFingerprint(current);
+  if (now === recorded) return null;
+  return [
+    `Refused: the ${protocol.name} protocol runs an immutable Charter — the`,
+    'Standing Orders are fixed at Writ Drop and cannot be amended mid-session,',
+    'yet CHARTER.md has changed since',
+    `(${recorded.slice(0, 12)} → ${now.slice(0, 12)}).`,
+    'Revert CHARTER.md to its Writ Drop text, or prorogue this session and',
+    'convene a new one under the amended Charter.',
+  ].join(' ');
+};
+
+/**
+ * Guard a governance write: prints the refusal and returns false if an
+ * immutable Charter has been tampered with, true when the act may proceed.
+ */
+const charterIsIntact = async (dir: string, protocolName: string): Promise<boolean> => {
+  const violation = await immutableCharterViolation(dir, protocolName);
+  if (violation === null) return true;
+  err(violation);
+  return false;
+};
+
 /**
  * Atomic file write: land a complete temp file, then rename it over the target.
  *
@@ -649,6 +707,7 @@ const cmdDivision = async (argv: readonly string[]): Promise<number> => {
     err(`division: ${dir} is not a session repo`);
     return EXIT.USAGE;
   }
+  if (!(await charterIsIntact(dir, charter.protocol))) return EXIT.REFUSED;
   if (values.motion === undefined) {
     err('division: --motion is required');
     return EXIT.USAGE;
@@ -824,6 +883,7 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
   const dir = values.dir ?? '.';
   const { state, hansard, charter } = await loadSession(dir);
   if (state === null || charter === null) { err(`assent: ${dir} is not a session repo`); return EXIT.USAGE; }
+  if (!(await charterIsIntact(dir, charter.protocol))) return EXIT.REFUSED;
   if (values.motion === undefined || values.actor === undefined) {
     err('assent: --motion and --actor are required'); return EXIT.USAGE;
   }
@@ -1103,6 +1163,9 @@ const cmdActor = async (argv: readonly string[]): Promise<number> => {
     err(`actor: ${dir} is not a session repo`);
     return EXIT.USAGE;
   }
+  if (verb !== 'list' && !(await charterIsIntact(dir, charter.protocol))) {
+    return EXIT.REFUSED;
+  }
 
   if (verb === 'list') {
     const protocol = await sessionProtocol(charter.protocol);
@@ -1225,6 +1288,7 @@ const cmdEscalate = async (argv: readonly string[]): Promise<number> => {
   const dir = values.dir ?? '.';
   const { state, charter } = await loadSession(dir);
   if (state === null) { err(`escalate: ${dir} is not a session repo`); return EXIT.USAGE; }
+  if (charter !== null && !(await charterIsIntact(dir, charter.protocol))) return EXIT.REFUSED;
   if (values.actor === undefined || values.title === undefined || values.body === undefined) {
     err('escalate: --actor, --title and --body are required');
     return EXIT.USAGE;
@@ -1850,6 +1914,7 @@ const cmdChallenge = async (argv: readonly string[]): Promise<number> => {
   const dir = values.dir ?? '.';
   const { hansard, charter } = await loadSession(dir);
   if (charter === null) { err(`challenge: ${dir} is not a session repo`); return EXIT.USAGE; }
+  if (!(await charterIsIntact(dir, charter.protocol))) return EXIT.REFUSED;
   if (values.actor === undefined || values.against === undefined || values.grounds === undefined) {
     err('challenge: --actor, --against and --grounds are required'); return EXIT.USAGE;
   }
@@ -1921,6 +1986,7 @@ const cmdPair = async (argv: readonly string[]): Promise<number> => {
   const dir = values.dir ?? '.';
   const { hansard, charter } = await loadSession(dir);
   if (charter === null) { err(`pair: ${dir} is not a session repo`); return EXIT.USAGE; }
+  if (!(await charterIsIntact(dir, charter.protocol))) return EXIT.REFUSED;
   if (!isPairingFormat(values.format)) {
     err('pair: --format must be swiss | round-robin | single-elim'); return EXIT.USAGE;
   }
@@ -1968,6 +2034,9 @@ const cmdMatch = async (argv: readonly string[]): Promise<number> => {
   const dir = values.dir ?? '.';
   const { hansard, charter } = await loadSession(dir);
   if (charter === null) { err(`match: ${dir} is not a session repo`); return EXIT.USAGE; }
+  if (verb !== 'list' && !(await charterIsIntact(dir, charter.protocol))) {
+    return EXIT.REFUSED;
+  }
 
   if (verb === 'list') {
     const all = matches(hansard);

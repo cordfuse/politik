@@ -14,10 +14,14 @@ mechanics. What the engine enforces:
 
 - **Vocabulary** — enforced. A protocol's role and primitive terms translate
   CANON for the interface and the record.
-- **Behavioral flags** — partially enforced. `session.escalation` is wired
+- **Behavioral flags** — mostly enforced. `session.escalation` is wired
   (a protocol declaring no escalation refuses a Point of Order — see
-  [ADR-0006](docs/adr/0006-protocol-behavioral-enforcement.md)). `no_record` and
-  `immutable_charter` are declared on the manifests but not yet enforced.
+  [ADR-0006](docs/adr/0006-protocol-behavioral-enforcement.md)), and
+  `immutable_charter` is now enforced: the engine fingerprints the Charter at
+  Writ Drop and refuses a governance act if CHARTER.md is edited afterwards, so
+  an adversarial-collaboration or elimination-tournament session cannot have its
+  Standing Orders changed mid-session. `no_record` remains declared but
+  unenforced — no shipping protocol sets it.
 - **Mechanics** — enforced (ADR-0007). Each protocol composes how a decision
   resolves (majority · supermajority · unanimity), how an actor exits (division ·
   elimination · none), and when a session ends (objective · last-standing ·
