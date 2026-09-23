@@ -16,7 +16,7 @@
 ---
 
 ## STATUS
-- **Visibility:** Public · DOI: 10.5281/zenodo.19490359
+- **Visibility:** Public · DOI: 10.5281/zenodo.19490358 (concept DOI — always resolves to the latest version)
 - **Stage:** Architecture locked — reference implementation in progress
 
 ---

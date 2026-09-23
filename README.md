@@ -1,6 +1,6 @@
 # Politik
 
-[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.19490359-blue)](https://doi.org/10.5281/zenodo.19490359)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.19490358-blue)](https://doi.org/10.5281/zenodo.19490358)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 **A governed multi-agent framework built on git.**
@@ -213,5 +213,5 @@ MIT licensed. The entire framework — CANON, protocol library, session engine, 
 
 **Attribution:** Steve Krisjanovs, Cordfuse  
 **Architecture:** [POLITIK-ARCHITECTURE.md](POLITIK-ARCHITECTURE.md) · [PROTOCOLS.md](PROTOCOLS.md) · [RUNTIME.md](RUNTIME.md) · [RESEARCH.md](RESEARCH.md) · [EXECUTION.md](EXECUTION.md)  
-**DOI:** [10.5281/zenodo.19490359](https://doi.org/10.5281/zenodo.19490359)  
+**DOI:** [10.5281/zenodo.19490358](https://doi.org/10.5281/zenodo.19490358) (concept DOI — always resolves to the latest version)  
 **License:** MIT
