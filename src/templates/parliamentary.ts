@@ -468,8 +468,23 @@ before running them.** Draft and propose freely; ratifying is theirs.
 `;
 };
 
-const claudePointerTemplate = (): string =>
+/**
+ * The instruction files a harness loads on entering a session (ADR-0010).
+ *
+ * AGENTS.md is the one real copy; every other harness gets a short pointer to it,
+ * so a new harness is one line here and nothing can drift. `politik init` seals
+ * whichever of these exist onto the WRIT_DROP entry.
+ */
+export const INSTRUCTION_FILES = ['AGENTS.md', 'CLAUDE.md', 'GEMINI.md'] as const;
+
+/** Harness-specific pointers to AGENTS.md, keyed by file name. */
+const POINTER_FILES = ['CLAUDE.md', 'GEMINI.md'] as const;
+
+export const pointerTemplate = (): string =>
   `# This is a Politik session\n\nSee [AGENTS.md](AGENTS.md) — how to drive this governed session with the \`politik\` CLI.\n`;
+
+const pointerFiles = (): readonly FileWrite[] =>
+  POINTER_FILES.map((path) => ({ path, content: pointerTemplate() }));
 
 /**
  * The full Parliamentary template set, ready to commit into a session repo
@@ -482,6 +497,6 @@ export const scaffoldTemplates = (
   { path: 'CHARTER.md', content: charterTemplate(options) },
   { path: 'ORDER-PAPER.md', content: orderPaperTemplate(protocol) },
   { path: 'AGENTS.md', content: agentsTemplate(options) },
-  { path: 'CLAUDE.md', content: claudePointerTemplate() },
+  ...pointerFiles(),
   ...roleTemplates(protocol),
 ];

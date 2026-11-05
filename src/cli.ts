@@ -8,7 +8,7 @@
  * Attribution: Steve Krisjanovs, Cordfuse
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -280,10 +280,13 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
     termination: values.termination ?? m.termination,
     escalation: values.escalation ?? (manifest.protocol.no_escalation ? 'disabled' : 'enabled'),
   });
+  // Scaffold writes over same-named files (ADR-0010: it replaces the bootstrap
+  // instructions `politik new` leaves). Say so, rather than doing it silently.
+  const replaced = new Set(files.filter((f) => existsSync(join(dir, f.path))).map((f) => f.path));
   await writeFiles(dir, files);
 
   out(`SCAFFOLDED ${protocol}`);
-  for (const file of files) out(`  ${file.path}`);
+  for (const file of files) out(`  ${file.path}${replaced.has(file.path) ? '   (replaced existing file)' : ''}`);
   out('');
   out(`Edit the Standing Orders, then: politik init --charter ${join(dir, 'CHARTER.md')} --speaker <handle>`);
   return EXIT.OK;
