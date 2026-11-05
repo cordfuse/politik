@@ -276,3 +276,75 @@ describe('identity on the record (ADR-0011 §5)', () => {
     });
   });
 });
+
+const hasSshKeygen = (process.env['PATH'] ?? '').split(':').some((p) => existsSync(join(p, 'ssh-keygen')));
+
+const run = (cmd: string, args: readonly string[], cwd: string): Promise<Result> =>
+  new Promise((resolve) => {
+    const child = spawn(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    let err = '';
+    child.stdout.on('data', (c: Buffer) => { out += c.toString(); });
+    child.stderr.on('data', (c: Buffer) => { err += c.toString(); });
+    child.on('close', (code) => resolve({ code: code ?? -1, out: out.trim(), err: err.trim() }));
+  });
+
+describe('signed confirmations (ADR-0011 §5)', () => {
+  /** A local session requiring both the Speaker's confirmation and a signature. */
+  const withSignedSession = async (fn: (dir: string, root: string) => Promise<void>): Promise<void> => {
+    const root = await mkdtemp(join(tmpdir(), 'politik-signed-'));
+    try {
+      const dir = join(root, 's');
+      await runBin(['scaffold', '--dir', dir, '--quorum', '1']);
+      const charter = await readFile(join(dir, 'CHARTER.md'), 'utf8');
+      await writeFile(join(dir, 'CHARTER.md'), charter.replace(/signed_confirmations: off/, 'signed_confirmations: required'));
+      assert.equal((await runBin(['init', '--charter', join(dir, 'CHARTER.md'), '--speaker', 'steve', '--dir', dir])).code, 0);
+      for (const args of [
+        ['division', 'call', '--dir', dir, '--motion', 'm1', '--actor', 'steve', '--role', 'AUTHORITY'],
+        ['division', 'vote', '--dir', dir, '--motion', 'm1', '--actor', 'ada', '--role', 'MEMBER', '--vote', 'AYE'],
+        ['division', 'tally', '--dir', dir, '--motion', 'm1'],
+      ]) assert.equal((await runBin(args)).code, 0);
+      await runBin(['assent', '--dir', dir, '--motion', 'm1', '--actor', 'steve', '--role', 'AUTHORITY'], HARNESS);
+      await fn(dir, root);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  };
+
+  const pendingId = async (dir: string): Promise<string> =>
+    (JSON.parse((await runBin(['pending', '--dir', dir, '--json'])).out) as Array<{ id: string }>)[0]?.id ?? '';
+
+  it('a confirmed act is signed, verifies, and passes integrity', { skip: !hasScript || !hasSshKeygen }, async () => {
+    await withSignedSession(async (dir, root) => {
+      const key = join(root, 'key');
+      assert.equal((await run('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', key], root)).code, 0);
+      const pub = (await readFile(`${key}.pub`, 'utf8')).trim();
+      await writeFile(join(root, 'allowed'), `tester@example.com namespaces="git" ${pub}\n`);
+      for (const [k, v] of [['gpg.format', 'ssh'], ['user.signingkey', `${key}.pub`], ['gpg.ssh.allowedSignersFile', join(root, 'allowed')]] as const) {
+        await git(dir, ['config', k, v]);
+      }
+      const id = await pendingId(dir);
+      const ok = await runInTerminal(['confirm', id, '--dir', dir], id);
+      assert.match(ok.out, /CONFIRMED/);
+      assert.equal((await git(dir, ['log', '-1', '--format=%G?'])).out, 'G');
+      const integrity = await runBin(['integrity', '--dir', dir]);
+      assert.doesNotMatch(integrity.out, /confirmation-unsigned/);
+    });
+  });
+
+  it('if the signature cannot be made, nothing is recorded and the act stays pending', { skip: !hasScript }, async () => {
+    await withSignedSession(async (dir, root) => {
+      await git(dir, ['config', 'gpg.format', 'ssh']);
+      await git(dir, ['config', 'user.signingkey', join(root, 'no-such-key.pub')]);
+      const before = (await git(dir, ['rev-parse', 'HEAD'])).out;
+      const id = await pendingId(dir);
+      const r = await runInTerminal(['confirm', id, '--dir', dir], id);
+      assert.doesNotMatch(r.out, /CONFIRMED/);
+      assert.match(r.out, /could not be signed/);
+      assert.equal((await git(dir, ['rev-parse', 'HEAD'])).out, before, 'no unsigned commit was made');
+      assert.equal((await git(dir, ['status', '--porcelain'])).out, '', 'the act left nothing behind');
+      assert.doesNotMatch(await readFile(join(dir, 'HANSARD.md'), 'utf8'), /ASSENT_GRANTED/);
+      assert.equal(await pendingId(dir), id, 'still pending');
+    });
+  });
+});

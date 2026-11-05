@@ -9,7 +9,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { readFile, readdir, writeFile, mkdir, rename } from 'node:fs/promises';
+import { readFile, readdir, writeFile, mkdir, rename, rm } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -1181,13 +1181,35 @@ const commitAct = async (
   // ADR-0011 §5: a confirmed act is signed with the confirming person's key when
   // the Charter requires it, so confirmation cannot be forged without that key.
   const sign = confirmedBy !== null && (await charterRequiresSignedConfirmations(dir));
-  return commitRecord(dir, `${message}\n\n${provenanceTrailers(via, confirmedBy, operator)}`, [
-    'HANSARD.md',
-    'STATE.json',
-    'LEDGER.md',
-    '.politik/LEDGER.md',
-    ...extra,
-  ], undefined, { sign });
+  const paths = ['HANSARD.md', 'STATE.json', 'LEDGER.md', '.politik/LEDGER.md', ...extra];
+  const result = await commitRecord(dir, `${message}\n\n${provenanceTrailers(via, confirmedBy, operator)}`, paths, undefined, { sign });
+  if (sign && !result.committed && result.reason === 'signing failed') {
+    // The act must not survive unsigned (ADR-0011 §5): put every record file back
+    // as it was, so the working tree matches the last signed state, then refuse.
+    for (const path of paths) {
+      if ((await gitx(dir, ['ls-files', '--error-unmatch', '--', path])).code === 0) {
+        await gitx(dir, ['checkout', 'HEAD', '--', path]);
+      } else if (existsSync(join(dir, path))) {
+        await rm(join(dir, path), { force: true });
+      }
+    }
+    throw new Error('the confirmation could not be signed with your git signing key — nothing was recorded');
+  }
+  return result;
+};
+
+/**
+ * Commits in this session that record a Speaker confirmation but whose signature
+ * does not verify (`%G?` other than G or U). Verification uses the clone's git
+ * configuration — for SSH signatures, `gpg.ssh.allowedSignersFile`.
+ */
+const unverifiedConfirmations = async (dir: string): Promise<readonly string[]> => {
+  const log = await gitx(dir, ['log', '--format=%H%x09%G?%x09%(trailers:key=Politik-Confirmed-By,valueonly,separator=%x2C)', '--', '.']);
+  if (log.code !== 0 || log.out === '') return [];
+  return log.out.split('\n')
+    .map((line) => line.split('\t'))
+    .filter(([, status, confirmed]) => (confirmed ?? '').trim() !== '' && status !== 'G' && status !== 'U')
+    .map(([sha]) => sha ?? '');
 };
 
 const charterRequiresSignedConfirmations = async (dir: string): Promise<boolean> => {
@@ -2312,9 +2334,17 @@ const cmdIntegrity = async (argv: readonly string[]): Promise<number> => {
   const tampered = await instructionsViolation(dir);
   if (tampered !== null) out(`  [HIGH] instructions-tampered — ${tampered}`);
 
+  // ADR-0011 §5: under signed_confirmations, every confirmed act must carry a
+  // signature that verifies. Report each one that does not.
+  const unsigned = (await charterRequiresSignedConfirmations(dir)) ? await unverifiedConfirmations(dir) : [];
+  for (const sha of unsigned) {
+    out(`  [HIGH] confirmation-unsigned — ${sha.slice(0, 8)} records a Speaker confirmation without a verifying signature`);
+  }
+  const failedSeal = tampered !== null || unsigned.length > 0;
+
   const findings = reviewIntegrity(hansard);
   if (findings.length === 0) {
-    if (tampered !== null) return EXIT.REFUSED;
+    if (failedSeal) return EXIT.REFUSED;
     out('no bad-faith patterns detected — the record is clean');
     return EXIT.OK;
   }
@@ -2325,7 +2355,7 @@ const cmdIntegrity = async (argv: readonly string[]): Promise<number> => {
   out('');
   out(`${vices.length} vice finding(s), ${virtues.length} virtue(s). Surfaced to the Speaker; no action taken — the Speaker rules.`);
   // A high-severity vice exits non-zero so a watching Speaker/CI is alerted.
-  return tampered !== null || vices.some((f) => f.severity === 'high') ? EXIT.REFUSED : EXIT.OK;
+  return failedSeal || vices.some((f) => f.severity === 'high') ? EXIT.REFUSED : EXIT.OK;
 };
 
 /** `politik hansard` — the record, rendered in the protocol's vocabulary. */

@@ -70,6 +70,8 @@ session:
   assent: AUTHORITY              # only the Speaker enacts a carried Motion
   speaker_confirmation: ${speakerConfirmation}   # 'required' = assent/rule/prorogue requested by an AI
                                  # harness or script wait for the Speaker to run politik confirm (ADR-0010)
+  signed_confirmations: off      # 'required' = a confirmed act's commit must be signed with the
+                                 # confirming person's git signing key (ADR-0011)
 
   endurance:
     max_motions: null
