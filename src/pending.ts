@@ -14,6 +14,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { deletePendingRef, readPendingRefs, syncConfig, writePendingRef } from './remote.ts';
 
 /** The acts that exercise the Speaker's constitutional authority. */
 export const CONSTITUTIONAL_ACTS = ['assent', 'rule', 'prorogue'] as const;
@@ -38,6 +39,16 @@ export interface PendingAct {
 /** Where a session's staged acts live. Never committed. */
 export const pendingDir = (sessionDir: string): string => join(sessionDir, '.politik', 'pending');
 
+/** The session's GUID, which namespaces its shared pending refs (ADR-0011 §4). */
+const sessionGuid = async (sessionDir: string): Promise<string | null> => {
+  try {
+    const raw = JSON.parse(await readFile(join(sessionDir, 'STATE.json'), 'utf8')) as { session_guid?: unknown };
+    return typeof raw.session_guid === 'string' && /^[A-Za-z0-9._-]+$/.test(raw.session_guid) ? raw.session_guid : null;
+  } catch {
+    return null;
+  }
+};
+
 const ID_PATTERN = /^[a-z]+-[0-9a-f]{6}$/;
 
 /** True for a well-formed pending id — guards against path traversal on confirm/reject. */
@@ -45,11 +56,25 @@ export const isPendingId = (id: string): boolean => ID_PATTERN.test(id);
 
 const newId = (act: ConstitutionalAct): string => `${act}-${randomBytes(3).toString('hex')}`;
 
-/** Stage an act. Written atomically so an interrupt cannot leave a half-file to confirm. */
+/**
+ * Stage an act. In a shared session (ADR-0011) it is pushed as a pending ref so
+ * the Speaker sees it from any machine; throws if it cannot be shared, so an act
+ * is never staged where the Speaker cannot reach it. Otherwise it is written
+ * atomically to `.politik/pending/`.
+ */
 export const stagePending = async (
   sessionDir: string,
   input: Omit<PendingAct, 'id'>,
 ): Promise<PendingAct> => {
+  const cfg = await syncConfig(sessionDir);
+  if (cfg !== null) {
+    const guid = await sessionGuid(sessionDir);
+    if (guid === null) throw new Error('cannot share a pending act: STATE.json has no session GUID');
+    const pending: PendingAct = { id: newId(input.act), ...input };
+    const shared = await writePendingRef(sessionDir, cfg, guid, pending.id, `${JSON.stringify(pending, null, 2)}\n`);
+    if (!shared.ok) throw new Error(`could not share the pending act with ${cfg.remote}: ${shared.reason}`);
+    return pending;
+  }
   const dir = pendingDir(sessionDir);
   await mkdir(dir, { recursive: true });
   // Ignore the folder's own contents, including this file, so a staged act never
@@ -82,8 +107,16 @@ const parsePending = (raw: string): PendingAct | null => {
   }
 };
 
-/** Every well-formed staged act, oldest first. */
+/** Every well-formed staged act, oldest first. Shared sessions read the pending refs. */
 export const listPending = async (sessionDir: string): Promise<readonly PendingAct[]> => {
+  if ((await syncConfig(sessionDir)) !== null) {
+    const guid = await sessionGuid(sessionDir);
+    if (guid === null) return [];
+    return (await readPendingRefs(sessionDir, guid))
+      .map(parsePending)
+      .filter((a): a is PendingAct => a !== null)
+      .sort((a, b) => a.requested_at.localeCompare(b.requested_at));
+  }
   const dir = pendingDir(sessionDir);
   if (!existsSync(dir)) return [];
   const acts: PendingAct[] = [];
@@ -96,6 +129,9 @@ export const listPending = async (sessionDir: string): Promise<readonly PendingA
 
 export const readPending = async (sessionDir: string, id: string): Promise<PendingAct | null> => {
   if (!isPendingId(id)) return null;
+  if ((await syncConfig(sessionDir)) !== null) {
+    return (await listPending(sessionDir)).find((a) => a.id === id) ?? null;
+  }
   const path = join(pendingDir(sessionDir), `${id}.json`);
   if (!existsSync(path)) return null;
   return parsePending(await readFile(path, 'utf8'));
@@ -103,6 +139,12 @@ export const readPending = async (sessionDir: string, id: string): Promise<Pendi
 
 export const removePending = async (sessionDir: string, id: string): Promise<void> => {
   if (!isPendingId(id)) return;
+  const cfg = await syncConfig(sessionDir);
+  if (cfg !== null) {
+    const guid = await sessionGuid(sessionDir);
+    if (guid !== null) await deletePendingRef(sessionDir, cfg, guid, id);
+    return;
+  }
   await rm(join(pendingDir(sessionDir), `${id}.json`), { force: true });
 };
 

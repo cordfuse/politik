@@ -69,6 +69,14 @@ export const CONFIRMED_BY_SPEAKER = 'speaker-at-terminal';
  * and then confirmed. Trailers keep the commit subject — the line every existing
  * tool and test reads — exactly as it was.
  */
-export const provenanceTrailers = (via: string, confirmedBy: string | null = null): string =>
-  [`Politik-Requested-Via: ${via}`, ...(confirmedBy === null ? [] : [`Politik-Confirmed-By: ${confirmedBy}`])]
-    .join('\n');
+export const provenanceTrailers = (
+  via: string,
+  confirmedBy: string | null = null,
+  operator: string | null = null,
+): string =>
+  [
+    `Politik-Requested-Via: ${via}`,
+    ...(confirmedBy === null ? [] : [`Politik-Confirmed-By: ${confirmedBy}`]),
+    // ADR-0011 §5: the person operating this clone, so a shared record says who acted.
+    ...(operator === null ? [] : [`Politik-Operator: ${operator}`]),
+  ].join('\n');

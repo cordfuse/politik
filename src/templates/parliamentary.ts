@@ -70,6 +70,8 @@ session:
   assent: AUTHORITY              # only the Speaker enacts a carried Motion
   speaker_confirmation: ${speakerConfirmation}   # 'required' = assent/rule/prorogue requested by an AI
                                  # harness or script wait for the Speaker to run politik confirm (ADR-0010)
+  signed_confirmations: off      # 'required' = a confirmed act's commit must be signed with the
+                                 # confirming person's git signing key (ADR-0011)
 
   endurance:
     max_motions: null
@@ -494,6 +496,12 @@ They talk in plain language; you turn it into \`politik\` commands.
 - **The record starts at Writ Drop.** The Hansard begins at the
   \`writ drop: session <guid>\` commit. In a tree, earlier commits belong to the
   enclosing repository, not to this session.
+- **Shared sessions sync themselves.** If \`politik remote\` shows a remote, other
+  people act on this session from their own machines. Every act fetches first and
+  pushes after; you never pull or merge the record by hand. If an act reports
+  *recorded locally, not shared yet*, run \`politik sync\` and tell the Speaker. If
+  the remote is unreachable, governance refuses — say so rather than retrying in a
+  loop. Pending acts are shared too, and only the seat an act names can confirm it.
 `;
 };
 
