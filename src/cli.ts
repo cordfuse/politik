@@ -125,7 +125,7 @@ Usage
   politik status [--dir <dir>] [--json]
   politik hansard [--dir <dir>]           # the record, in the protocol's vocabulary
   politik integrity [--dir <dir>]         # scan the record for bad-faith patterns
-  politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
+  politik prorogue [--dir <dir>] --actor <handle> --role <ROLE> --trigger <TRIGGER>
   politik standings [--dir <dir>] [--by win-loss|survival]   # score a competitive protocol
   politik pair --format swiss|round-robin|single-elim [--dir <dir>]   # pair the next round of MATCHes
   politik match report --match <id> --winner <contestant> [--actor <referee>]
