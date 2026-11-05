@@ -5,7 +5,7 @@
 
 **A governed multi-agent framework built on git.**
 
-Pluggable governance protocols. Stateless agent workers. Git as the session substrate. Immutable Hansard. Append-only LEDGER. Human constitutional authority.
+Pluggable governance protocols. Stateless agent workers. Git as the session substrate. Immutable Hansard. Append-only LEDGER. Human constitutional authority. Bring your own AI harness.
 
 ---
 
@@ -28,10 +28,12 @@ The result: agents that produce outputs nobody can fully trust, audit, or reprod
 Politik is a **governed multi-agent operating system** where:
 
 - A **human** is the constitutional authority — present but not operational
+- The human governs through **whichever AI harness they already use** — Claude Code, Codex, agy, opencode — and still confirms every permanent act themselves
 - **Agents** are stateless CLI workers that spawn, do work, and dispose
 - A **git repository IS the session** — charter, record, state, and invite in one
 - **Pluggable governance protocols** translate the framework to any industry vocabulary
-- **A governed tree, not a single machine** — sessions nest into an Org → Team → Ticket hierarchy in one repository; `politik registry` reports the state of everything, across machines and teams
+- **A governed tree** — sessions nest into an Org → Team → Ticket hierarchy in one repository; `politik registry` reports the state of every node
+- **Not a single machine** — a session is shared through any git remote; people and agents on different machines act on it, every act syncs, and the Hansard never needs a manual merge
 - **No new infrastructure required** — git already built it
 
 Nobody connected these pieces this way before.
@@ -171,7 +173,7 @@ and correct on git alone. *Run local, run free.*
 | PR Review | Division (vote) |
 | Issue | Escalation |
 | GitHub Actions | Clerk automation |
-| Repo access | Taking a Seat |
+| Repo access | Taking a Seat (`politik join --as <handle>`) |
 | git history | Hansard (immutable record) |
 
 ### The Politik Tree
@@ -196,6 +198,8 @@ Broadcast received → Agent spawned → Prompt executed → Result committed to
 ### The Human Role
 
 The Speaker (human) is constitutionally present, not operationally present. Drops the Writ, defines Standing Orders, rules on escalations. The session governs itself.
+
+The Speaker works through **their own AI harness**, opened in the session folder, in plain language. The harness reads freely and drafts freely, but the constitutional acts — assent, rulings, prorogation — are staged for the Speaker, who enacts them by typing the act's id at a real terminal. Every commit records who asked and how (ADR-0010). In a shared session, only the seat an act names can confirm it (ADR-0011).
 
 ### Governance Protocols
 
