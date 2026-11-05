@@ -122,7 +122,7 @@ Usage
   politik broadcast --target <ROLE> --slots <n> --task <text> [--dir <dir>]
   politik motion link --motion <id> --pr <n> [--url <u>]
   politik ledger [--dir <dir>]
-  politik status [--dir <dir>]
+  politik status [--dir <dir>] [--json]
   politik hansard [--dir <dir>]           # the record, in the protocol's vocabulary
   politik integrity [--dir <dir>]         # scan the record for bad-faith patterns
   politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
@@ -2088,7 +2088,7 @@ const cmdHansard = async (argv: readonly string[]): Promise<number> => {
 };
 
 const cmdStatus = async (argv: readonly string[]): Promise<number> => {
-  const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' } } });
+  const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' }, json: { type: 'boolean' } } });
   const dir = values.dir ?? '.';
 
   const raw = await readIfPresent(join(dir, 'STATE.json'));
@@ -2103,6 +2103,31 @@ const cmdStatus = async (argv: readonly string[]): Promise<number> => {
     return EXIT.REFUSED;
   }
 
+  const pending = await listPending(resolve(dir));
+  const hansardRaw = await readIfPresent(join(dir, 'HANSARD.md'));
+  const entries = hansardRaw === null ? [] : parseEntries(hansardRaw);
+
+  // ADR-0010: a stable machine-readable view, so a harness answering the Speaker
+  // reads fields rather than scraping text.
+  if (values.json === true) {
+    const last = entries.at(-1);
+    out(JSON.stringify({
+      session: state.session_guid,
+      protocol: state.protocol,
+      state: state.state,
+      suspension: state.suspension,
+      quorum: state.quorum,
+      updated_at: state.updated_at,
+      updated_by: state.updated_by,
+      record: {
+        entries: entries.length,
+        last: last === undefined ? null : { type: last.type, actor: last.actor, at: last.at },
+      },
+      pending: pending.map((p) => ({ id: p.id, act: p.act, summary: p.summary })),
+    }, null, 2));
+    return EXIT.OK;
+  }
+
   out(`session   ${state.session_guid}`);
   out(`protocol  ${state.protocol}`);
   out(`state     ${state.state}`);
@@ -2112,12 +2137,13 @@ const cmdStatus = async (argv: readonly string[]): Promise<number> => {
   out(`quorum    ${state.quorum.present} of ${state.quorum.required}`);
   out(`updated   ${state.updated_at} by ${state.updated_by}`);
 
-  const hansard = await readIfPresent(join(dir, 'HANSARD.md'));
-  if (hansard !== null) {
-    const entries = parseEntries(hansard);
+  if (hansardRaw !== null) {
     out(`record    ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`);
     const last = entries.at(-1);
     if (last !== undefined) out(`last      ${last.type} by ${last.actor} at ${last.at}`);
+  }
+  if (pending.length > 0) {
+    out(`pending   ${pending.length} act${pending.length === 1 ? '' : 's'} awaiting the Speaker — politik pending`);
   }
   return EXIT.OK;
 };

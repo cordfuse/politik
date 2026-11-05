@@ -413,3 +413,22 @@ describe('protocol AGENTS.md — guidance for a harness assisting the Speaker (A
     });
   });
 });
+
+describe('status --json and the pending line (ADR-0010)', () => {
+  it('reports state as JSON, including acts awaiting the Speaker', async () => {
+    await withTmp(async (dir) => {
+      await convene(dir);
+      await carryMotion(dir);
+      await runBin(ASSENT(dir), HARNESS);
+      const r = await runBin(['status', '--dir', dir, '--json']);
+      assert.equal(r.code, 0, r.err);
+      const s = JSON.parse(r.out) as { protocol: string; pending: Array<{ act: string }>; record: { entries: number } };
+      assert.equal(s.protocol, 'parliamentary');
+      assert.equal(s.pending.length, 1);
+      assert.equal(s.pending[0]?.act, 'assent');
+      assert.ok(s.record.entries > 0);
+      const text = await runBin(['status', '--dir', dir]);
+      assert.match(text.out, /pending\s+1 act awaiting the Speaker/);
+    });
+  });
+});
