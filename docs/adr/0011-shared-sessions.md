@@ -2,7 +2,7 @@
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
-**Status:** Accepted — building on `feat/shared-sessions` (stacked on ADR-0010).
+**Status:** Accepted — built (`src/remote.ts`; `politik remote` / `join` / `sync`, `init --remote`; sync-and-retry around acts; shared pending refs; `Politik-Operator` trailer; `signed_confirmations`). Stacked on ADR-0010.
 
 ---
 

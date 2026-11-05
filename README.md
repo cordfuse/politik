@@ -90,6 +90,24 @@ and, for a confirmed act, that the Speaker confirmed it. The session's instructi
 files are sealed at Writ Drop: if an agent rewrites them, governance stops until
 they are restored.
 
+### Sharing a session across machines
+
+A session can be shared through any git remote — GitHub, a NAS, anything git can
+reach (ADR-0011). Several people, each with their own harness, and agents on other
+machines can all act on it:
+
+```sh
+politik remote git@github.com:acme/q4-planning.git    # the Speaker shares it
+politik join   git@github.com:acme/q4-planning.git q4 --as ada   # someone else joins
+```
+
+Every act fetches the latest record first and pushes after; if someone else acted
+in between, Politik recomputes the act on top of theirs, so the Hansard never needs a
+manual merge. Offline, governance refuses and reads still work. Acts staged for the
+Speaker are shared too, and only the seat an act names can confirm it. For proof
+rather than names, set `signed_confirmations: required` in the Charter and each
+confirmed act is signed with the confirming person's git key.
+
 ### By hand, or from a script
 
 Every command below is a git commit. `git log` in the session directory is the

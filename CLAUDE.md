@@ -29,7 +29,10 @@ ADR-0009 (the **MATCH primitive** + pairing — `politik pair`/`match`, unblocki
 Swiss/round-robin/single-elimination scoring) and ADR-0010 (the **operator
 interface** — bring your own harness via `politik new`; constitutional acts a
 harness requests are staged and confirmed by the Speaker at a terminal;
-provenance trailers; sealed instruction files) are all **Accepted**.
+provenance trailers; sealed instruction files) and ADR-0011 (**shared sessions** —
+`politik remote`/`join`/`sync`; every act fetches, fast-forwards, acts, pushes, and
+recomputes if overtaken; pending acts shared as refs; only the named seat confirms;
+optional signed confirmations) are all **Accepted**.
 `POLITIK-ARCHITECTURE.md` was amended only by ADR-0004, which added the `ASSENT`
 verb and the `CONFLICT` primitive.
 
