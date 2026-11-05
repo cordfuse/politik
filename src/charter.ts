@@ -39,6 +39,22 @@ import { isTerminationPolicy, type TerminationPolicy } from './prorogation.ts';
 export const charterFingerprint = (source: string): string =>
   createHash('sha256').update(source, 'utf8').digest('hex');
 
+/**
+ * Fingerprint of a session's instruction files (ADR-0010 §4) — AGENTS.md and the
+ * harness pointers — as one value. Order-independent, and adding or removing a
+ * file changes it, so planting a new instruction file is caught as surely as
+ * editing an existing one.
+ */
+export const instructionsFingerprint = (
+  files: ReadonlyArray<{ readonly path: string; readonly content: string }>,
+): string => {
+  const hash = createHash('sha256');
+  for (const f of [...files].sort((a, b) => a.path.localeCompare(b.path))) {
+    hash.update(f.path, 'utf8').update('\0').update(f.content, 'utf8').update('\0');
+  }
+  return hash.digest('hex');
+};
+
 /* -------------------------------------------------------------------------- */
 /* Schema                                                                      */
 /* -------------------------------------------------------------------------- */

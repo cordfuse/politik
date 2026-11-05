@@ -15,11 +15,11 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { isRole, type Role } from './canon.ts';
-import { charterFingerprint, parseCharter, validateCharter } from './charter.ts';
+import { charterFingerprint, instructionsFingerprint, parseCharter, validateCharter } from './charter.ts';
 import { dropWrit } from './init.ts';
 import { initSessionRepo } from './git.ts';
 import { parseState, serializeState, type SessionStateFile } from './state.ts';
-import { bootstrapTemplate, pointerFiles, scaffoldTemplates } from './templates/parliamentary.ts';
+import { INSTRUCTION_FILES, bootstrapTemplate, pointerFiles, scaffoldTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
 import {
@@ -652,16 +652,17 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
     return EXIT.USAGE;
   }
 
+  // `--dir` is the standard flag; `--out` stays an accepted alias here.
+  const dir = values.dir ?? values.out ?? '.';
+
   const result = dropWrit({
     charter_source: source,
     session_guid: values.guid ?? crypto.randomUUID(),
     now: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
     speaker: values.speaker,
     protocol: values.protocol === undefined ? undefined : { name: values.protocol },
+    instruction_files: await readInstructionFiles(dir),
   });
-
-  // `--dir` is the standard flag; `--out` stays an accepted alias here.
-  const dir = values.dir ?? values.out ?? '.';
   await writeFiles(dir, result.files);
 
   if (!result.ok) {
@@ -772,6 +773,69 @@ const immutableCharterViolation = async (
     'Revert CHARTER.md to its Writ Drop text, or prorogue this session and',
     'convene a new one under the amended Charter.',
   ].join(' ');
+};
+
+/** The instruction files present in a session directory (ADR-0010 §4). */
+const readInstructionFiles = async (
+  dir: string,
+): Promise<ReadonlyArray<{ readonly path: string; readonly content: string }>> => {
+  const files: Array<{ path: string; content: string }> = [];
+  for (const path of INSTRUCTION_FILES) {
+    const content = await readIfPresent(join(dir, path));
+    if (content !== null) files.push({ path, content });
+  }
+  return files;
+};
+
+/**
+ * Refuse governance when the session's instruction files have changed since Writ
+ * Drop (ADR-0010 §4).
+ *
+ * These are the files the Speaker's own harness loads on entering the session. An
+ * agent that rewrites — or plants — one has tried to reprogram the governor's
+ * tool, so this applies under every protocol, not only immutable-charter ones.
+ * Null when the act may proceed: an intact set, or a session sealed before
+ * ADR-0010 (no fingerprint to compare against).
+ */
+const instructionsViolation = async (dir: string): Promise<string | null> => {
+  const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
+  let recorded: string | null = null;
+  for (const entry of parseEntries(hansard)) {
+    if (entry.type === RECORD_TYPES.WRIT_DROP) { recorded = entry.fields['Instructions SHA256'] ?? null; break; }
+  }
+  if (recorded === null) return null;
+  const files = await readInstructionFiles(dir);
+  const now = instructionsFingerprint(files);
+  if (now === recorded) return null;
+  return [
+    `Refused: this session's instruction files (${INSTRUCTION_FILES.join(', ')}) have changed since`,
+    `Writ Drop (${recorded.slice(0, 12)} → ${now.slice(0, 12)}). These are the instructions the Speaker's`,
+    'own AI harness loads here; an agent may have tried to rewrite them. Inspect with `git diff`',
+    'and restore them from the Writ Drop commit before continuing.',
+  ].join(' ');
+};
+
+/**
+ * Commands that only read, or that set a session up before Writ Drop. Every other
+ * command is governance and refuses to run while the instruction files are
+ * tampered (ADR-0010 §4); these stay available so the Speaker can see what
+ * happened and repair it.
+ */
+const UNGUARDED_COMMANDS: ReadonlySet<string | undefined> = new Set([
+  undefined, '-h', '--help', 'help', 'version', '--version',
+  'new', 'scaffold', 'init', 'doctor', 'protocol', 'validate',
+  'status', 'hansard', 'ledger', 'integrity', 'pending', 'reject',
+  'registry', 'cascade', 'standings',
+]);
+
+/** The `--dir` a command line targets, defaulting to the working directory. */
+const dirArg = (argv: readonly string[]): string => {
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i] ?? '';
+    if (a === '--dir') return argv[i + 1] ?? '.';
+    if (a.startsWith('--dir=')) return a.slice('--dir='.length);
+  }
+  return '.';
 };
 
 /**
@@ -1982,8 +2046,14 @@ const cmdIntegrity = async (argv: readonly string[]): Promise<number> => {
   const { state, hansard } = await loadSession(dir);
   if (state === null) { err(`integrity: ${dir} is not a session repo`); return EXIT.USAGE; }
 
+  // ADR-0010 §4: a tampered instruction set is the most serious finding there is
+  // — it targets the Speaker's own harness — so it leads, and fails the check.
+  const tampered = await instructionsViolation(dir);
+  if (tampered !== null) out(`  [HIGH] instructions-tampered — ${tampered}`);
+
   const findings = reviewIntegrity(hansard);
   if (findings.length === 0) {
+    if (tampered !== null) return EXIT.REFUSED;
     out('no bad-faith patterns detected — the record is clean');
     return EXIT.OK;
   }
@@ -1994,7 +2064,7 @@ const cmdIntegrity = async (argv: readonly string[]): Promise<number> => {
   out('');
   out(`${vices.length} vice finding(s), ${virtues.length} virtue(s). Surfaced to the Speaker; no action taken — the Speaker rules.`);
   // A high-severity vice exits non-zero so a watching Speaker/CI is alerted.
-  return vices.some((f) => f.severity === 'high') ? EXIT.REFUSED : EXIT.OK;
+  return tampered !== null || vices.some((f) => f.severity === 'high') ? EXIT.REFUSED : EXIT.OK;
 };
 
 /** `politik hansard` — the record, rendered in the protocol's vocabulary. */
@@ -2421,6 +2491,11 @@ const cmdCascade = async (argv: readonly string[]): Promise<number> => {
 
 export const run = async (argv: readonly string[]): Promise<number> => {
   const [command, ...rest] = argv;
+
+  if (!UNGUARDED_COMMANDS.has(command)) {
+    const violation = await instructionsViolation(dirArg(rest));
+    if (violation !== null) { err(violation); return EXIT.REFUSED; }
+  }
 
   switch (command) {
     case undefined:

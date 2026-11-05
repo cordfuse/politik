@@ -18,6 +18,7 @@ import {
   validateCharter,
   parseCharter,
   charterFingerprint,
+  instructionsFingerprint,
   type Charter,
   type CharterIssue,
   type ProtocolContext,
@@ -42,6 +43,11 @@ export interface WritDropInput {
   readonly speaker: string;
   /** Resolved protocol, when available. Enables ADR-0002 rules 2 and 5. */
   readonly protocol?: ProtocolContext;
+  /**
+   * The session's instruction files present at Writ Drop (ADR-0010 §4). Sealed
+   * onto the WRIT_DROP entry so a later rewrite is detected.
+   */
+  readonly instruction_files?: ReadonlyArray<{ readonly path: string; readonly content: string }>;
 }
 
 export type WritDropResult =
@@ -95,7 +101,12 @@ const hansard = (input: WritDropInput, guid: string): string =>
     at: input.now,
     actor: input.speaker,
     role: 'AUTHORITY',
-    fields: { 'Charter SHA256': charterFingerprint(input.charter_source) },
+    fields: {
+      'Charter SHA256': charterFingerprint(input.charter_source),
+      ...(input.instruction_files === undefined || input.instruction_files.length === 0
+        ? {}
+        : { 'Instructions SHA256': instructionsFingerprint(input.instruction_files) }),
+    },
     body: `Writ dropped. Session ${guid} convened under the attached Charter.`,
   });
 
