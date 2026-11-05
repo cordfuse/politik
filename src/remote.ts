@@ -172,7 +172,10 @@ export const pushRecord = async (
   const r = await gitx(dir, ['push', '--porcelain', cfg.remote, `HEAD:refs/heads/${cfg.branch}`]);
   if (r.code === 0) return { ok: true, rejected: false, reason: 'pushed' };
   const text = `${r.out}\n${r.err}`;
-  const rejected = /\[rejected\]|non-fast-forward|fetch first|\(stale info\)/.test(text);
+  // Lost races: an ordinary non-fast-forward, or — when another push lands while
+  // ours is in flight — the receiving side refusing to move the ref.
+  const rejected = /\[rejected\]|\[remote rejected\]|non-fast-forward|fetch first|stale info|failed to update ref|cannot lock ref/
+    .test(text);
   return { ok: false, rejected, reason: firstLine(r.err || r.out) };
 };
 

@@ -510,6 +510,15 @@ const cmdJoin = async (argv: readonly string[]): Promise<number> => {
   const clone = await gitx('.', ['clone', '--quiet', url, dir]);
   if (clone.code !== 0) { err(`join: could not clone ${url}: ${clone.err.split('\n')[0] ?? ''}`); return EXIT.REFUSED; }
   await gitx(dir, ['fetch', '--quiet', 'origin', '+refs/politik/pending/*:refs/politik/pending/*']);
+  // A bare remote whose HEAD names a branch that was never pushed clones with
+  // nothing checked out. If the remote has exactly one branch, that is the record.
+  if ((await gitx(dir, ['rev-parse', '--verify', '--quiet', 'HEAD'])).code !== 0) {
+    const branches = (await gitx(dir, ['for-each-ref', '--format=%(refname:lstrip=3)', 'refs/remotes/origin/'])).out
+      .split('\n').filter((b) => b !== '' && b !== 'HEAD');
+    if (branches.length === 1 && branches[0] !== undefined) {
+      await gitx(dir, ['checkout', '--quiet', '-b', branches[0], '--track', `origin/${branches[0]}`]);
+    }
+  }
 
   if ((await readIfPresent(join(dir, 'STATE.json'))) === null) {
     err(`join: ${url} was cloned to ${dir}, but its root is not a convened session.`);
@@ -671,7 +680,7 @@ const cmdConfirm = async (argv: readonly string[]): Promise<number> => {
 
   out(`Constitutional act — this will be permanently recorded in the Hansard:`);
   out(`  ${pending.summary}`);
-  out(`  command:       politik ${pending.act} ${pending.argv.join(' ')}`);
+  out(`  command:       politik ${pending.act} ${withDir(pending.argv, sessionDir).join(' ')}`);
   out(`  requested via: ${pending.requested_via} at ${pending.requested_at}`);
   const typed = await askSpeaker(`Type ${id} to confirm: `);
   if (typed !== id) { err('Not confirmed — nothing was recorded. The act is still pending.'); return EXIT.REFUSED; }
@@ -679,7 +688,10 @@ const cmdConfirm = async (argv: readonly string[]): Promise<number> => {
   speakerConfirmed = true;
   actProvenance = { via: pending.requested_via, confirmedBy: CONFIRMED_BY_SPEAKER };
   try {
-    const code = await withSync(sessionDir, () => run([pending.act, ...pending.argv]), { retry: true });
+    // Replay against this machine's copy of the session: a pending act shared from
+    // another machine names that machine's path (ADR-0011 §4).
+    const argv = withDir(pending.argv, sessionDir);
+    const code = await withSync(sessionDir, () => run([pending.act, ...argv]), { retry: true });
     if (code === EXIT.OK) {
       await removePending(sessionDir, id);
       out(`CONFIRMED — ${id}`);
