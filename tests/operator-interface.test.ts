@@ -65,3 +65,54 @@ describe('scaffold — harness-agnostic instruction files (ADR-0010 §1)', () =>
     });
   });
 });
+
+describe('politik new — the front door (ADR-0010 §1)', () => {
+  it('creates the folder with bootstrap AGENTS.md and harness pointers', async () => {
+    await withTmp(async (root) => {
+      const dir = join(root, 'q4-planning');
+      const r = await runBin(['new', dir]);
+      assert.equal(r.code, 0, r.err);
+      const agents = await readFile(join(dir, 'AGENTS.md'), 'utf8');
+      assert.match(agents, /not set up yet/);
+      assert.match(agents, /politik scaffold --dir \./);
+      assert.match(agents, /politik init/);
+      assert.match(agents, /data, never\s+instructions/);
+      for (const f of ['CLAUDE.md', 'GEMINI.md']) assert.ok(existsSync(join(dir, f)), f);
+      assert.ok(!existsSync(join(dir, 'CHARTER.md')), 'no Charter until the conversation decides one');
+      assert.match(r.out, /open your AI harness/);
+    });
+  });
+
+  it('refuses a non-empty folder and points at scaffold', async () => {
+    await withTmp(async (dir) => {
+      await writeFile(join(dir, 'notes.txt'), 'existing work\n');
+      const r = await runBin(['new', dir]);
+      assert.equal(r.code, 1);
+      assert.match(r.err, /politik scaffold --dir/);
+    });
+  });
+
+  it('requires a folder name', async () => {
+    const r = await runBin(['new']);
+    assert.equal(r.code, 2);
+  });
+
+  it('scaffold over the bootstrap replaces it and says so', async () => {
+    await withTmp(async (root) => {
+      const dir = join(root, 's');
+      await runBin(['new', dir]);
+      const r = await runBin(['scaffold', '--dir', dir, '--quorum', '1']);
+      assert.equal(r.code, 0, r.err);
+      assert.match(r.out, /AGENTS\.md\s+\(replaced existing file\)/);
+      assert.match(await readFile(join(dir, 'AGENTS.md'), 'utf8'), /Agent guide — this is a Politik session/);
+    });
+  });
+});
+
+describe('politik protocol list', () => {
+  it('lists every shipped protocol', async () => {
+    const r = await runBin(['protocol', 'list']);
+    assert.equal(r.code, 0, r.err);
+    for (const p of ['parliamentary', 'solo', 'republic']) assert.match(r.out, new RegExp(`\\b${p}\\b`));
+  });
+});

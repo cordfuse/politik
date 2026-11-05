@@ -9,7 +9,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
+import { readFile, readdir, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -19,7 +19,7 @@ import { charterFingerprint, parseCharter, validateCharter } from './charter.ts'
 import { dropWrit } from './init.ts';
 import { initSessionRepo } from './git.ts';
 import { parseState, serializeState, type SessionStateFile } from './state.ts';
-import { scaffoldTemplates } from './templates/parliamentary.ts';
+import { bootstrapTemplate, pointerFiles, scaffoldTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
 import { runTurn } from './runner.ts';
@@ -78,8 +78,10 @@ const USAGE = `politik — governed multi-agent sessions on git
 
 Usage
   politik version
-  politik scaffold --dir <dir> [--protocol parliamentary] [--quorum <n>] [--parent <dir>]
+  politik new <dir>                       # start here: folder + instructions for your AI harness
+  politik scaffold [--dir <dir>] [--protocol parliamentary] [--quorum <n>] [--parent <dir>]
   politik doctor
+  politik protocol list                   # the shipped protocols
   politik protocol lint <manifest.yml>
   politik protocol new <name> [--mode <mode>] [--out <dir>]
   politik validate <charter.md> [--protocol <name>]
@@ -292,6 +294,35 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
   return EXIT.OK;
 };
 
+/**
+ * `politik new <dir>` — the operator's front door (ADR-0010 §1).
+ *
+ * Creates the folder and writes bootstrap instructions for whichever harness the
+ * operator opens there; the harness runs first-time setup as a conversation and
+ * calls `scaffold` and `init` itself. Deliberately does almost nothing: protocol,
+ * quorum and seats are decided in that conversation, not by flags here.
+ */
+const cmdNew = async (argv: readonly string[]): Promise<number> => {
+  const target = argv[0];
+  if (target === undefined || target.startsWith('-')) {
+    err('new: a folder name is required — politik new <dir>');
+    return EXIT.USAGE;
+  }
+  if (existsSync(target) && (await readdir(target)).length > 0) {
+    err(`new: ${target} already exists and is not empty. To set up a session in an existing folder, run: politik scaffold --dir ${target}`);
+    return EXIT.REFUSED;
+  }
+  const files = [{ path: 'AGENTS.md', content: bootstrapTemplate() }, ...pointerFiles()];
+  await writeFiles(target, files);
+
+  out(`NEW SESSION FOLDER ${target}`);
+  for (const file of files) out(`  ${file.path}`);
+  out('');
+  out(`Next: cd ${target} and open your AI harness (claude, codex, agy, opencode…).`);
+  out('It will walk you through choosing a protocol, writing the Charter, and convening the session.');
+  return EXIT.OK;
+};
+
 /** Probe the host and report whether a session can run here. */
 const cmdDoctor = async (): Promise<number> => {
   const diagnosis = await diagnose();
@@ -310,6 +341,20 @@ const cmdDoctor = async (): Promise<number> => {
 /** `politik protocol lint <file>` / `politik protocol new <name>`. */
 const cmdProtocol = async (argv: readonly string[]): Promise<number> => {
   const [verb, ...rest] = argv;
+
+  if (verb === 'list') {
+    // The shipped protocols, so a harness guiding first-time setup can offer real
+    // choices instead of guessing names (ADR-0010).
+    const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'protocols');
+    const names = (await readdir(dir)).filter((f) => f.endsWith('.yml')).sort();
+    for (const file of names) {
+      const src = (await readIfPresent(join(dir, file))) ?? '';
+      const blurb = (src.split('\n').find((l) => l.startsWith('#')) ?? '')
+        .replace(/^#\s*/, '').split(/(?<=\.)\s/)[0] ?? '';
+      out(`  ${file.replace(/\.yml$/, '').padEnd(28)} ${blurb}`);
+    }
+    return EXIT.OK;
+  }
 
   if (verb === 'lint') {
     const path = rest[0];
@@ -2204,6 +2249,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
     case '--version':
       out(VERSION);
       return EXIT.OK;
+    case 'new':
+      return cmdNew(rest);
     case 'scaffold':
       return cmdScaffold(rest);
     case 'doctor':
