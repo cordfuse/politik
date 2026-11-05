@@ -22,6 +22,9 @@ import { parseState, serializeState, type SessionStateFile } from './state.ts';
 import { bootstrapTemplate, pointerFiles, scaffoldTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
+import {
+  CONFIRMED_BY_SPEAKER, detectHarness, isSpeakerAtTerminal, provenanceTrailers, requestedVia,
+} from './operator.ts';
 import { runTurn } from './runner.ts';
 import { GitTransport } from './transport.ts';
 import { conflictEntry, detectRecordConflicts, openConflicts, resolveConflict } from './conflict.ts';
@@ -683,18 +686,30 @@ const logAct = async (dir: string, actor: string, role: Role, item: string): Pro
  * interrupt can never land between telling the operator "success" and the record
  * actually existing: every command writes, commits, then reports.
  */
+/**
+ * Provenance for the act in flight (ADR-0010 §3). Normally derived from this
+ * process; `politik confirm` overrides it so a staged act records who originally
+ * requested it and that the Speaker confirmed it.
+ */
+let actProvenance: { readonly via: string; readonly confirmedBy: string | null } | null = null;
+
+const currentProvenance = (): { readonly via: string; readonly confirmedBy: string | null } =>
+  actProvenance ?? { via: requestedVia(process.env, process.stdin.isTTY === true), confirmedBy: null };
+
 const commitAct = (
   dir: string,
   message: string,
   extra: readonly string[] = [],
-): Promise<CommitResult> =>
-  commitRecord(dir, message, [
+): Promise<CommitResult> => {
+  const { via, confirmedBy } = currentProvenance();
+  return commitRecord(dir, `${message}\n\n${provenanceTrailers(via, confirmedBy)}`, [
     'HANSARD.md',
     'STATE.json',
     'LEDGER.md',
     '.politik/LEDGER.md',
     ...extra,
   ]);
+};
 
 /** Print a commit's outcome. Call only AFTER the commit, as part of the report. */
 const reportCommit = (result: CommitResult): void => {

@@ -116,3 +116,52 @@ describe('politik protocol list', () => {
     for (const p of ['parliamentary', 'solo', 'republic']) assert.match(r.out, new RegExp(`\\b${p}\\b`));
   });
 });
+
+const gitOut = (dir: string, args: readonly string[]): Promise<string> =>
+  new Promise((resolve) => {
+    const child = spawn('git', args, { cwd: dir, stdio: ['ignore', 'pipe', 'ignore'] });
+    let out = '';
+    child.stdout.on('data', (c: Buffer) => { out += c.toString(); });
+    child.on('close', () => resolve(out.trim()));
+  });
+
+/** Scaffold + Writ Drop a quorum-1 session. Extra scaffold flags pass through. */
+const convene = async (dir: string, scaffoldExtra: readonly string[] = []): Promise<void> => {
+  const s = await runBin(['scaffold', '--dir', dir, '--quorum', '1', ...scaffoldExtra]);
+  assert.equal(s.code, 0, s.err);
+  const i = await runBin(['init', '--charter', join(dir, 'CHARTER.md'), '--speaker', 'steve', '--dir', dir]);
+  assert.equal(i.code, 0, i.err);
+};
+
+describe('provenance trailers (ADR-0010 §3)', () => {
+  it('detects the harness, preferring AI_AGENT', async () => {
+    const { detectHarness, requestedVia } = await import('../src/operator.ts');
+    assert.equal(detectHarness({ AI_AGENT: 'claude-code_2-1-283_agent', CLAUDECODE: '1' }), 'claude-code_2-1-283_agent');
+    assert.equal(detectHarness({ CLAUDECODE: '1' }), 'claude-code');
+    assert.equal(detectHarness({ OPENCODE_PID: '42' }), 'opencode');
+    assert.equal(detectHarness({ ANTIGRAVITY_CONVERSATION_ID: 'x' }), 'agy');
+    assert.equal(detectHarness({ HOME: '/home/x' }), null);
+    assert.equal(requestedVia({}, true), 'terminal');
+    assert.equal(requestedVia({}, false), 'script');
+  });
+
+  it('records which harness requested a governance act, leaving the subject intact', async () => {
+    await withTmp(async (dir) => {
+      await convene(dir);
+      const r = await runBin(['division', 'call', '--dir', dir, '--motion', 'm1', '--actor', 'steve', '--role', 'AUTHORITY'],
+        { AI_AGENT: 'claude-code_test_agent' });
+      assert.equal(r.code, 0, r.err);
+      const body = await gitOut(dir, ['log', '-1', '--format=%B']);
+      assert.match(body, /Politik-Requested-Via: claude-code_test_agent/);
+      assert.doesNotMatch(body.split('\n')[0] ?? '', /Politik-/, 'trailers stay out of the subject line');
+    });
+  });
+
+  it('says "script" when there is no terminal and no harness', async () => {
+    await withTmp(async (dir) => {
+      await convene(dir);
+      await runBin(['division', 'call', '--dir', dir, '--motion', 'm1', '--actor', 'steve', '--role', 'AUTHORITY']);
+      assert.match(await gitOut(dir, ['log', '-1', '--format=%B']), /Politik-Requested-Via: script/);
+    });
+  });
+});
