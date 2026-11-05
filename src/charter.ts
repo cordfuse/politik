@@ -81,6 +81,12 @@ export interface SessionBlock {
   readonly deadline: string | null;
   readonly merge_strategy: MergeStrategy;
   readonly assent: Role;
+  /**
+   * ADR-0010: whether assent, rule and prorogue requested by an AI harness or a
+   * script are staged for the Speaker's confirmation. Absent means 'off', so every
+   * session convened before ADR-0010 behaves exactly as it did.
+   */
+  readonly speaker_confirmation: 'required' | 'off';
   readonly endurance: Endurance;
 }
 
@@ -334,6 +340,7 @@ export const parseCharter = (source: string): ParseResult => {
       // rule and let a bad assent silently open a session (AUDIT #8).
       assent: session['assent'] === undefined ? 'AUTHORITY' : (session['assent'] as Role),
       stale_action: session['stale_action'] === 'dissolve' ? 'dissolve' : 'suspend',
+      speaker_confirmation: session['speaker_confirmation'] === 'required' ? 'required' : 'off',
       checkpoint_interval_hours: asNumberOrNull(session['checkpoint_interval_hours']),
       endurance: {
         max_motions: asNumberOrNull(endurance['max_motions']),

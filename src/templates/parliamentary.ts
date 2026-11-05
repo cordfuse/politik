@@ -32,6 +32,8 @@ export interface CharterTemplateOptions {
   readonly exit?: string;
   readonly termination?: string;
   readonly escalation?: string;
+  /** ADR-0010: stage constitutional acts for the Speaker's confirmation. */
+  readonly speaker_confirmation?: 'required' | 'off';
   /** Protocol name for the frontmatter. Defaults to parliamentary. */
   readonly protocol?: string;
 }
@@ -51,6 +53,7 @@ export const charterTemplate = (options: CharterTemplateOptions = {}): string =>
   const exit = options.exit ?? 'division';
   const termination = options.termination ?? 'objective';
   const escalation = options.escalation ?? 'enabled';
+  const speakerConfirmation = options.speaker_confirmation ?? 'required';
   const protocol = options.protocol ?? 'parliamentary';
 
   return `---
@@ -65,6 +68,8 @@ session:
   deadline: null                 # ISO-8601 wall-clock ceiling, or null
   merge_strategy: merge_commit   # squash is invalid under record_mode: distributed
   assent: AUTHORITY              # only the Speaker enacts a carried Motion
+  speaker_confirmation: ${speakerConfirmation}   # 'required' = assent/rule/prorogue requested by an AI
+                                 # harness or script wait for the Speaker to run politik confirm (ADR-0010)
 
   endurance:
     max_motions: null

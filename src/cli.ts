@@ -23,6 +23,11 @@ import { bootstrapTemplate, pointerFiles, scaffoldTemplates } from './templates/
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
 import {
+  isPendingId, listPending, readPending, removePending, stagePending, withDir,
+  type ConstitutionalAct,
+} from './pending.ts';
+import { createInterface } from 'node:readline/promises';
+import {
   CONFIRMED_BY_SPEAKER, detectHarness, isSpeakerAtTerminal, provenanceTrailers, requestedVia,
 } from './operator.ts';
 import { runTurn } from './runner.ts';
@@ -83,7 +88,11 @@ Usage
   politik version
   politik new <dir>                       # start here: folder + instructions for your AI harness
   politik scaffold [--dir <dir>] [--protocol parliamentary] [--quorum <n>] [--parent <dir>]
+                   [--speaker-confirmation required|off]
   politik doctor
+  politik pending [--dir <dir>] [--json]  # constitutional acts staged for the Speaker
+  politik confirm <id> [--dir <dir>]      # the Speaker, at a terminal: execute a staged act
+  politik reject <id> [--dir <dir>]       # discard a staged act
   politik protocol list                   # the shipped protocols
   politik protocol lint <manifest.yml>
   politik protocol new <name> [--mode <mode>] [--out <dir>]
@@ -172,7 +181,8 @@ const err = (line: string) => process.stderr.write(`${line}\n`);
 const badRole = (value: string | undefined): boolean => value !== undefined && !isRole(value);
 
 /** Exit codes: 0 success, 1 refusal (invalid input), 2 usage error. */
-const EXIT = { OK: 0, REFUSED: 1, USAGE: 2 } as const;
+/** PENDING (ADR-0010): the act was staged for the Speaker's confirmation, not recorded. */
+const EXIT = { OK: 0, REFUSED: 1, USAGE: 2, PENDING: 3 } as const;
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                     */
@@ -218,6 +228,7 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
       termination: { type: 'string' },
       escalation: { type: 'string' },
       parent: { type: 'string' },
+      'speaker-confirmation': { type: 'string' },
     },
   });
 
@@ -240,6 +251,11 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
     return EXIT.USAGE;
   }
 
+  const speakerConfirmation = values['speaker-confirmation'] ?? 'required';
+  if (speakerConfirmation !== 'required' && speakerConfirmation !== 'off') {
+    err('scaffold: --speaker-confirmation must be required | off');
+    return EXIT.USAGE;
+  }
   const quorum = values.quorum === undefined ? undefined : Number(values.quorum);
   if (quorum !== undefined && (!Number.isInteger(quorum) || quorum < 1)) {
     err('scaffold: --quorum must be an integer >= 1');
@@ -284,6 +300,7 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
     exit: values.exit ?? m.exit,
     termination: values.termination ?? m.termination,
     escalation: values.escalation ?? (manifest.protocol.no_escalation ? 'disabled' : 'enabled'),
+    speaker_confirmation: speakerConfirmation,
   });
   // Scaffold writes over same-named files (ADR-0010: it replaces the bootstrap
   // instructions `politik new` leaves). Say so, rather than doing it silently.
@@ -323,6 +340,149 @@ const cmdNew = async (argv: readonly string[]): Promise<number> => {
   out('');
   out(`Next: cd ${target} and open your AI harness (claude, codex, agy, opencode…).`);
   out('It will walk you through choosing a protocol, writing the Charter, and convening the session.');
+  return EXIT.OK;
+};
+
+
+/* -------------------------------------------------------------------------- */
+/* The Speaker's confirmation (ADR-0010 §2)                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Set only by `politik confirm`, in-process, after the Speaker has typed the act's
+ * id at a terminal. There is deliberately no flag or environment variable that
+ * sets it: a harness cannot pass its way past the gate.
+ */
+let speakerConfirmed = false;
+
+/** Read one line from the terminal. Only ever called when stdin is a TTY. */
+const askSpeaker = async (prompt: string): Promise<string> => {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try { return (await rl.question(prompt)).trim(); } finally { rl.close(); }
+};
+
+/**
+ * Gate a constitutional act. Returns null when it may proceed, or an exit code
+ * when it must not run now.
+ *
+ * Under `speaker_confirmation: required`: a person at a terminal (no harness
+ * detected) is asked inline; anything else — an AI harness, a script, a pipe — has
+ * the act staged for `politik confirm` and nothing reaches the record. A Charter
+ * without the setting (every pre-ADR-0010 session) is never gated.
+ */
+const awaitSpeaker = async (
+  act: ConstitutionalAct,
+  argv: readonly string[],
+  dir: string,
+  summary: string,
+): Promise<number | null> => {
+  if (speakerConfirmed) return null;
+  const charterRaw = await readIfPresent(join(dir, 'CHARTER.md'));
+  const parsed = charterRaw === null ? null : parseCharter(charterRaw);
+  if (parsed === null || !parsed.ok || parsed.charter.session.speaker_confirmation !== 'required') return null;
+
+  const interactive = process.stdin.isTTY === true;
+  if (isSpeakerAtTerminal(process.env, interactive)) {
+    out(`Constitutional act — this will be permanently recorded in the Hansard:`);
+    out(`  ${summary}`);
+    const typed = await askSpeaker(`Type "${act}" to confirm: `);
+    if (typed === act) return null;
+    err('Not confirmed — nothing was recorded.');
+    return EXIT.REFUSED;
+  }
+
+  const sessionDir = resolve(dir);
+  const pending = await stagePending(sessionDir, {
+    act,
+    argv: withDir(argv, sessionDir),
+    summary,
+    requested_via: requestedVia(process.env, interactive),
+    requested_at: nowStamp(),
+  });
+  out(`STAGED — ${summary}`);
+  out(`  pending act: ${pending.id}`);
+  out('  Nothing is recorded yet. This is the Speaker\'s decision: they confirm it in');
+  out('  their own terminal (not through an AI harness):');
+  out(`    politik confirm ${pending.id}${dir === '.' ? '' : ` --dir ${dir}`}`);
+  out(`  To discard it instead: politik reject ${pending.id}${dir === '.' ? '' : ` --dir ${dir}`}`);
+  return EXIT.PENDING;
+};
+
+/** `politik pending [--dir] [--json]` — staged acts awaiting the Speaker. */
+const cmdPending = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' }, json: { type: 'boolean' } } });
+  const acts = await listPending(resolve(values.dir ?? '.'));
+  if (values.json === true) { out(JSON.stringify(acts, null, 2)); return EXIT.OK; }
+  if (acts.length === 0) { out('No pending acts.'); return EXIT.OK; }
+  out(`PENDING ACTS (${acts.length}) — confirm each with: politik confirm <id>`);
+  for (const a of acts) {
+    out(`  ${a.id}   ${a.summary}`);
+    out(`    requested via ${a.requested_via} at ${a.requested_at}`);
+  }
+  return EXIT.OK;
+};
+
+/**
+ * `politik confirm <id>` — the Speaker executes a staged act.
+ *
+ * Refuses without a terminal or under a detected harness, shows exactly what will
+ * run, and requires the act's id to be typed back. Only then is the act replayed
+ * and committed, with provenance naming who requested it and that the Speaker
+ * confirmed it.
+ */
+const cmdConfirm = async (argv: readonly string[]): Promise<number> => {
+  const { values, positionals } = parseArgs({
+    args: [...argv], options: { dir: { type: 'string' } }, allowPositionals: true,
+  });
+  const id = positionals[0];
+  if (id === undefined || !isPendingId(id)) { err('confirm: a pending act id is required — see: politik pending'); return EXIT.USAGE; }
+
+  const harness = detectHarness(process.env);
+  if (!isSpeakerAtTerminal(process.env, process.stdin.isTTY === true)) {
+    err(`confirm: refused — this must be run by the Speaker at a terminal, not by ${harness ?? 'a script or pipe'}.`);
+    err(`  Open your own terminal and run: politik confirm ${id}${values.dir === undefined ? '' : ` --dir ${values.dir}`}`);
+    return EXIT.REFUSED;
+  }
+
+  const sessionDir = resolve(values.dir ?? '.');
+  const pending = await readPending(sessionDir, id);
+  if (pending === null) { err(`confirm: no pending act ${id} in ${sessionDir}`); return EXIT.USAGE; }
+
+  out(`Constitutional act — this will be permanently recorded in the Hansard:`);
+  out(`  ${pending.summary}`);
+  out(`  command:       politik ${pending.act} ${pending.argv.join(' ')}`);
+  out(`  requested via: ${pending.requested_via} at ${pending.requested_at}`);
+  const typed = await askSpeaker(`Type ${id} to confirm: `);
+  if (typed !== id) { err('Not confirmed — nothing was recorded. The act is still pending.'); return EXIT.REFUSED; }
+
+  speakerConfirmed = true;
+  actProvenance = { via: pending.requested_via, confirmedBy: CONFIRMED_BY_SPEAKER };
+  try {
+    const code = await run([pending.act, ...pending.argv]);
+    if (code === EXIT.OK) {
+      await removePending(sessionDir, id);
+      out(`CONFIRMED — ${id}`);
+    } else {
+      err(`confirm: the act did not complete — ${id} is still pending (discard it with: politik reject ${id})`);
+    }
+    return code;
+  } finally {
+    speakerConfirmed = false;
+    actProvenance = null;
+  }
+};
+
+/** `politik reject <id>` — discard a staged act. Nothing was recorded, so nothing is. */
+const cmdReject = async (argv: readonly string[]): Promise<number> => {
+  const { values, positionals } = parseArgs({
+    args: [...argv], options: { dir: { type: 'string' } }, allowPositionals: true,
+  });
+  const id = positionals[0];
+  if (id === undefined || !isPendingId(id)) { err('reject: a pending act id is required — see: politik pending'); return EXIT.USAGE; }
+  const sessionDir = resolve(values.dir ?? '.');
+  if ((await readPending(sessionDir, id)) === null) { err(`reject: no pending act ${id} in ${sessionDir}`); return EXIT.USAGE; }
+  await removePending(sessionDir, id);
+  out(`REJECTED — ${id} discarded; nothing was recorded`);
   return EXIT.OK;
 };
 
@@ -950,6 +1110,9 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
   if (values.motion === undefined || values.actor === undefined) {
     err('assent: --motion and --actor are required'); return EXIT.USAGE;
   }
+  const gated = await awaitSpeaker('assent', argv, dir,
+    `Assent to motion "${values.motion}" as ${values.actor} — enact it`);
+  if (gated !== null) return gated;
 
   try {
     const outcome = tallyDivision(hansard, values.motion, charter.session.quorum);
@@ -1430,6 +1593,9 @@ const cmdRule = async (argv: readonly string[]): Promise<number> => {
     return EXIT.USAGE;
   }
   if (badRole(values.role)) { err(`rule: "${values.role}" is not a CANON role`); return EXIT.USAGE; }
+  const gated = await awaitSpeaker('rule', argv, dir,
+    `Rule ${(values.outcome ?? 'UPHELD').toUpperCase()} on point of order #${values.seq ?? '1'} as ${values.actor}: "${values.body}"`);
+  if (gated !== null) return gated;
 
   const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
 
@@ -1914,6 +2080,9 @@ const cmdProrogue = async (argv: readonly string[]): Promise<number> => {
     err(`prorogue: no readable STATE.json in ${dir}`);
     return EXIT.USAGE;
   }
+  const gated = await awaitSpeaker('prorogue', argv, dir,
+    `Prorogue the session as ${values.actor} (trigger: ${values.trigger ?? 'TRIGGER_SPEAKER'}) — seal the Hansard`);
+  if (gated !== null) return gated;
 
   const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
   const trigger = (values.trigger ?? 'TRIGGER_SPEAKER') as Trigger;
@@ -2266,6 +2435,12 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return EXIT.OK;
     case 'new':
       return cmdNew(rest);
+    case 'pending':
+      return cmdPending(rest);
+    case 'confirm':
+      return cmdConfirm(rest);
+    case 'reject':
+      return cmdReject(rest);
     case 'scaffold':
       return cmdScaffold(rest);
     case 'doctor':

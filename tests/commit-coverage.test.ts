@@ -43,7 +43,8 @@ describe('a governance act leaves nothing uncommitted', () => {
   it('commits the files the Hansard cites (escalation, ruling, seal)', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'politik-commit-'));
     try {
-      await run(['scaffold', '--dir', dir, '--quorum', '1']);
+      // Scripted acts below; the Speaker-confirmation gate (ADR-0010) is covered in operator-interface.test.ts.
+      await run(['scaffold', '--dir', dir, '--quorum', '1', '--speaker-confirmation', 'off']);
       await run(['init', '--charter', join(dir, 'CHARTER.md'), '--speaker', 'steve', '--dir', dir]);
       assert.equal(await porcelain(dir), '', 'writ drop should leave a clean tree');
 

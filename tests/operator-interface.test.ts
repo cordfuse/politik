@@ -165,3 +165,157 @@ describe('provenance trailers (ADR-0010 §3)', () => {
     });
   });
 });
+
+/** Carry motion m1 in a convened quorum-1 session, ready for assent. */
+const carryMotion = async (dir: string): Promise<void> => {
+  for (const args of [
+    ['division', 'call', '--dir', dir, '--motion', 'm1', '--actor', 'steve', '--role', 'AUTHORITY'],
+    ['division', 'vote', '--dir', dir, '--motion', 'm1', '--actor', 'ada', '--role', 'MEMBER', '--vote', 'AYE'],
+    ['division', 'tally', '--dir', dir, '--motion', 'm1'],
+  ]) {
+    const r = await runBin(args);
+    assert.equal(r.code, 0, `${args.join(' ')}: ${r.err}`);
+  }
+};
+
+const ASSENT = (dir: string) => ['assent', '--dir', dir, '--motion', 'm1', '--actor', 'steve', '--role', 'AUTHORITY'];
+const HARNESS = { AI_AGENT: 'claude-code_test_agent' };
+
+const pendingIds = async (dir: string): Promise<string[]> => {
+  const r = await runBin(['pending', '--dir', dir, '--json']);
+  return (JSON.parse(r.out) as Array<{ id: string }>).map((p) => p.id);
+};
+
+/** Run a command under a pseudo-terminal (util-linux `script`), typing `input`. */
+const runInTerminal = (args: readonly string[], input: string): Promise<Result> =>
+  new Promise((resolve) => {
+    const cmd = ['node', BIN, ...args].map((a) => `'${a.replace(/'/g, `'\\''`)}'`).join(' ');
+    const child = spawn('script', ['-qec', cmd, '/dev/null'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { PATH: process.env['PATH'], HOME: process.env['HOME'] },
+    });
+    let out = '';
+    child.stdout.on('data', (c: Buffer) => { out += c.toString(); });
+    child.stdin.end(`${input}\n`);
+    child.on('close', (code) => resolve({ code: code ?? -1, out, err: '' }));
+  });
+
+/** util-linux `script` provides the pseudo-terminal; skip the terminal test without it. */
+const onPath = (bin: string): boolean =>
+  (process.env['PATH'] ?? '').split(':').some((p) => existsSync(join(p, bin)));
+const hasScript = onPath('script');
+
+describe('the Speaker\'s confirmation — pending acts (ADR-0010 §2)', () => {
+  it('stages a constitutional act requested by a harness: exit 3, nothing recorded, tree clean', async () => {
+    await withTmp(async (dir) => {
+      await convene(dir);
+      await carryMotion(dir);
+      const before = await gitOut(dir, ['rev-parse', 'HEAD']);
+      const r = await runBin(ASSENT(dir), HARNESS);
+      assert.equal(r.code, 3, r.err);
+      assert.match(r.out, /STAGED — Assent to motion "m1"/);
+      assert.match(r.out, /politik confirm assent-[0-9a-f]{6}/);
+      assert.equal(await gitOut(dir, ['rev-parse', 'HEAD']), before, 'no commit');
+      assert.equal(await gitOut(dir, ['status', '--porcelain']), '', 'staging leaves the tree clean');
+      assert.doesNotMatch(await readFile(join(dir, 'HANSARD.md'), 'utf8'), /ASSENT_GRANTED/);
+      const listed = await runBin(['pending', '--dir', dir, '--json']);
+      const acts = JSON.parse(listed.out) as Array<{ act: string; requested_via: string }>;
+      assert.equal(acts.length, 1);
+      assert.equal(acts[0]?.act, 'assent');
+      assert.equal(acts[0]?.requested_via, 'claude-code_test_agent');
+    });
+  });
+
+  it('stages a scripted request too (no terminal, no harness)', async () => {
+    await withTmp(async (dir) => {
+      await convene(dir);
+      await carryMotion(dir);
+      const r = await runBin(ASSENT(dir));
+      assert.equal(r.code, 3);
+    });
+  });
+
+  it('gates rule and prorogue as well', async () => {
+    await withTmp(async (dir) => {
+      await convene(dir);
+      const rule = await runBin(['rule', '--dir', dir, '--actor', 'steve', '--outcome', 'UPHELD', '--body', 'sustained'], HARNESS);
+      assert.equal(rule.code, 3, rule.err);
+      const pro = await runBin(['prorogue', '--dir', dir, '--actor', 'steve', '--role', 'AUTHORITY', '--trigger', 'objective_met'], HARNESS);
+      assert.equal(pro.code, 3, pro.err);
+      assert.equal((await pendingIds(dir)).length, 2);
+    });
+  });
+
+  it('does not gate a session whose Charter turns it off, or a pre-ADR-0010 Charter', async () => {
+    await withTmp(async (dir) => {
+      await convene(dir, ['--speaker-confirmation', 'off']);
+      await carryMotion(dir);
+      const r = await runBin(ASSENT(dir), HARNESS);
+      assert.equal(r.code, 0, r.err);
+      assert.match(await gitOut(dir, ['log', '-1', '--format=%B']), /ASSENT_GRANTED[\s\S]*Politik-Requested-Via: claude-code_test_agent/);
+    });
+  });
+
+  it('confirm refuses under a harness and without a terminal — the act stays pending', async () => {
+    await withTmp(async (dir) => {
+      await convene(dir);
+      await carryMotion(dir);
+      await runBin(ASSENT(dir), HARNESS);
+      const [id] = await pendingIds(dir);
+      assert.ok(id !== undefined);
+      const viaHarness = await runBin(['confirm', id, '--dir', dir], HARNESS);
+      assert.equal(viaHarness.code, 1);
+      assert.match(viaHarness.err, /must be run by the Speaker at a terminal, not by claude-code_test_agent/);
+      const viaScript = await runBin(['confirm', id, '--dir', dir]);
+      assert.equal(viaScript.code, 1);
+      assert.match(viaScript.err, /not by a script or pipe/);
+      assert.deepEqual(await pendingIds(dir), [id]);
+      assert.doesNotMatch(await readFile(join(dir, 'HANSARD.md'), 'utf8'), /ASSENT_GRANTED/);
+    });
+  });
+
+  it('reject discards a staged act and records nothing', async () => {
+    await withTmp(async (dir) => {
+      await convene(dir);
+      await carryMotion(dir);
+      await runBin(ASSENT(dir), HARNESS);
+      const [id] = await pendingIds(dir);
+      const before = await gitOut(dir, ['rev-parse', 'HEAD']);
+      const r = await runBin(['reject', id ?? '', '--dir', dir], HARNESS);
+      assert.equal(r.code, 0, r.err);
+      assert.deepEqual(await pendingIds(dir), []);
+      assert.equal(await gitOut(dir, ['rev-parse', 'HEAD']), before);
+    });
+  });
+
+  it('rejects malformed ids rather than touching arbitrary paths', async () => {
+    await withTmp(async (dir) => {
+      await convene(dir);
+      assert.equal((await runBin(['reject', '../../etc/passwd', '--dir', dir])).code, 2);
+      assert.equal((await runBin(['confirm', '../x', '--dir', dir])).code, 2);
+    });
+  });
+
+  it('the Speaker confirms at a terminal by typing the id: recorded with full provenance', { skip: !hasScript }, async () => {
+    await withTmp(async (dir) => {
+      await convene(dir);
+      await carryMotion(dir);
+      await runBin(ASSENT(dir), HARNESS);
+      const [id] = await pendingIds(dir);
+      assert.ok(id !== undefined);
+
+      const wrong = await runInTerminal(['confirm', id, '--dir', dir], 'yes');
+      assert.match(wrong.out, /Not confirmed/);
+      assert.deepEqual(await pendingIds(dir), [id], 'a wrong answer leaves it pending');
+
+      const ok = await runInTerminal(['confirm', id, '--dir', dir], id);
+      assert.match(ok.out, /CONFIRMED/);
+      assert.deepEqual(await pendingIds(dir), []);
+      const body = await gitOut(dir, ['log', '-1', '--format=%B']);
+      assert.match(body, /^ASSENT_GRANTED/);
+      assert.match(body, /Politik-Requested-Via: claude-code_test_agent/);
+      assert.match(body, /Politik-Confirmed-By: speaker-at-terminal/);
+      assert.equal(await gitOut(dir, ['status', '--porcelain']), '');
+    });
+  });
+});

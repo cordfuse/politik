@@ -129,7 +129,7 @@ export const initSessionRepo = async (
     // Speaker without rewriting the parent repo's config. Exclude `*.tmp` — an
     // atomic write interrupted mid-flight can orphan one, and it must never enter
     // the record.
-    await git(dir, ['add', '.', ':(exclude)*.tmp'], spawnFn);
+    await git(dir, ['add', '.', ':(exclude)*.tmp', ':(exclude).politik/pending'], spawnFn);
     const commit = await git(
       dir,
       ['-c', `user.name=${speaker}`, '-c', `user.email=${speaker}@politik.local`,
@@ -151,7 +151,7 @@ export const initSessionRepo = async (
   }
   await git(dir, ['config', 'user.name', speaker], spawnFn);
   await git(dir, ['config', 'user.email', `${speaker}@politik.local`], spawnFn);
-  await git(dir, ['add', '-A', '.', ':(exclude)*.tmp'], spawnFn);
+  await git(dir, ['add', '-A', '.', ':(exclude)*.tmp', ':(exclude).politik/pending'], spawnFn);
   const commit = await git(dir, ['commit', '-m', `writ drop: session ${guid}`], spawnFn);
   if (commit.code !== 0) return { committed: false, sha: null, reason: 'repo initialized, nothing to commit' };
   const sha = await git(dir, ['rev-parse', 'HEAD'], spawnFn);
