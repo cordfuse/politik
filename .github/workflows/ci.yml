@@ -87,7 +87,9 @@ jobs:
           git config user.email ci@example.com && git config user.name CI
 
           politik doctor || true
-          politik scaffold --out . --quorum 2
+          # A scripted session: CI has no terminal, so opt out of the Speaker's
+          # confirmation (ADR-0010). The gate itself is checked further down.
+          politik scaffold --out . --quorum 2 --speaker-confirmation off
           politik validate CHARTER.md
           # `politik init` commits the writ drop itself — standalone (git init)
           # or, as here where the dir is already a repo, into the enclosing repo
@@ -100,6 +102,21 @@ jobs:
           politik division tally --motion motion-001 --actor ci --role AUTHORITY
           politik assent --motion motion-001 --actor ci --role AUTHORITY
           politik status --dir .
+
+          # ADR-0010 from an installed package: a default session stages an
+          # assent requested without a terminal (exit 3) and records nothing.
+          cd /tmp/clean
+          politik new gated && cd gated
+          git init -q . && git config user.email ci@example.com && git config user.name CI
+          politik scaffold --dir . --quorum 1 >/dev/null
+          politik init --charter CHARTER.md --speaker ci >/dev/null
+          politik division call --motion m1 --actor ci --role AUTHORITY >/dev/null
+          politik division vote --motion m1 --actor a --role MEMBER --vote AYE >/dev/null
+          politik division tally --motion m1 >/dev/null
+          set +e; politik assent --motion m1 --actor ci --role AUTHORITY; code=$?; set -e
+          test "$code" -eq 3
+          politik pending | grep -q 'assent-'
+          if grep -q ASSENT_GRANTED HANSARD.md; then echo 'staged assent was recorded'; exit 1; fi
 
           # The protocol library must be reachable from an installed package.
           politik protocol lint /tmp/clean/node_modules/@cordfuse/politik/protocols/parliamentary.yml
