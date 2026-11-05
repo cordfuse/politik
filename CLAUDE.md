@@ -14,8 +14,10 @@ framework runs, governs, and has been exercised live — Motions tabled by real
 agents, carried by Division, enacted by Assent, a simulated constitutional
 collapse. Protocols now genuinely **behave** differently (one shared engine,
 composable mechanics — ADR-0007) and **read** differently (vocabulary display).
-~35 modules, 671 tests, CI green. Every command, all 11 protocols, the agent
+~38 modules, 758 tests, CI green. Every command, all 11 protocols, the agent
 turn (`run`), and live SCM projection have been dogfooded end to end.
+**Released: v0.4.0 (2026-11-05)** — npm `@cordfuse/politik@0.4.0`, Zenodo
+10.5281/zenodo.23990434 (concept DOI 10.5281/zenodo.19490358).
 
 Architecture decisions are in [`docs/adr/`](docs/adr/). ADR-0001 (transport),
 ADR-0002 (CHARTER.md schema), ADR-0003 (STATE.json schema), ADR-0004 (motion
@@ -42,6 +44,38 @@ is now closed; the remaining entries are documentation history.
 
 Phase 1's only remaining item is the arXiv preprint. Phase 8 (public launch) has
 not started.
+
+## Where we left off (2026-11-05)
+
+**v0.4.0 shipped — the operator interface and shared sessions.** Designed in a
+cortex session (Nov 4–5), built and released the same day. PRs #33, #34, #35.
+
+- **ADR-0010 — bring your own harness (#34).** The Speaker opens their own AI
+  harness in the session folder (`politik new <dir>` writes the bootstrap
+  `AGENTS.md`). `assent`/`rule`/`prorogue` requested by a harness or a script are
+  **staged** (exit 3) under `speaker_confirmation: required` — the default for new
+  scaffolds; pre-ADR Charters are never gated — and only `politik confirm <id>`,
+  typed back at a real terminal, enacts them. Provenance trailers on every commit;
+  instruction files sealed at Writ Drop. Modules: `src/operator.ts`,
+  `src/pending.ts`.
+- **ADR-0011 — shared sessions (#35).** `politik remote`/`join`/`sync`; every act
+  fetches, fast-forwards, acts, pushes, and recomputes if another machine acted
+  first (3 attempts; `run` not retried). Offline governance refuses. Pending acts
+  travel as `refs/politik/pending/<guid>/<id>`; only the named seat confirms;
+  optional `signed_confirmations`. Module: `src/remote.ts`.
+- **#33 — first outside contribution** (Opensiro, which assessed Politik for its
+  agent-harness index): containment no longer mistakes `..cache/` for traversal.
+- **Scripted sessions must scaffold with `--speaker-confirmation off`** — CI smoke
+  and two tests do. Forgetting it is the first thing to check when a script's
+  `assent` exits 3.
+- **Release mechanics learned:** a tag push publishes to npm via `release.yml`; the
+  org `NPM_TOKEN` had expired (E404 on publish) and was rotated — direct token
+  publishing ends Jan 2027, migrate to npm Trusted Publishing (librarian TODO.md).
+  Zenodo's GitHub integration failed again; v0.4.0 was deposited by hand with
+  `zenodo-newversion` (librarian ZENODO.md).
+- **Open:** `--json`/`--dry-run` beyond `status`/`pending`; a dashboard TUI for
+  non-developer Speakers; OS-level enforcement against a hostile agent with the
+  operator's shell (ADR-0010 threat model).
 
 ## Where we left off (2026-08-10)
 
