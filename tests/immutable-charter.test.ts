@@ -32,7 +32,8 @@ const run = (args: readonly string[]): Promise<number> =>
   });
 
 const convene = async (dir: string, protocol: string): Promise<void> => {
-  await run(['scaffold', '--dir', dir, '--protocol', protocol, '--quorum', '2']);
+  // Scripted acts below; the Speaker-confirmation gate (ADR-0010) is covered in operator-interface.test.ts.
+  await run(['scaffold', '--dir', dir, '--protocol', protocol, '--quorum', '2', '--speaker-confirmation', 'off']);
   await run(['init', '--charter', join(dir, 'CHARTER.md'), '--speaker', 'steve', '--dir', dir]);
 };
 

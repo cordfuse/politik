@@ -8,20 +8,28 @@
  * Attribution: Steve Krisjanovs, Cordfuse
  */
 
-import { readFileSync } from 'node:fs';
-import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
+import { existsSync, readFileSync } from 'node:fs';
+import { readFile, readdir, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { isRole, type Role } from './canon.ts';
-import { charterFingerprint, parseCharter, validateCharter } from './charter.ts';
+import { charterFingerprint, instructionsFingerprint, parseCharter, validateCharter } from './charter.ts';
 import { dropWrit } from './init.ts';
 import { initSessionRepo } from './git.ts';
 import { parseState, serializeState, type SessionStateFile } from './state.ts';
-import { scaffoldTemplates } from './templates/parliamentary.ts';
+import { INSTRUCTION_FILES, bootstrapTemplate, pointerFiles, scaffoldTemplates } from './templates/parliamentary.ts';
 import { generateProtocol, lintSource } from './protocol-sdk.ts';
 import { diagnose } from './doctor.ts';
+import {
+  isPendingId, listPending, readPending, removePending, stagePending, withDir,
+  type ConstitutionalAct,
+} from './pending.ts';
+import { createInterface } from 'node:readline/promises';
+import {
+  CONFIRMED_BY_SPEAKER, detectHarness, isSpeakerAtTerminal, provenanceTrailers, requestedVia,
+} from './operator.ts';
 import { runTurn } from './runner.ts';
 import { GitTransport } from './transport.ts';
 import { conflictEntry, detectRecordConflicts, openConflicts, resolveConflict } from './conflict.ts';
@@ -78,8 +86,14 @@ const USAGE = `politik — governed multi-agent sessions on git
 
 Usage
   politik version
-  politik scaffold --dir <dir> [--protocol parliamentary] [--quorum <n>] [--parent <dir>]
+  politik new <dir>                       # start here: folder + instructions for your AI harness
+  politik scaffold [--dir <dir>] [--protocol parliamentary] [--quorum <n>] [--parent <dir>]
+                   [--speaker-confirmation required|off]
   politik doctor
+  politik pending [--dir <dir>] [--json]  # constitutional acts staged for the Speaker
+  politik confirm <id> [--dir <dir>]      # the Speaker, at a terminal: execute a staged act
+  politik reject <id> [--dir <dir>]       # discard a staged act
+  politik protocol list                   # the shipped protocols
   politik protocol lint <manifest.yml>
   politik protocol new <name> [--mode <mode>] [--out <dir>]
   politik validate <charter.md> [--protocol <name>]
@@ -108,10 +122,10 @@ Usage
   politik broadcast --target <ROLE> --slots <n> --task <text> [--dir <dir>]
   politik motion link --motion <id> --pr <n> [--url <u>]
   politik ledger [--dir <dir>]
-  politik status [--dir <dir>]
+  politik status [--dir <dir>] [--json]
   politik hansard [--dir <dir>]           # the record, in the protocol's vocabulary
   politik integrity [--dir <dir>]         # scan the record for bad-faith patterns
-  politik prorogue --dir <dir> --actor <handle> --role <ROLE> --trigger <TRIGGER>
+  politik prorogue [--dir <dir>] --actor <handle> --role <ROLE> --trigger <TRIGGER>
   politik standings [--dir <dir>] [--by win-loss|survival]   # score a competitive protocol
   politik pair --format swiss|round-robin|single-elim [--dir <dir>]   # pair the next round of MATCHes
   politik match report --match <id> --winner <contestant> [--actor <referee>]
@@ -167,7 +181,8 @@ const err = (line: string) => process.stderr.write(`${line}\n`);
 const badRole = (value: string | undefined): boolean => value !== undefined && !isRole(value);
 
 /** Exit codes: 0 success, 1 refusal (invalid input), 2 usage error. */
-const EXIT = { OK: 0, REFUSED: 1, USAGE: 2 } as const;
+/** PENDING (ADR-0010): the act was staged for the Speaker's confirmation, not recorded. */
+const EXIT = { OK: 0, REFUSED: 1, USAGE: 2, PENDING: 3 } as const;
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                     */
@@ -213,6 +228,7 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
       termination: { type: 'string' },
       escalation: { type: 'string' },
       parent: { type: 'string' },
+      'speaker-confirmation': { type: 'string' },
     },
   });
 
@@ -235,6 +251,11 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
     return EXIT.USAGE;
   }
 
+  const speakerConfirmation = values['speaker-confirmation'] ?? 'required';
+  if (speakerConfirmation !== 'required' && speakerConfirmation !== 'off') {
+    err('scaffold: --speaker-confirmation must be required | off');
+    return EXIT.USAGE;
+  }
   const quorum = values.quorum === undefined ? undefined : Number(values.quorum);
   if (quorum !== undefined && (!Number.isInteger(quorum) || quorum < 1)) {
     err('scaffold: --quorum must be an integer >= 1');
@@ -279,13 +300,189 @@ const cmdScaffold = async (argv: readonly string[]): Promise<number> => {
     exit: values.exit ?? m.exit,
     termination: values.termination ?? m.termination,
     escalation: values.escalation ?? (manifest.protocol.no_escalation ? 'disabled' : 'enabled'),
+    speaker_confirmation: speakerConfirmation,
   });
+  // Scaffold writes over same-named files (ADR-0010: it replaces the bootstrap
+  // instructions `politik new` leaves). Say so, rather than doing it silently.
+  const replaced = new Set(files.filter((f) => existsSync(join(dir, f.path))).map((f) => f.path));
   await writeFiles(dir, files);
 
   out(`SCAFFOLDED ${protocol}`);
-  for (const file of files) out(`  ${file.path}`);
+  for (const file of files) out(`  ${file.path}${replaced.has(file.path) ? '   (replaced existing file)' : ''}`);
   out('');
   out(`Edit the Standing Orders, then: politik init --charter ${join(dir, 'CHARTER.md')} --speaker <handle>`);
+  return EXIT.OK;
+};
+
+/**
+ * `politik new <dir>` — the operator's front door (ADR-0010 §1).
+ *
+ * Creates the folder and writes bootstrap instructions for whichever harness the
+ * operator opens there; the harness runs first-time setup as a conversation and
+ * calls `scaffold` and `init` itself. Deliberately does almost nothing: protocol,
+ * quorum and seats are decided in that conversation, not by flags here.
+ */
+const cmdNew = async (argv: readonly string[]): Promise<number> => {
+  const target = argv[0];
+  if (target === undefined || target.startsWith('-')) {
+    err('new: a folder name is required — politik new <dir>');
+    return EXIT.USAGE;
+  }
+  if (existsSync(target) && (await readdir(target)).length > 0) {
+    err(`new: ${target} already exists and is not empty. To set up a session in an existing folder, run: politik scaffold --dir ${target}`);
+    return EXIT.REFUSED;
+  }
+  const files = [{ path: 'AGENTS.md', content: bootstrapTemplate() }, ...pointerFiles()];
+  await writeFiles(target, files);
+
+  out(`NEW SESSION FOLDER ${target}`);
+  for (const file of files) out(`  ${file.path}`);
+  out('');
+  out(`Next: cd ${target} and open your AI harness (claude, codex, agy, opencode…).`);
+  out('It will walk you through choosing a protocol, writing the Charter, and convening the session.');
+  return EXIT.OK;
+};
+
+
+/* -------------------------------------------------------------------------- */
+/* The Speaker's confirmation (ADR-0010 §2)                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Set only by `politik confirm`, in-process, after the Speaker has typed the act's
+ * id at a terminal. There is deliberately no flag or environment variable that
+ * sets it: a harness cannot pass its way past the gate.
+ */
+let speakerConfirmed = false;
+
+/** Read one line from the terminal. Only ever called when stdin is a TTY. */
+const askSpeaker = async (prompt: string): Promise<string> => {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try { return (await rl.question(prompt)).trim(); } finally { rl.close(); }
+};
+
+/**
+ * Gate a constitutional act. Returns null when it may proceed, or an exit code
+ * when it must not run now.
+ *
+ * Under `speaker_confirmation: required`: a person at a terminal (no harness
+ * detected) is asked inline; anything else — an AI harness, a script, a pipe — has
+ * the act staged for `politik confirm` and nothing reaches the record. A Charter
+ * without the setting (every pre-ADR-0010 session) is never gated.
+ */
+const awaitSpeaker = async (
+  act: ConstitutionalAct,
+  argv: readonly string[],
+  dir: string,
+  summary: string,
+): Promise<number | null> => {
+  if (speakerConfirmed) return null;
+  const charterRaw = await readIfPresent(join(dir, 'CHARTER.md'));
+  const parsed = charterRaw === null ? null : parseCharter(charterRaw);
+  if (parsed === null || !parsed.ok || parsed.charter.session.speaker_confirmation !== 'required') return null;
+
+  const interactive = process.stdin.isTTY === true;
+  if (isSpeakerAtTerminal(process.env, interactive)) {
+    out(`Constitutional act — this will be permanently recorded in the Hansard:`);
+    out(`  ${summary}`);
+    const typed = await askSpeaker(`Type "${act}" to confirm: `);
+    if (typed === act) return null;
+    err('Not confirmed — nothing was recorded.');
+    return EXIT.REFUSED;
+  }
+
+  const sessionDir = resolve(dir);
+  const pending = await stagePending(sessionDir, {
+    act,
+    argv: withDir(argv, sessionDir),
+    summary,
+    requested_via: requestedVia(process.env, interactive),
+    requested_at: nowStamp(),
+  });
+  out(`STAGED — ${summary}`);
+  out(`  pending act: ${pending.id}`);
+  out('  Nothing is recorded yet. This is the Speaker\'s decision: they confirm it in');
+  out('  their own terminal (not through an AI harness):');
+  out(`    politik confirm ${pending.id}${dir === '.' ? '' : ` --dir ${dir}`}`);
+  out(`  To discard it instead: politik reject ${pending.id}${dir === '.' ? '' : ` --dir ${dir}`}`);
+  return EXIT.PENDING;
+};
+
+/** `politik pending [--dir] [--json]` — staged acts awaiting the Speaker. */
+const cmdPending = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' }, json: { type: 'boolean' } } });
+  const acts = await listPending(resolve(values.dir ?? '.'));
+  if (values.json === true) { out(JSON.stringify(acts, null, 2)); return EXIT.OK; }
+  if (acts.length === 0) { out('No pending acts.'); return EXIT.OK; }
+  out(`PENDING ACTS (${acts.length}) — confirm each with: politik confirm <id>`);
+  for (const a of acts) {
+    out(`  ${a.id}   ${a.summary}`);
+    out(`    requested via ${a.requested_via} at ${a.requested_at}`);
+  }
+  return EXIT.OK;
+};
+
+/**
+ * `politik confirm <id>` — the Speaker executes a staged act.
+ *
+ * Refuses without a terminal or under a detected harness, shows exactly what will
+ * run, and requires the act's id to be typed back. Only then is the act replayed
+ * and committed, with provenance naming who requested it and that the Speaker
+ * confirmed it.
+ */
+const cmdConfirm = async (argv: readonly string[]): Promise<number> => {
+  const { values, positionals } = parseArgs({
+    args: [...argv], options: { dir: { type: 'string' } }, allowPositionals: true,
+  });
+  const id = positionals[0];
+  if (id === undefined || !isPendingId(id)) { err('confirm: a pending act id is required — see: politik pending'); return EXIT.USAGE; }
+
+  const harness = detectHarness(process.env);
+  if (!isSpeakerAtTerminal(process.env, process.stdin.isTTY === true)) {
+    err(`confirm: refused — this must be run by the Speaker at a terminal, not by ${harness ?? 'a script or pipe'}.`);
+    err(`  Open your own terminal and run: politik confirm ${id}${values.dir === undefined ? '' : ` --dir ${values.dir}`}`);
+    return EXIT.REFUSED;
+  }
+
+  const sessionDir = resolve(values.dir ?? '.');
+  const pending = await readPending(sessionDir, id);
+  if (pending === null) { err(`confirm: no pending act ${id} in ${sessionDir}`); return EXIT.USAGE; }
+
+  out(`Constitutional act — this will be permanently recorded in the Hansard:`);
+  out(`  ${pending.summary}`);
+  out(`  command:       politik ${pending.act} ${pending.argv.join(' ')}`);
+  out(`  requested via: ${pending.requested_via} at ${pending.requested_at}`);
+  const typed = await askSpeaker(`Type ${id} to confirm: `);
+  if (typed !== id) { err('Not confirmed — nothing was recorded. The act is still pending.'); return EXIT.REFUSED; }
+
+  speakerConfirmed = true;
+  actProvenance = { via: pending.requested_via, confirmedBy: CONFIRMED_BY_SPEAKER };
+  try {
+    const code = await run([pending.act, ...pending.argv]);
+    if (code === EXIT.OK) {
+      await removePending(sessionDir, id);
+      out(`CONFIRMED — ${id}`);
+    } else {
+      err(`confirm: the act did not complete — ${id} is still pending (discard it with: politik reject ${id})`);
+    }
+    return code;
+  } finally {
+    speakerConfirmed = false;
+    actProvenance = null;
+  }
+};
+
+/** `politik reject <id>` — discard a staged act. Nothing was recorded, so nothing is. */
+const cmdReject = async (argv: readonly string[]): Promise<number> => {
+  const { values, positionals } = parseArgs({
+    args: [...argv], options: { dir: { type: 'string' } }, allowPositionals: true,
+  });
+  const id = positionals[0];
+  if (id === undefined || !isPendingId(id)) { err('reject: a pending act id is required — see: politik pending'); return EXIT.USAGE; }
+  const sessionDir = resolve(values.dir ?? '.');
+  if ((await readPending(sessionDir, id)) === null) { err(`reject: no pending act ${id} in ${sessionDir}`); return EXIT.USAGE; }
+  await removePending(sessionDir, id);
+  out(`REJECTED — ${id} discarded; nothing was recorded`);
   return EXIT.OK;
 };
 
@@ -307,6 +504,20 @@ const cmdDoctor = async (): Promise<number> => {
 /** `politik protocol lint <file>` / `politik protocol new <name>`. */
 const cmdProtocol = async (argv: readonly string[]): Promise<number> => {
   const [verb, ...rest] = argv;
+
+  if (verb === 'list') {
+    // The shipped protocols, so a harness guiding first-time setup can offer real
+    // choices instead of guessing names (ADR-0010).
+    const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'protocols');
+    const names = (await readdir(dir)).filter((f) => f.endsWith('.yml')).sort();
+    for (const file of names) {
+      const src = (await readIfPresent(join(dir, file))) ?? '';
+      const blurb = (src.split('\n').find((l) => l.startsWith('#')) ?? '')
+        .replace(/^#\s*/, '').split(/(?<=\.)\s/)[0] ?? '';
+      out(`  ${file.replace(/\.yml$/, '').padEnd(28)} ${blurb}`);
+    }
+    return EXIT.OK;
+  }
 
   if (verb === 'lint') {
     const path = rest[0];
@@ -441,16 +652,17 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
     return EXIT.USAGE;
   }
 
+  // `--dir` is the standard flag; `--out` stays an accepted alias here.
+  const dir = values.dir ?? values.out ?? '.';
+
   const result = dropWrit({
     charter_source: source,
     session_guid: values.guid ?? crypto.randomUUID(),
     now: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
     speaker: values.speaker,
     protocol: values.protocol === undefined ? undefined : { name: values.protocol },
+    instruction_files: await readInstructionFiles(dir),
   });
-
-  // `--dir` is the standard flag; `--out` stays an accepted alias here.
-  const dir = values.dir ?? values.out ?? '.';
   await writeFiles(dir, result.files);
 
   if (!result.ok) {
@@ -563,6 +775,69 @@ const immutableCharterViolation = async (
   ].join(' ');
 };
 
+/** The instruction files present in a session directory (ADR-0010 §4). */
+const readInstructionFiles = async (
+  dir: string,
+): Promise<ReadonlyArray<{ readonly path: string; readonly content: string }>> => {
+  const files: Array<{ path: string; content: string }> = [];
+  for (const path of INSTRUCTION_FILES) {
+    const content = await readIfPresent(join(dir, path));
+    if (content !== null) files.push({ path, content });
+  }
+  return files;
+};
+
+/**
+ * Refuse governance when the session's instruction files have changed since Writ
+ * Drop (ADR-0010 §4).
+ *
+ * These are the files the Speaker's own harness loads on entering the session. An
+ * agent that rewrites — or plants — one has tried to reprogram the governor's
+ * tool, so this applies under every protocol, not only immutable-charter ones.
+ * Null when the act may proceed: an intact set, or a session sealed before
+ * ADR-0010 (no fingerprint to compare against).
+ */
+const instructionsViolation = async (dir: string): Promise<string | null> => {
+  const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
+  let recorded: string | null = null;
+  for (const entry of parseEntries(hansard)) {
+    if (entry.type === RECORD_TYPES.WRIT_DROP) { recorded = entry.fields['Instructions SHA256'] ?? null; break; }
+  }
+  if (recorded === null) return null;
+  const files = await readInstructionFiles(dir);
+  const now = instructionsFingerprint(files);
+  if (now === recorded) return null;
+  return [
+    `Refused: this session's instruction files (${INSTRUCTION_FILES.join(', ')}) have changed since`,
+    `Writ Drop (${recorded.slice(0, 12)} → ${now.slice(0, 12)}). These are the instructions the Speaker's`,
+    'own AI harness loads here; an agent may have tried to rewrite them. Inspect with `git diff`',
+    'and restore them from the Writ Drop commit before continuing.',
+  ].join(' ');
+};
+
+/**
+ * Commands that only read, or that set a session up before Writ Drop. Every other
+ * command is governance and refuses to run while the instruction files are
+ * tampered (ADR-0010 §4); these stay available so the Speaker can see what
+ * happened and repair it.
+ */
+const UNGUARDED_COMMANDS: ReadonlySet<string | undefined> = new Set([
+  undefined, '-h', '--help', 'help', 'version', '--version',
+  'new', 'scaffold', 'init', 'doctor', 'protocol', 'validate',
+  'status', 'hansard', 'ledger', 'integrity', 'pending', 'reject',
+  'registry', 'cascade', 'standings',
+]);
+
+/** The `--dir` a command line targets, defaulting to the working directory. */
+const dirArg = (argv: readonly string[]): string => {
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i] ?? '';
+    if (a === '--dir') return argv[i + 1] ?? '.';
+    if (a.startsWith('--dir=')) return a.slice('--dir='.length);
+  }
+  return '.';
+};
+
 /**
  * Guard a governance write: prints the refusal and returns false if an
  * immutable Charter has been tampered with, true when the act may proceed.
@@ -635,18 +910,30 @@ const logAct = async (dir: string, actor: string, role: Role, item: string): Pro
  * interrupt can never land between telling the operator "success" and the record
  * actually existing: every command writes, commits, then reports.
  */
+/**
+ * Provenance for the act in flight (ADR-0010 §3). Normally derived from this
+ * process; `politik confirm` overrides it so a staged act records who originally
+ * requested it and that the Speaker confirmed it.
+ */
+let actProvenance: { readonly via: string; readonly confirmedBy: string | null } | null = null;
+
+const currentProvenance = (): { readonly via: string; readonly confirmedBy: string | null } =>
+  actProvenance ?? { via: requestedVia(process.env, process.stdin.isTTY === true), confirmedBy: null };
+
 const commitAct = (
   dir: string,
   message: string,
   extra: readonly string[] = [],
-): Promise<CommitResult> =>
-  commitRecord(dir, message, [
+): Promise<CommitResult> => {
+  const { via, confirmedBy } = currentProvenance();
+  return commitRecord(dir, `${message}\n\n${provenanceTrailers(via, confirmedBy)}`, [
     'HANSARD.md',
     'STATE.json',
     'LEDGER.md',
     '.politik/LEDGER.md',
     ...extra,
   ]);
+};
 
 /** Print a commit's outcome. Call only AFTER the commit, as part of the report. */
 const reportCommit = (result: CommitResult): void => {
@@ -887,6 +1174,9 @@ const cmdAssent = async (argv: readonly string[]): Promise<number> => {
   if (values.motion === undefined || values.actor === undefined) {
     err('assent: --motion and --actor are required'); return EXIT.USAGE;
   }
+  const gated = await awaitSpeaker('assent', argv, dir,
+    `Assent to motion "${values.motion}" as ${values.actor} — enact it`);
+  if (gated !== null) return gated;
 
   try {
     const outcome = tallyDivision(hansard, values.motion, charter.session.quorum);
@@ -1367,6 +1657,9 @@ const cmdRule = async (argv: readonly string[]): Promise<number> => {
     return EXIT.USAGE;
   }
   if (badRole(values.role)) { err(`rule: "${values.role}" is not a CANON role`); return EXIT.USAGE; }
+  const gated = await awaitSpeaker('rule', argv, dir,
+    `Rule ${(values.outcome ?? 'UPHELD').toUpperCase()} on point of order #${values.seq ?? '1'} as ${values.actor}: "${values.body}"`);
+  if (gated !== null) return gated;
 
   const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
 
@@ -1753,8 +2046,14 @@ const cmdIntegrity = async (argv: readonly string[]): Promise<number> => {
   const { state, hansard } = await loadSession(dir);
   if (state === null) { err(`integrity: ${dir} is not a session repo`); return EXIT.USAGE; }
 
+  // ADR-0010 §4: a tampered instruction set is the most serious finding there is
+  // — it targets the Speaker's own harness — so it leads, and fails the check.
+  const tampered = await instructionsViolation(dir);
+  if (tampered !== null) out(`  [HIGH] instructions-tampered — ${tampered}`);
+
   const findings = reviewIntegrity(hansard);
   if (findings.length === 0) {
+    if (tampered !== null) return EXIT.REFUSED;
     out('no bad-faith patterns detected — the record is clean');
     return EXIT.OK;
   }
@@ -1765,7 +2064,7 @@ const cmdIntegrity = async (argv: readonly string[]): Promise<number> => {
   out('');
   out(`${vices.length} vice finding(s), ${virtues.length} virtue(s). Surfaced to the Speaker; no action taken — the Speaker rules.`);
   // A high-severity vice exits non-zero so a watching Speaker/CI is alerted.
-  return vices.some((f) => f.severity === 'high') ? EXIT.REFUSED : EXIT.OK;
+  return tampered !== null || vices.some((f) => f.severity === 'high') ? EXIT.REFUSED : EXIT.OK;
 };
 
 /** `politik hansard` — the record, rendered in the protocol's vocabulary. */
@@ -1789,7 +2088,7 @@ const cmdHansard = async (argv: readonly string[]): Promise<number> => {
 };
 
 const cmdStatus = async (argv: readonly string[]): Promise<number> => {
-  const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' } } });
+  const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' }, json: { type: 'boolean' } } });
   const dir = values.dir ?? '.';
 
   const raw = await readIfPresent(join(dir, 'STATE.json'));
@@ -1804,6 +2103,31 @@ const cmdStatus = async (argv: readonly string[]): Promise<number> => {
     return EXIT.REFUSED;
   }
 
+  const pending = await listPending(resolve(dir));
+  const hansardRaw = await readIfPresent(join(dir, 'HANSARD.md'));
+  const entries = hansardRaw === null ? [] : parseEntries(hansardRaw);
+
+  // ADR-0010: a stable machine-readable view, so a harness answering the Speaker
+  // reads fields rather than scraping text.
+  if (values.json === true) {
+    const last = entries.at(-1);
+    out(JSON.stringify({
+      session: state.session_guid,
+      protocol: state.protocol,
+      state: state.state,
+      suspension: state.suspension,
+      quorum: state.quorum,
+      updated_at: state.updated_at,
+      updated_by: state.updated_by,
+      record: {
+        entries: entries.length,
+        last: last === undefined ? null : { type: last.type, actor: last.actor, at: last.at },
+      },
+      pending: pending.map((p) => ({ id: p.id, act: p.act, summary: p.summary })),
+    }, null, 2));
+    return EXIT.OK;
+  }
+
   out(`session   ${state.session_guid}`);
   out(`protocol  ${state.protocol}`);
   out(`state     ${state.state}`);
@@ -1813,12 +2137,13 @@ const cmdStatus = async (argv: readonly string[]): Promise<number> => {
   out(`quorum    ${state.quorum.present} of ${state.quorum.required}`);
   out(`updated   ${state.updated_at} by ${state.updated_by}`);
 
-  const hansard = await readIfPresent(join(dir, 'HANSARD.md'));
-  if (hansard !== null) {
-    const entries = parseEntries(hansard);
+  if (hansardRaw !== null) {
     out(`record    ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`);
     const last = entries.at(-1);
     if (last !== undefined) out(`last      ${last.type} by ${last.actor} at ${last.at}`);
+  }
+  if (pending.length > 0) {
+    out(`pending   ${pending.length} act${pending.length === 1 ? '' : 's'} awaiting the Speaker — politik pending`);
   }
   return EXIT.OK;
 };
@@ -1851,6 +2176,9 @@ const cmdProrogue = async (argv: readonly string[]): Promise<number> => {
     err(`prorogue: no readable STATE.json in ${dir}`);
     return EXIT.USAGE;
   }
+  const gated = await awaitSpeaker('prorogue', argv, dir,
+    `Prorogue the session as ${values.actor} (trigger: ${values.trigger ?? 'TRIGGER_SPEAKER'}) — seal the Hansard`);
+  if (gated !== null) return gated;
 
   const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
   const trigger = (values.trigger ?? 'TRIGGER_SPEAKER') as Trigger;
@@ -2190,6 +2518,11 @@ const cmdCascade = async (argv: readonly string[]): Promise<number> => {
 export const run = async (argv: readonly string[]): Promise<number> => {
   const [command, ...rest] = argv;
 
+  if (!UNGUARDED_COMMANDS.has(command)) {
+    const violation = await instructionsViolation(dirArg(rest));
+    if (violation !== null) { err(violation); return EXIT.REFUSED; }
+  }
+
   switch (command) {
     case undefined:
     case '-h':
@@ -2201,6 +2534,14 @@ export const run = async (argv: readonly string[]): Promise<number> => {
     case '--version':
       out(VERSION);
       return EXIT.OK;
+    case 'new':
+      return cmdNew(rest);
+    case 'pending':
+      return cmdPending(rest);
+    case 'confirm':
+      return cmdConfirm(rest);
+    case 'reject':
+      return cmdReject(rest);
     case 'scaffold':
       return cmdScaffold(rest);
     case 'doctor':

@@ -26,7 +26,10 @@ a session is a git-tracked *directory*; monorepo tree by default, standalone rep
 an opt-in mode; **fully built — monorepo placement, federation as local traversal
 (`politik registry`/`cascade`), and explicit mode (`init --standalone`)**) and
 ADR-0009 (the **MATCH primitive** + pairing — `politik pair`/`match`, unblocking
-Swiss/round-robin/single-elimination scoring) are all **Accepted**.
+Swiss/round-robin/single-elimination scoring) and ADR-0010 (the **operator
+interface** — bring your own harness via `politik new`; constitutional acts a
+harness requests are staged and confirmed by the Speaker at a terminal;
+provenance trailers; sealed instruction files) are all **Accepted**.
 `POLITIK-ARCHITECTURE.md` was amended only by ADR-0004, which added the `ASSENT`
 verb and the `CONFLICT` primitive.
 

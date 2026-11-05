@@ -39,6 +39,22 @@ import { isTerminationPolicy, type TerminationPolicy } from './prorogation.ts';
 export const charterFingerprint = (source: string): string =>
   createHash('sha256').update(source, 'utf8').digest('hex');
 
+/**
+ * Fingerprint of a session's instruction files (ADR-0010 §4) — AGENTS.md and the
+ * harness pointers — as one value. Order-independent, and adding or removing a
+ * file changes it, so planting a new instruction file is caught as surely as
+ * editing an existing one.
+ */
+export const instructionsFingerprint = (
+  files: ReadonlyArray<{ readonly path: string; readonly content: string }>,
+): string => {
+  const hash = createHash('sha256');
+  for (const f of [...files].sort((a, b) => a.path.localeCompare(b.path))) {
+    hash.update(f.path, 'utf8').update('\0').update(f.content, 'utf8').update('\0');
+  }
+  return hash.digest('hex');
+};
+
 /* -------------------------------------------------------------------------- */
 /* Schema                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -81,6 +97,12 @@ export interface SessionBlock {
   readonly deadline: string | null;
   readonly merge_strategy: MergeStrategy;
   readonly assent: Role;
+  /**
+   * ADR-0010: whether assent, rule and prorogue requested by an AI harness or a
+   * script are staged for the Speaker's confirmation. Absent means 'off', so every
+   * session convened before ADR-0010 behaves exactly as it did.
+   */
+  readonly speaker_confirmation: 'required' | 'off';
   readonly endurance: Endurance;
 }
 
@@ -334,6 +356,7 @@ export const parseCharter = (source: string): ParseResult => {
       // rule and let a bad assent silently open a session (AUDIT #8).
       assent: session['assent'] === undefined ? 'AUTHORITY' : (session['assent'] as Role),
       stale_action: session['stale_action'] === 'dissolve' ? 'dissolve' : 'suspend',
+      speaker_confirmation: session['speaker_confirmation'] === 'required' ? 'required' : 'off',
       checkpoint_interval_hours: asNumberOrNull(session['checkpoint_interval_hours']),
       endurance: {
         max_motions: asNumberOrNull(endurance['max_motions']),
