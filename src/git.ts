@@ -60,6 +60,7 @@ export const commitRecord = async (
   message: string,
   paths: readonly string[] = ['HANSARD.md', 'STATE.json'],
   spawnFn: typeof spawn = spawn,
+  opts: { readonly sign?: boolean } = {},
 ): Promise<CommitResult> => {
   const isRepo = await git(dir, ['rev-parse', '--is-inside-work-tree'], spawnFn);
   if (isRepo.code !== 0) {
@@ -87,9 +88,12 @@ export const commitRecord = async (
     return { committed: false, sha: null, reason: 'no changes to record' };
   }
 
-  const commit = await git(dir, ['commit', '-m', message], spawnFn);
+  const commit = await git(dir, ['commit', ...(opts.sign === true ? ['-S'] : []), '-m', message], spawnFn);
   if (commit.code !== 0) {
-    return { committed: false, sha: null, reason: 'commit failed' };
+    // A required signature that cannot be made must not degrade to an unsigned
+    // record (ADR-0011 §5): unstage, so nothing half-done is left behind.
+    if (opts.sign === true) await git(dir, ['reset', '--quiet', '--', ...present], spawnFn);
+    return { committed: false, sha: null, reason: opts.sign === true ? 'signing failed' : 'commit failed' };
   }
 
   const sha = await git(dir, ['rev-parse', 'HEAD'], spawnFn);

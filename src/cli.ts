@@ -28,6 +28,10 @@ import {
 } from './pending.ts';
 import { createInterface } from 'node:readline/promises';
 import {
+  configureClone, disableSync, discardTo, enableSync, fastForward, fetchRemote, gitx, headSha,
+  operatorHandle, operatorIdentity, pushRecord, syncConfig, syncNow,
+} from './remote.ts';
+import {
   CONFIRMED_BY_SPEAKER, detectHarness, isSpeakerAtTerminal, provenanceTrailers, requestedVia,
 } from './operator.ts';
 import { runTurn } from './runner.ts';
@@ -93,11 +97,14 @@ Usage
   politik pending [--dir <dir>] [--json]  # constitutional acts staged for the Speaker
   politik confirm <id> [--dir <dir>]      # the Speaker, at a terminal: execute a staged act
   politik reject <id> [--dir <dir>]       # discard a staged act
+  politik remote [<url>] [--as <handle>] [--off]   # share this session through a git remote
+  politik join <url> [<dir>] --as <handle>        # take a seat in a shared session from this machine
+  politik sync [--dir <dir>]              # reconcile this clone with the shared record
   politik protocol list                   # the shipped protocols
   politik protocol lint <manifest.yml>
   politik protocol new <name> [--mode <mode>] [--out <dir>]
   politik validate <charter.md> [--protocol <name>]
-  politik init --charter <path> --speaker <handle> [--dir <dir>] [--guid <id>] [--standalone]
+  politik init --charter <path> --speaker <handle> [--dir <dir>] [--guid <id>] [--standalone] [--remote <url>]
   politik run --agent <id> --actor <h> --role <ROLE> (--task <text> | --claim)
   politik division call --motion <id> --actor <h> --role <ROLE> [--reviewers a,b]
   politik division vote --motion <id> --actor <h> --role <ROLE> --vote AYE|NO|ABSTAIN
@@ -168,8 +175,23 @@ Commands
 /* Output                                                                      */
 /* -------------------------------------------------------------------------- */
 
-const out = (line = '') => process.stdout.write(`${line}\n`);
-const err = (line: string) => process.stderr.write(`${line}\n`);
+/**
+ * Output is buffered while a shared-session act is attempted (ADR-0011 §2): if the
+ * push is rejected the attempt is discarded and redone, and the operator must only
+ * ever see the attempt that was actually recorded.
+ */
+let outputBuffer: Array<readonly ['out' | 'err', string]> | null = null;
+const out = (line = '') => {
+  if (outputBuffer !== null) outputBuffer.push(['out', line]);
+  else process.stdout.write(`${line}\n`);
+};
+const err = (line: string) => {
+  if (outputBuffer !== null) outputBuffer.push(['err', line]);
+  else process.stderr.write(`${line}\n`);
+};
+const flushOutput = (lines: ReadonlyArray<readonly ['out' | 'err', string]>): void => {
+  for (const [stream, line] of lines) (stream === 'out' ? process.stdout : process.stderr).write(`${line}\n`);
+};
 
 /**
  * A supplied --role/--target must name a CANON role; an absent one falls back to
@@ -345,6 +367,180 @@ const cmdNew = async (argv: readonly string[]): Promise<number> => {
 
 
 /* -------------------------------------------------------------------------- */
+/* Shared sessions across machines (ADR-0011)                                  */
+/* -------------------------------------------------------------------------- */
+
+/** Nesting depth of sync: only the outermost governance command syncs. */
+let syncDepth = 0;
+
+/**
+ * Run a governance act against a shared session: fetch and fast-forward, act,
+ * push. If the push is rejected because someone acted first, discard the local
+ * attempt, catch up, and recompute — up to three attempts — showing only the
+ * output of the attempt that was recorded. An unshared session, or a nested call,
+ * runs the act directly.
+ */
+const withSync = async (
+  dir: string,
+  exec: () => Promise<number>,
+  opts: { readonly retry: boolean },
+): Promise<number> => {
+  const cfg = syncDepth > 0 ? null : await syncConfig(dir);
+  if (cfg === null) return exec();
+  syncDepth += 1;
+  try {
+    const attempts = opts.retry ? 3 : 1;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      const fetched = await fetchRemote(dir, cfg);
+      if (!fetched.ok) {
+        err(`Refused: this is a shared session and ${cfg.remote} cannot be reached (${fetched.reason}).`);
+        err('  Acting offline would let acts land out of order. Reads still work; try again when connected.');
+        return EXIT.REFUSED;
+      }
+      const ff = await fastForward(dir, cfg);
+      if (ff === 'diverged' || ff === 'blocked') {
+        err(ff === 'diverged'
+          ? 'Refused: the local and shared records have diverged. Run: politik sync'
+          : 'Refused: cannot catch up with the shared record — uncommitted changes conflict with it.');
+        return EXIT.REFUSED;
+      }
+      if (ff === 'ahead') {
+        const caughtUp = await pushRecord(dir, cfg);
+        if (!caughtUp.ok) { err(`Refused: earlier local acts are not shared yet and could not be pushed (${caughtUp.reason}). Run: politik sync`); return EXIT.REFUSED; }
+      }
+
+      const start = await headSha(dir);
+      outputBuffer = [];
+      let code: number;
+      try { code = await exec(); } catch (error) { flushOutput(outputBuffer); outputBuffer = null; throw error; }
+      const lines = outputBuffer;
+      outputBuffer = null;
+
+      const end = await headSha(dir);
+      if (end === start) { flushOutput(lines); return code; }
+
+      const pushed = await pushRecord(dir, cfg);
+      if (pushed.ok) { flushOutput(lines); return code; }
+
+      if (pushed.rejected && opts.retry && attempt < attempts && start !== null) {
+        if (await discardTo(dir, start)) continue;
+        flushOutput(lines);
+        err('Recorded locally, but someone else acted first and the attempt could not be redone safely. Run: politik sync');
+        return code;
+      }
+      flushOutput(lines);
+      err(pushed.rejected
+        ? 'Recorded locally, but not shared yet — someone else acted first. Run: politik sync'
+        : `Recorded locally, but could not reach ${cfg.remote} to share it (${pushed.reason}). Run: politik sync`);
+      return code;
+    }
+    err(`Refused: the shared session is busy — ${attempts} attempts were overtaken by other acts. Try again.`);
+    return EXIT.REFUSED;
+  } finally {
+    syncDepth -= 1;
+  }
+};
+
+/** Before a read: catch up with the shared record if possible, silently if not. */
+const refreshForRead = async (dir: string): Promise<void> => {
+  const cfg = await syncConfig(dir);
+  if (cfg === null) return;
+  if ((await fetchRemote(dir, cfg)).ok) await fastForward(dir, cfg);
+};
+
+/** `politik remote [<url>] [--as <handle>] [--off]` — make a session shared, or show how it is. */
+const cmdRemote = async (argv: readonly string[]): Promise<number> => {
+  const { values, positionals } = parseArgs({
+    args: [...argv], allowPositionals: true,
+    options: { dir: { type: 'string' }, as: { type: 'string' }, off: { type: 'boolean' }, name: { type: 'string' } },
+  });
+  const dir = values.dir ?? '.';
+  if (values.off === true) {
+    await disableSync(dir);
+    out('Sync off — this clone no longer pushes or pulls the record. The remote is unchanged.');
+    return EXIT.OK;
+  }
+  const url = positionals[0];
+  if (url === undefined) {
+    const cfg = await syncConfig(dir);
+    if (cfg === null) { out('Not shared. Share it with: politik remote <url>'); return EXIT.OK; }
+    const where = await gitx(dir, ['remote', 'get-url', cfg.remote]);
+    out(`shared    via ${cfg.remote} — ${where.out || '(no url)'}`);
+    out(`branch    ${cfg.branch}`);
+    out(`you are   ${cfg.handle ?? '(unknown — set with: politik remote --as <handle>)'}`);
+    return EXIT.OK;
+  }
+  if ((await readIfPresent(join(dir, 'STATE.json'))) === null) {
+    err(`remote: ${dir} is not a convened session — run politik init first`);
+    return EXIT.USAGE;
+  }
+  const handle = values.as ?? (await writDropSpeaker(dir));
+  const result = await enableSync(dir, url, { remote: values.name ?? 'origin', handle });
+  if (!result.ok) { err(`remote: ${result.message}`); return EXIT.REFUSED; }
+  out(`SHARED — ${result.message}`);
+  if (handle !== null) out(`  you are ${handle}`);
+  out(`  Others join with: politik join ${url} <dir> --as <their handle>`);
+  return EXIT.OK;
+};
+
+/** The Speaker named on the WRIT_DROP entry. */
+const writDropSpeaker = async (dir: string): Promise<string | null> => {
+  const hansard = (await readIfPresent(join(dir, 'HANSARD.md'))) ?? '';
+  for (const entry of parseEntries(hansard)) {
+    if (entry.type === RECORD_TYPES.WRIT_DROP) return entry.actor;
+  }
+  return null;
+};
+
+/**
+ * `politik join <url> [dir] --as <handle>` — take a seat in a shared session from
+ * this machine: clone it, check it is a session with intact seals, turn on sync.
+ */
+const cmdJoin = async (argv: readonly string[]): Promise<number> => {
+  const { values, positionals } = parseArgs({
+    args: [...argv], allowPositionals: true, options: { as: { type: 'string' } },
+  });
+  const url = positionals[0];
+  if (url === undefined) { err('join: a remote url is required — politik join <url> [dir] --as <handle>'); return EXIT.USAGE; }
+  const dir = positionals[1] ?? (url.replace(/\/+$/, '').split(/[/:]/).pop() ?? 'session').replace(/\.git$/, '');
+  if (existsSync(dir) && (await readdir(dir)).length > 0) {
+    err(`join: ${dir} already exists and is not empty`);
+    return EXIT.REFUSED;
+  }
+  const clone = await gitx('.', ['clone', '--quiet', url, dir]);
+  if (clone.code !== 0) { err(`join: could not clone ${url}: ${clone.err.split('\n')[0] ?? ''}`); return EXIT.REFUSED; }
+  await gitx(dir, ['fetch', '--quiet', 'origin', '+refs/politik/pending/*:refs/politik/pending/*']);
+
+  if ((await readIfPresent(join(dir, 'STATE.json'))) === null) {
+    err(`join: ${url} was cloned to ${dir}, but its root is not a convened session.`);
+    err('  If it is a tree of sessions, cd into the node you want and run: politik remote --as <handle> --dir .');
+    return EXIT.REFUSED;
+  }
+  const tampered = await instructionsViolation(dir);
+  if (tampered !== null) { err(`join: ${tampered}`); return EXIT.REFUSED; }
+
+  const cfg = await configureClone(dir, values.as ?? null);
+  if (cfg === null) { err('join: the clone is not on a branch'); return EXIT.REFUSED; }
+  out(`JOINED ${dir} — shared via ${cfg.remote}, branch ${cfg.branch}`);
+  out(`  you are ${cfg.handle ?? '(unknown — set with: politik remote --as <handle>)'}`);
+  out('');
+  out(`Next: cd ${dir} and open your AI harness (claude, codex, agy, opencode…).`);
+  return EXIT.OK;
+};
+
+/** `politik sync` — reconcile this clone's record with the shared one. */
+const cmdSync = async (argv: readonly string[]): Promise<number> => {
+  const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' } } });
+  const dir = values.dir ?? '.';
+  const cfg = await syncConfig(dir);
+  if (cfg === null) { out('Not shared — nothing to sync. Share it with: politik remote <url>'); return EXIT.OK; }
+  const result = await syncNow(dir, cfg);
+  if (!result.ok) { err(`sync: ${result.message}`); return EXIT.REFUSED; }
+  out(`SYNCED — ${result.message}`);
+  return EXIT.OK;
+};
+
+/* -------------------------------------------------------------------------- */
 /* The Speaker's confirmation (ADR-0010 §2)                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -392,13 +588,19 @@ const awaitSpeaker = async (
   }
 
   const sessionDir = resolve(dir);
-  const pending = await stagePending(sessionDir, {
-    act,
-    argv: withDir(argv, sessionDir),
-    summary,
-    requested_via: requestedVia(process.env, interactive),
-    requested_at: nowStamp(),
-  });
+  let pending;
+  try {
+    pending = await stagePending(sessionDir, {
+      act,
+      argv: withDir(argv, sessionDir),
+      summary,
+      requested_via: requestedVia(process.env, interactive),
+      requested_at: nowStamp(),
+    });
+  } catch (error) {
+    err(`Refused: ${error instanceof Error ? error.message : String(error)}. Nothing was staged or recorded.`);
+    return EXIT.REFUSED;
+  }
   out(`STAGED — ${summary}`);
   out(`  pending act: ${pending.id}`);
   out('  Nothing is recorded yet. This is the Speaker\'s decision: they confirm it in');
@@ -411,6 +613,7 @@ const awaitSpeaker = async (
 /** `politik pending [--dir] [--json]` — staged acts awaiting the Speaker. */
 const cmdPending = async (argv: readonly string[]): Promise<number> => {
   const { values } = parseArgs({ args: [...argv], options: { dir: { type: 'string' }, json: { type: 'boolean' } } });
+  await refreshForRead(values.dir ?? '.');
   const acts = await listPending(resolve(values.dir ?? '.'));
   if (values.json === true) { out(JSON.stringify(acts, null, 2)); return EXIT.OK; }
   if (acts.length === 0) { out('No pending acts.'); return EXIT.OK; }
@@ -420,6 +623,12 @@ const cmdPending = async (argv: readonly string[]): Promise<number> => {
     out(`    requested via ${a.requested_via} at ${a.requested_at}`);
   }
   return EXIT.OK;
+};
+
+/** The `--actor` a staged act names. */
+const actorOf = (argv: readonly string[]): string | null => {
+  const i = argv.indexOf('--actor');
+  return i >= 0 ? argv[i + 1] ?? null : null;
 };
 
 /**
@@ -445,8 +654,20 @@ const cmdConfirm = async (argv: readonly string[]): Promise<number> => {
   }
 
   const sessionDir = resolve(values.dir ?? '.');
+  await refreshForRead(sessionDir);
   const pending = await readPending(sessionDir, id);
   if (pending === null) { err(`confirm: no pending act ${id} in ${sessionDir}`); return EXIT.USAGE; }
+
+  // ADR-0011 §4: in a shared session only the seat the act names may confirm it.
+  if ((await syncConfig(sessionDir)) !== null) {
+    const actor = actorOf(pending.argv);
+    const me = await operatorHandle(sessionDir);
+    if (actor !== null && me !== actor) {
+      err(`confirm: refused — ${id} is ${actor}'s act to confirm, and this clone is operated by ${me ?? 'an unknown seat'}.`);
+      err('  Set who you are with: politik remote --as <handle>');
+      return EXIT.REFUSED;
+    }
+  }
 
   out(`Constitutional act — this will be permanently recorded in the Hansard:`);
   out(`  ${pending.summary}`);
@@ -458,7 +679,7 @@ const cmdConfirm = async (argv: readonly string[]): Promise<number> => {
   speakerConfirmed = true;
   actProvenance = { via: pending.requested_via, confirmedBy: CONFIRMED_BY_SPEAKER };
   try {
-    const code = await run([pending.act, ...pending.argv]);
+    const code = await withSync(sessionDir, () => run([pending.act, ...pending.argv]), { retry: true });
     if (code === EXIT.OK) {
       await removePending(sessionDir, id);
       out(`CONFIRMED — ${id}`);
@@ -638,6 +859,7 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
       guid: { type: 'string' },
       protocol: { type: 'string' },
       standalone: { type: 'boolean' },
+      remote: { type: 'string' },
     },
   });
 
@@ -689,6 +911,14 @@ const cmdInit = async (argv: readonly string[]): Promise<number> => {
   out(`  state    ${result.state.state}`);
   out(`  files    ${result.files.length} written to ${dir}`);
   out(`  git      ${repo.reason}${repo.sha ? ` (${repo.sha.slice(0, 7)})` : ''}`);
+
+  // ADR-0011: share the session from the Writ Drop, with the Speaker as this
+  // clone's seat. The session is open either way; a failed publish is reported.
+  if (values.remote !== undefined) {
+    const shared = await enableSync(dir, values.remote, { handle: values.speaker });
+    if (shared.ok) out(`  shared   ${shared.message}`);
+    else { err(`  shared   NOT shared — ${shared.message}. Retry with: politik remote ${values.remote}`); return EXIT.REFUSED; }
+  }
   return EXIT.OK;
 };
 
@@ -826,7 +1056,16 @@ const UNGUARDED_COMMANDS: ReadonlySet<string | undefined> = new Set([
   'new', 'scaffold', 'init', 'doctor', 'protocol', 'validate',
   'status', 'hansard', 'ledger', 'integrity', 'pending', 'reject',
   'registry', 'cascade', 'standings',
+  'remote', 'join', 'sync',
 ]);
+
+/** Read-only commands that catch up with a shared record first (ADR-0011 §2). */
+const REFRESH_BEFORE: ReadonlySet<string | undefined> = new Set([
+  'status', 'hansard', 'ledger', 'integrity', 'standings',
+]);
+
+/** Governance commands not retried on a rejected push: re-running them has effects. */
+const NOT_RETRIED: ReadonlySet<string | undefined> = new Set(['run']);
 
 /** The `--dir` a command line targets, defaulting to the working directory. */
 const dirArg = (argv: readonly string[]): string => {
@@ -920,19 +1159,29 @@ let actProvenance: { readonly via: string; readonly confirmedBy: string | null }
 const currentProvenance = (): { readonly via: string; readonly confirmedBy: string | null } =>
   actProvenance ?? { via: requestedVia(process.env, process.stdin.isTTY === true), confirmedBy: null };
 
-const commitAct = (
+const commitAct = async (
   dir: string,
   message: string,
   extra: readonly string[] = [],
 ): Promise<CommitResult> => {
   const { via, confirmedBy } = currentProvenance();
-  return commitRecord(dir, `${message}\n\n${provenanceTrailers(via, confirmedBy)}`, [
+  const operator = await operatorIdentity(dir);
+  // ADR-0011 §5: a confirmed act is signed with the confirming person's key when
+  // the Charter requires it, so confirmation cannot be forged without that key.
+  const sign = confirmedBy !== null && (await charterRequiresSignedConfirmations(dir));
+  return commitRecord(dir, `${message}\n\n${provenanceTrailers(via, confirmedBy, operator)}`, [
     'HANSARD.md',
     'STATE.json',
     'LEDGER.md',
     '.politik/LEDGER.md',
     ...extra,
-  ]);
+  ], undefined, { sign });
+};
+
+const charterRequiresSignedConfirmations = async (dir: string): Promise<boolean> => {
+  const raw = await readIfPresent(join(dir, 'CHARTER.md'));
+  const parsed = raw === null ? null : parseCharter(raw);
+  return parsed !== null && parsed.ok && parsed.charter.session.signed_confirmations === 'required';
 };
 
 /** Print a commit's outcome. Call only AFTER the commit, as part of the report. */
@@ -2523,6 +2772,18 @@ export const run = async (argv: readonly string[]): Promise<number> => {
     if (violation !== null) { err(violation); return EXIT.REFUSED; }
   }
 
+  // ADR-0011: governance on a shared session syncs around the act. `confirm`
+  // syncs around its own replay (after the Speaker has typed the id), so it is
+  // not wrapped here.
+  if (REFRESH_BEFORE.has(command)) await refreshForRead(dirArg(rest));
+  if (!UNGUARDED_COMMANDS.has(command) && command !== 'confirm') {
+    return withSync(dirArg(rest), () => dispatch(command, rest), { retry: !NOT_RETRIED.has(command) });
+  }
+  return dispatch(command, rest);
+};
+
+const dispatch = async (command: string | undefined, rest: readonly string[]): Promise<number> => {
+
   switch (command) {
     case undefined:
     case '-h':
@@ -2542,6 +2803,12 @@ export const run = async (argv: readonly string[]): Promise<number> => {
       return cmdConfirm(rest);
     case 'reject':
       return cmdReject(rest);
+    case 'remote':
+      return cmdRemote(rest);
+    case 'join':
+      return cmdJoin(rest);
+    case 'sync':
+      return cmdSync(rest);
     case 'scaffold':
       return cmdScaffold(rest);
     case 'doctor':

@@ -103,6 +103,11 @@ export interface SessionBlock {
    * session convened before ADR-0010 behaves exactly as it did.
    */
   readonly speaker_confirmation: 'required' | 'off';
+  /**
+   * ADR-0011: whether a confirmed act's commit must be signed with the confirming
+   * person's git signing key. Absent means 'off'.
+   */
+  readonly signed_confirmations: 'required' | 'off';
   readonly endurance: Endurance;
 }
 
@@ -357,6 +362,7 @@ export const parseCharter = (source: string): ParseResult => {
       assent: session['assent'] === undefined ? 'AUTHORITY' : (session['assent'] as Role),
       stale_action: session['stale_action'] === 'dissolve' ? 'dissolve' : 'suspend',
       speaker_confirmation: session['speaker_confirmation'] === 'required' ? 'required' : 'off',
+      signed_confirmations: session['signed_confirmations'] === 'required' ? 'required' : 'off',
       checkpoint_interval_hours: asNumberOrNull(session['checkpoint_interval_hours']),
       endurance: {
         max_motions: asNumberOrNull(endurance['max_motions']),
