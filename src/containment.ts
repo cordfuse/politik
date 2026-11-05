@@ -30,7 +30,7 @@
  * Attribution: Steve Krisjanovs, Cordfuse
  */
 
-import { isAbsolute, relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 import type { Role } from './canon.ts';
 import type { HansardEntry } from './hansard.ts';
@@ -63,7 +63,10 @@ export interface ContainmentCheck {
 export const isInside = (root: string, path: string): boolean => {
   const target = isAbsolute(path) ? path : resolve(root, path);
   const rel = relative(resolve(root), target);
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+  // Only a parent-directory segment escapes. An ordinary filename such as
+  // "..cache" starts with two dots but is still inside the session.
+  const escapes = rel === '..' || rel.startsWith(`..${sep}`);
+  return !escapes && !isAbsolute(rel);
 };
 
 /**

@@ -25,6 +25,13 @@ describe('path containment', () => {
   it('is not fooled by a path that re-enters', () => {
     assert.ok(isInside(SESSION, 'motions/../HANSARD.md'));
   });
+
+  it('accepts in-session filenames beginning with two dots', () => {
+    assert.ok(isInside(SESSION, '..cache/state.json'));
+    assert.ok(isInside(SESSION, '..notes'));
+    assert.ok(checkContainment(SESSION, ['..cache/state.json'], '').contained);
+    assert.ok(!isInside(SESSION, '../outside.json'));
+  });
 });
 
 describe('output scanning', () => {
