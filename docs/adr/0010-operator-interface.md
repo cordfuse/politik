@@ -2,7 +2,7 @@
 
 **Attribution:** Steve Krisjanovs, Cordfuse
 
-**Status:** Accepted — building on `feat/operator-interface`.
+**Status:** Accepted — built (`src/operator.ts`, `src/pending.ts`; `politik new`, `pending` / `confirm` / `reject`, `protocol list`, `status --json`; provenance trailers; sealed instruction files).
 
 ---
 

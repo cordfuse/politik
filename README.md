@@ -64,6 +64,34 @@ node bin/politik.js doctor
 
 ## A first session
 
+**Bring your own AI harness** (ADR-0010). Create the folder, open whichever harness
+you already use there, and talk to it in plain language:
+
+```sh
+politik new q4-planning
+cd q4-planning
+claude                    # or codex, agy, opencode…
+```
+
+The harness walks you through choosing a protocol, writing the Charter and
+convening the session, then turns your requests into `politik` commands. Reading
+is free; permanent acts are not. `assent`, `rule` and `prorogue` requested by a
+harness or a script are **staged**, and only you can enact them, in your own
+terminal:
+
+```sh
+politik pending                 # what is waiting for you
+politik confirm assent-3f9a2c   # shows the act, asks you to type its id, then records it
+politik reject  assent-3f9a2c   # or discard it
+```
+
+Every commit records how it was requested (`Politik-Requested-Via: claude-code_…`)
+and, for a confirmed act, that the Speaker confirmed it. The session's instruction
+files are sealed at Writ Drop: if an agent rewrites them, governance stops until
+they are restored.
+
+### By hand, or from a script
+
 Every command below is a git commit. `git log` in the session directory is the
 Hansard — the immutable record.
 
@@ -76,6 +104,11 @@ politik division vote  --dir ./session --motion adopt-standard --actor bo  --rol
 politik division tally --dir ./session --motion adopt-standard               # → Motion CARRIED
 politik assent         --dir ./session --motion adopt-standard --actor you --role AUTHORITY
 ```
+
+Run at your own terminal, `assent` asks you to type `assent` to confirm. For a
+fully scripted session (CI, tests), scaffold with `--speaker-confirmation off` —
+the setting lives in the Charter, which is sealed at Writ Drop, so it cannot be
+switched off later.
 
 Seat a real agent to do the work instead of a human vote:
 
