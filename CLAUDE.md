@@ -14,7 +14,7 @@ framework runs, governs, and has been exercised live — Motions tabled by real
 agents, carried by Division, enacted by Assent, a simulated constitutional
 collapse. Protocols now genuinely **behave** differently (one shared engine,
 composable mechanics — ADR-0007) and **read** differently (vocabulary display).
-~38 modules, 758 tests, CI green. Every command, all 11 protocols, the agent
+~40 modules, 758 tests, CI green. Every command, all 11 protocols, the agent
 turn (`run`), and live SCM projection have been dogfooded end to end.
 **Released: v0.4.0 (2026-11-05)** — npm `@cordfuse/politik@0.4.0`, Zenodo
 10.5281/zenodo.23990434 (concept DOI 10.5281/zenodo.19490358).
