@@ -16,10 +16,10 @@ collapse. Protocols now genuinely **behave** differently (one shared engine,
 composable mechanics — ADR-0007) and **read** differently (vocabulary display).
 42 modules, 771 tests, CI green. Every command, all 12 protocols, the agent
 turn (`run`), and live SCM projection have been dogfooded end to end.
-**Released: v0.5.0 (2026-11-25)** — npm `@cordfuse/politik@0.5.0`. Zenodo version
-DOI for v0.5.0 pending a manual deposit (`zenodo-newversion`); concept DOI
-10.5281/zenodo.19490358 always resolves to the latest. Previous: v0.4.0
-(2026-11-05), 10.5281/zenodo.23990434.
+**Released: v0.5.0 (2026-11-25)** — npm `@cordfuse/politik@0.5.0`, Zenodo
+10.5281/zenodo.24545671 (deposited by hand; concept DOI 10.5281/zenodo.19490358
+always resolves to the latest). Previous: v0.4.0 (2026-11-05),
+10.5281/zenodo.23990434.
 
 Architecture decisions are in [`docs/adr/`](docs/adr/). ADR-0001 (transport),
 ADR-0002 (CHARTER.md schema), ADR-0003 (STATE.json schema), ADR-0004 (motion
