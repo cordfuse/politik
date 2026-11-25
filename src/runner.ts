@@ -17,8 +17,10 @@
  */
 
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { findAgent, composePrompt, type AgentSpec } from './agents.ts';
 import type { Role, Verb } from './canon.ts';
@@ -26,7 +28,7 @@ import { parseCharter, type Charter } from './charter.ts';
 import { parseEnvelope, claimSlot, type Envelope } from './envelope.ts';
 import { standForElection, bowOut, type ElectionOptions } from './election.ts';
 import { nodeLockFs } from './lockfs.ts';
-import { appendEntry, type HansardEntry } from './hansard.ts';
+import { appendEntry, parseEntries, type HansardEntry } from './hansard.ts';
 import { spawnAgent, type SpawnResult } from './spawn.ts';
 import {
   appendLedgerRow, parseResultText, parseUsage, type Usage,
@@ -122,7 +124,11 @@ const git = (dir: string, args: readonly string[], spawnFn: typeof spawn): Promi
     child.stdout?.on('data', (c: Buffer) => {
       output += c.toString();
     });
-    child.on('close', () => resolve(output.trim()));
+    // trimEnd, not trim: `git status --porcelain` lines start with a status
+    // column that may be a space (" M file"). Trimming the front stripped it
+    // from the first line, so the first unstaged file lost its first letter
+    // ("ANSARD.md") and a hand edit of the record went unflagged.
+    child.on('close', () => resolve(output.trimEnd()));
     child.on('error', () => resolve(''));
   });
 
@@ -319,6 +325,27 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     const beforeDirty = await dirtyFiles(options.dir, spawnFn);
 
     const measure = options.measure !== false && agent.json_args !== undefined;
+
+    // Per-turn grants for harnesses that sandbox their own shell (agents.ts
+    // session_args): the session's git directory, which an enclosing repo may
+    // own, and where this CLI runs from, so the agent can act through it.
+    const gitDir =
+      (await git(options.dir, ['rev-parse', '--absolute-git-dir'], spawnFn)) ||
+      join(resolve(options.dir), '.git');
+    const politikRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+    // Where the agent will find `politik`: the directory it was invoked from and
+    // the one holding it on PATH (a global npm bin often lives under $HOME,
+    // which a sandbox hides). Read-only grants, deduplicated.
+    const invokedFrom = process.argv[1] === undefined ? null : dirname(resolve(process.argv[1]));
+    const onPath = (process.env['PATH'] ?? '')
+      .split(':')
+      .find((d) => d !== '' && existsSync(join(d, 'politik')));
+    const readPaths = [...new Set([politikRoot, invokedFrom, onPath === undefined ? null : resolve(onPath)])]
+      .filter((p): p is string => p !== null)
+      // A path inside the CLI's own install is already covered by politikRoot.
+      .filter((p) => p === politikRoot || !p.startsWith(`${politikRoot}/`));
+    const sessionArgs = agent.session_args?.({ git_dir: gitDir, read_paths: readPaths }) ?? [];
+    const turnArgs = [...(measure ? (agent.json_args ?? []) : []), ...sessionArgs];
     const sleepFn = options.sleepFn ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
     const policy = {
       auto_retry_max: charter.fault_handling.auto_retry_max,
@@ -333,7 +360,7 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
       cwd: options.dir,
       timeout_ms: options.timeout_ms,
       spawnFn,
-      extraArgs: measure ? agent.json_args : undefined,
+      extraArgs: turnArgs,
     });
 
     let attempts = 1;
@@ -363,7 +390,7 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
         cwd: options.dir,
         timeout_ms: options.timeout_ms,
         spawnFn,
-        extraArgs: measure ? agent.json_args : undefined,
+        extraArgs: turnArgs,
       });
     }
 
@@ -384,8 +411,37 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     // § File Sovereignty Rules). An actor writing to them is a Standing Orders
     // violation, and it must be recorded rather than silently tolerated —
     // a record an actor can write is not a record.
+    //
+    // An agent may also act *through the CLI* during its turn — cast a vote,
+    // call a Division — and those acts write and commit these same files. The
+    // record must keep them. So the files are read again after the turn, and a
+    // change to them is lawful only when it reached the record the way the CLI
+    // writes it: committed (nothing left dirty) and, for the Hansard, purely
+    // appended. Anything else is a hand edit: a violation, and the record is
+    // restored from the pre-turn copy rather than carrying the edit forward.
     const OWNED_BY_RECORD = ['HANSARD.md', 'STATE.json', 'LEDGER.md'];
-    const violations = touched.filter((f) => OWNED_BY_RECORD.includes(f));
+    const dirtyAfter = await dirtyFiles(options.dir, spawnFn);
+    const hansardAfter = (await readIf(join(options.dir, 'HANSARD.md'))) ?? '';
+    const hansardAppended =
+      hansardAfter.startsWith(hansard) && !dirtyAfter.includes('HANSARD.md');
+    const violations = touched.filter(
+      (f) =>
+        OWNED_BY_RECORD.includes(f) &&
+        (dirtyAfter.includes(f) || (f === 'HANSARD.md' && !hansardAppended)),
+    );
+    // Entries the CLI appended during the turn — votes, Divisions — kept as
+    // the base the turn's own entry is appended to.
+    const recordBase = hansardAppended ? hansardAfter : hansard;
+    const actsDuringTurn = hansardAppended
+      ? parseEntries(hansardAfter).length - parseEntries(hansard).length
+      : 0;
+    // The same rule for STATE.json: a committed CLI act may have moved it (a
+    // tally that deadlocks suspends the sitting), and the turn must not undo it.
+    const stateAfterRaw = dirtyAfter.includes('STATE.json')
+      ? null
+      : await readIf(join(options.dir, 'STATE.json'));
+    const stateBase =
+      (stateAfterRaw === null ? null : parseState(stateAfterRaw)) ?? state;
 
     // An agent that hits a decision above its authority is told (composePrompt,
     // Rules of the Floor) to file a Point of Order instead of proceeding. On a
@@ -424,6 +480,9 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
             : `exit ${String(result.exit_code)}`,
         'Elapsed ms': String(result.elapsed_ms),
         'Files touched': touched.length > 0 ? touched.join(', ') : 'none',
+        ...(actsDuringTurn > 0
+          ? { 'Acts during turn': `${String(actsDuringTurn)} recorded through the CLI` }
+          : {}),
         ...(violations.length > 0
           ? {
               'Standing Orders violation': `actor wrote to ${violations.join(', ')} — owned by RECORD`,
@@ -447,7 +506,7 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
 
     // Faults are recorded before the turn's own entry: they happened first, and
     // a reader should see the retries that led to the outcome.
-    let record = hansard;
+    let record = recordBase;
     for (const fault of faultEntries) record = appendEntry(record, fault);
     record = appendEntry(record, entry);
 
@@ -495,10 +554,12 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     // POINT_OF_ORDER cause. A breach names no escalation file; an agent's Point
     // of Order does, so its path is recorded as the escalation reference.
     const suspend = !containment.contained || agentEscalated;
+    // Built on the post-turn state, so a suspension or quorum change an act
+    // made during the turn survives; the turn only adds its own suspension.
     const nextState = createState({
-      session_guid: state.session_guid,
-      protocol: state.protocol,
-      state: suspend ? 'SUSPENDED' : 'CONVENED',
+      session_guid: stateBase.session_guid,
+      protocol: stateBase.protocol,
+      state: suspend ? 'SUSPENDED' : stateBase.state,
       ...(suspend
         ? {
             suspension: {
@@ -508,9 +569,11 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
               escalation_ref: agentEscalated ? (escalationFiles[0] ?? null) : null,
             },
           }
-        : {}),
-      quorum: state.quorum,
-      hansard_head: state.hansard_head,
+        : stateBase.suspension !== null
+          ? { suspension: stateBase.suspension }
+          : {}),
+      quorum: stateBase.quorum,
+      hansard_head: stateBase.hansard_head,
       updated_at: options.now,
     });
     await writeFile(join(options.dir, 'STATE.json'), serializeState(nextState), 'utf8');

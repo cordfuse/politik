@@ -189,3 +189,26 @@ describe('prompt injection format', () => {
     assert.match(observer, /Verbs granted to your role: none/);
   });
 });
+
+describe('per-turn sandbox grants', () => {
+  const ctx = { git_dir: '/work/session/.git', read_paths: ['/opt/politik'] };
+
+  it('grants agy only the session .git (write) and the CLI install (read), for this run only', () => {
+    const agy = findAgent('antigravity');
+    assert.ok(agy?.session_args, 'antigravity must declare session_args');
+    const args = agy.session_args(ctx);
+    assert.equal(args[0], '--settings');
+    const settings = JSON.parse(args[1] ?? '{}') as { permissions: { allow: string[] } };
+    assert.deepEqual(settings.permissions.allow, [
+      'write_file(/work/session/.git)',
+      'read_file(/opt/politik)',
+    ]);
+    assert.equal(Object.keys(settings).length, 1, 'no setting beyond the grant');
+  });
+
+  it('leaves every other agent untouched', () => {
+    for (const id of ['claude-code', 'codex-cli', 'gemini-cli', 'opencode', 'copilot']) {
+      assert.equal(findAgent(id)?.session_args, undefined, `${id} should not get session args`);
+    }
+  });
+});

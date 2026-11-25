@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -381,6 +381,179 @@ describe('an agent-filed Point of Order suspends the sitting', () => {
       assert.equal(parseState(readFileSync(join(dir, 'STATE.json'), 'utf8'))?.state, 'CONVENED');
       const last = parseEntries(readFileSync(join(dir, 'HANSARD.md'), 'utf8')).at(-1);
       assert.match(last?.fields['Point of Order'] ?? '', /ignored: this protocol declares no escalation/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('acts recorded during a turn survive it', () => {
+  /**
+   * A spawn double whose agent acts on the record while it runs. `act` edits
+   * the session files the way the agent did; `committed` says whether git then
+   * reports them clean (the CLI committed them) or dirty (a hand edit left in
+   * the tree). Regression for the Scrum UAT, where a Developer's two votes, cast
+   * through the CLI inside its own turn, were overwritten when the turn wrote
+   * back the Hansard it had read before the agent ran.
+   */
+  const makeActingSpawn = (dir: string, act: () => void, committed: boolean, files: string[]) => {
+    let agentRan = false;
+    return ((command: string, args: readonly string[]) => {
+      const listeners: Record<string, ((...a: unknown[]) => void)[]> = {};
+      const stdoutListeners: ((c: Buffer) => void)[] = [];
+      const child = {
+        stdout: { on: (_e: string, fn: (c: Buffer) => void) => stdoutListeners.push(fn) },
+        stderr: { on: () => undefined },
+        kill: () => undefined,
+        on: (event: string, fn: (...a: unknown[]) => void) => {
+          (listeners[event] ??= []).push(fn);
+          return child;
+        },
+      };
+      queueMicrotask(() => {
+        let output = '';
+        if (command === 'git' && args[0] === 'rev-parse') output = agentRan ? 'def456' : 'abc123';
+        else if (command === 'git' && args[0] === 'diff') output = committed && agentRan ? files.join('\n') : '';
+        else if (command === 'git' && args[0] === 'status') {
+          output = !committed && agentRan ? files.map((f) => ` M ${f}`).join('\n') : '';
+        } else if (command === 'git') output = '';
+        else {
+          agentRan = true;
+          act();
+          output = 'Reviewed both items and voted.';
+        }
+        for (const fn of stdoutListeners) fn(Buffer.from(output));
+        for (const fn of listeners['close'] ?? []) fn(0);
+      });
+      return child as never;
+    }) as never;
+  };
+
+  const vote = (at: string, actor: string, motion: string): string =>
+    `\n## ${at} — VOTE_CAST\n\n**Actor:** ${actor} (OPERATOR)\n**Motion:** ${motion}\n**Vote:** AYE\n`;
+
+  it('keeps a vote the agent cast through the CLI, and does not call it a violation', async () => {
+    const dir = await session();
+    try {
+      const hansardPath = join(dir, 'HANSARD.md');
+      const spawnFn = makeActingSpawn(
+        dir,
+        () => writeFileSync(hansardPath, readFileSync(hansardPath, 'utf8') + vote('2026-04-08T15:00:01Z', 'dev-a', 'motion-001')),
+        true,
+        ['HANSARD.md', 'STATE.json'],
+      );
+      const outcome = await runTurn({
+        dir, agent_id: 'claude-code', actor: 'dev-a', role: 'OPERATOR',
+        task: 'Review and vote.', now: NOW, spawnFn,
+      });
+      assert.ok(outcome.ok, JSON.stringify(outcome));
+
+      const entries = parseEntries(readFileSync(hansardPath, 'utf8'));
+      assert.ok(entries.some((e) => e.type === 'VOTE_CAST'), 'the vote cast during the turn must survive');
+      const last = entries.at(-1);
+      assert.equal(last?.type, 'MOTION_TABLED');
+      assert.equal(last?.fields['Standing Orders violation'], undefined);
+      assert.match(last?.fields['Acts during turn'] ?? '', /^1 recorded/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a suspension a committed act made during the turn', async () => {
+    const dir = await session();
+    try {
+      const statePath = join(dir, 'STATE.json');
+      const spawnFn = makeActingSpawn(
+        dir,
+        () => {
+          const s = parseState(readFileSync(statePath, 'utf8'));
+          assert.ok(s);
+          writeFileSync(statePath, JSON.stringify({
+            ...s,
+            state: 'SUSPENDED',
+            suspension: { cause: 'DEADLOCK', since: '2026-04-08T15:00:01Z', record_ref: 'HANSARD.md', escalation_ref: null },
+          }, null, 2));
+        },
+        true,
+        ['STATE.json'],
+      );
+      const outcome = await runTurn({
+        dir, agent_id: 'claude-code', actor: 'dev-a', role: 'OPERATOR',
+        task: 'Tally.', now: NOW, spawnFn,
+      });
+      assert.ok(outcome.ok, JSON.stringify(outcome));
+      const after = parseState(readFileSync(statePath, 'utf8'));
+      assert.equal(after?.state, 'SUSPENDED', 'the turn must not undo a suspension made during it');
+      assert.equal(after?.suspension?.cause, 'DEADLOCK');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('flags a hand edit of the Hansard and restores the record', async () => {
+    const dir = await session();
+    try {
+      const hansardPath = join(dir, 'HANSARD.md');
+      const before = readFileSync(hansardPath, 'utf8');
+      const spawnFn = makeActingSpawn(
+        dir,
+        () => writeFileSync(hansardPath, '# HANSARD\n\nnothing happened here\n'),
+        false,
+        ['HANSARD.md'],
+      );
+      const outcome = await runTurn({
+        dir, agent_id: 'claude-code', actor: 'dev-a', role: 'OPERATOR',
+        task: 'x', now: NOW, spawnFn,
+      });
+      assert.ok(outcome.ok, JSON.stringify(outcome));
+      const after = readFileSync(hansardPath, 'utf8');
+      assert.ok(after.startsWith(before), 'the pre-turn record must be restored, not the edit');
+      assert.ok(!after.includes('nothing happened here'));
+      const last = parseEntries(after).at(-1);
+      assert.match(last?.fields['Standing Orders violation'] ?? '', /HANSARD\.md/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('a sandboxed harness is granted the session for the turn', () => {
+  it('passes agy a --settings grant naming the session git directory', async () => {
+    const dir = await session();
+    let agentArgs: readonly string[] = [];
+    const spawnFn = ((command: string, args: readonly string[]) => {
+      const listeners: Record<string, ((...a: unknown[]) => void)[]> = {};
+      const stdoutListeners: ((c: Buffer) => void)[] = [];
+      const child = {
+        stdout: { on: (_e: string, fn: (c: Buffer) => void) => stdoutListeners.push(fn) },
+        stderr: { on: () => undefined },
+        kill: () => undefined,
+        on: (event: string, fn: (...a: unknown[]) => void) => {
+          (listeners[event] ??= []).push(fn);
+          return child;
+        },
+      };
+      queueMicrotask(() => {
+        let output = '';
+        if (command === 'git' && args.includes('--absolute-git-dir')) output = '/work/session/.git';
+        else if (command === 'git' && args[0] === 'rev-parse') output = 'abc123';
+        else if (command === 'git') output = '';
+        else { agentArgs = args; output = 'done'; }
+        for (const fn of stdoutListeners) fn(Buffer.from(output));
+        for (const fn of listeners['close'] ?? []) fn(0);
+      });
+      return child as never;
+    }) as never;
+    try {
+      const outcome = await runTurn({
+        dir, agent_id: 'antigravity', actor: 'dev-agy', role: 'OPERATOR',
+        task: 'Vote.', now: NOW, spawnFn,
+      });
+      assert.ok(outcome.ok, JSON.stringify(outcome));
+      const i = agentArgs.indexOf('--settings');
+      assert.ok(i >= 0, `agy args: ${agentArgs.join(' ')}`);
+      assert.match(agentArgs[i + 1] ?? '', /write_file\(\/work\/session\/\.git\)/);
+      assert.match(agentArgs[i + 1] ?? '', /read_file\(/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

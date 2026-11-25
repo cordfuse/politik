@@ -1223,6 +1223,12 @@ const reportCommit = (result: CommitResult): void => {
   if (result.committed) out(`  recorded ${result.sha?.slice(0, 8) ?? ''}`);
   else if (result.reason === 'not a git repository') {
     out('  [WARN] not a git repository — the record is not durable');
+  } else if (result.reason === 'git add failed' || result.reason === 'commit failed') {
+    // Loud, on stderr: the act was written to the working tree but git refused
+    // the commit, so it is NOT on the record. Printing success here told an
+    // agent in a sandbox (read-only .git) that its vote counted when it did not.
+    err(`  [ERROR] ${result.reason} — the act was written but NOT committed, so it is not on the record`);
+    err('  Check that this process can write to .git, then repeat the act.');
   }
 };
 

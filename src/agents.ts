@@ -54,7 +54,22 @@ export interface AgentSpec {
    * Without these the LEDGER can record elapsed time but not tokens or cost.
    */
   readonly json_args?: readonly string[];
+  /**
+   * Args computed per turn from the session being governed. For a harness
+   * that sandboxes its own shell, this is where a turn is granted exactly what
+   * governing the session needs — no more, and never saved to the user's
+   * settings.
+   */
+  readonly session_args?: (ctx: SessionContext) => readonly string[];
   readonly notes: string;
+}
+
+/** What a turn's harness must be able to reach to act on the record. */
+export interface SessionContext {
+  /** Absolute git directory of the session: acts commit here. */
+  readonly git_dir: string;
+  /** Absolute paths the `politik` CLI runs from: read-only is enough. */
+  readonly read_paths: readonly string[];
 }
 
 /**
@@ -134,7 +149,24 @@ export const AGENTS: readonly AgentSpec[] = Object.freeze([
     auth_local: 'oauth',
     auth_headless: 'oauth',
     stdio_json: false,
-    notes: 'Google. -p/--print for headless.',
+    // agy's default mode sandboxes the commands it runs: paths outside the
+    // workspace are invisible and .git is read-only. An agent that votes
+    // through `politik` from inside its turn then cannot load the CLI or
+    // commit the act (Scrum UAT, PR #38). `--settings` applies to this run
+    // only and is never saved; the grant is the session's own .git (write)
+    // and the CLI's install (read). The sandbox otherwise stays on.
+    session_args: (ctx) => [
+      '--settings',
+      JSON.stringify({
+        permissions: {
+          allow: [
+            `write_file(${ctx.git_dir})`,
+            ...ctx.read_paths.map((p) => `read_file(${p})`),
+          ],
+        },
+      }),
+    ],
+    notes: 'Google. -p/--print for headless. Sandboxed shell: granted the session .git per turn.',
   },
   {
     id: 'aider',

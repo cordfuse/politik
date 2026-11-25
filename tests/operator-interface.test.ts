@@ -432,3 +432,26 @@ describe('status --json and the pending line (ADR-0010)', () => {
     });
   });
 });
+
+describe('an act git refuses to commit is reported, not passed off as recorded', () => {
+  // Regression for the Scrum UAT: a sandboxed harness (read-only .git) ran
+  // `division vote`, was told "Review recorded", and the vote never reached the
+  // record. The CLI must say so on stderr.
+  it('prints an error when the commit cannot be written', async () => {
+    if (process.getuid?.() === 0) return; // root ignores the read-only bit
+    await withTmp(async (dir) => {
+      assert.equal((await runBin(['scaffold', '--dir', dir, '--quorum', '1', '--speaker-confirmation', 'off'])).code, 0);
+      assert.equal((await runBin(['init', '--charter', join(dir, 'CHARTER.md'), '--speaker', 'steve', '--dir', dir, '--standalone'])).code, 0);
+      assert.equal((await runBin(['division', 'call', '--dir', dir, '--motion', 'motion-001', '--actor', 'steve', '--role', 'AUTHORITY'])).code, 0);
+      const { chmod } = await import('node:fs/promises');
+      await chmod(join(dir, '.git'), 0o555);
+      try {
+        const r = await runBin(['division', 'vote', '--dir', dir, '--motion', 'motion-001', '--actor', 'dev-a', '--role', 'OPERATOR', '--vote', 'AYE']);
+        assert.match(r.err, /NOT committed/, `stderr: ${r.err}\nstdout: ${r.out}`);
+        assert.doesNotMatch(r.out, /recorded [0-9a-f]{8}/);
+      } finally {
+        await chmod(join(dir, '.git'), 0o755);
+      }
+    });
+  });
+});
