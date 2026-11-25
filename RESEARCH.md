@@ -91,6 +91,8 @@ Politik is the first instrument that makes this empirically testable.
 
 #### Case Study I — Agile/Scrum: The Protocol Your Audience Lives Daily
 
+*Runnable baseline: `protocols/scrum.yml` ships Scrum as a Politik protocol (available, not the default), so the same task can be run under Scrum and under any other protocol and the records compared. Estimation (planning poker) is not modelled — CANON has no secret-ballot convergence mechanic.*
+
 The Agile Manifesto was written in 2001 by 17 people who were genuinely trying to fix software development. The values were sound. Working software over comprehensive documentation. Individuals and interactions over processes and tools. The protocol was not wrong. The humans who administered it were.
 
 Within a decade, Agile had become exactly what it was designed to replace. The ceremonies proliferated: daily standups that should have been emails, sprint planning meetings that consumed the first day of every sprint, retrospectives where nobody said what they actually thought. The process became the product.
