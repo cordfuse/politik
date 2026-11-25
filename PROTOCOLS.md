@@ -8,7 +8,7 @@ See [POLITIK-ARCHITECTURE.md](POLITIK-ARCHITECTURE.md) for CANON, session struct
 
 ## Implementation status
 
-This document is the shipping protocol library — the eleven manifests in
+This document is the shipping protocol library — the twelve manifests in
 `protocols/*.yml`, each a vocabulary translation over CANON plus a composition of
 mechanics. What the engine enforces:
 
@@ -41,13 +41,13 @@ mechanics. What the engine enforces:
   to play equilibrium.
 
 Parliamentary is protocol #1, not a privileged mode. `scaffold --protocol <name>`
-scaffolds a Charter for any of the eleven, inheriting its mechanics. **Compose
+scaffolds a Charter for any of the twelve, inheriting its mechanics. **Compose
 your own** for any governance shape not here — the framework is the product, and
 a new protocol is a Charter away.
 
 ---
 
-## The eleven protocols
+## The twelve protocols
 
 ### Political archetypes
 
@@ -229,6 +229,41 @@ Mode: Authoritarian with DOMAIN_VETO safety carve-out
 | DOMAIN_VETO | Shareholder (special resolution veto) |
 Mode: Constitutional
 
+**Protocol: Scrum / Agile**
+| CANON | Term |
+|---|---|
+| AUTHORITY | Product Owner |
+| DELEGATE | Scrum Master |
+| OPERATOR | Developer |
+| MEMBER | Team Member |
+| OBSERVER | Stakeholder |
+| SESSION | Sprint |
+| PROCEEDING | Release |
+| CHARTER | Working Agreement |
+| RECORD | Sprint Log |
+| MOTION | Backlog Item |
+| DIVISION | Sprint Review |
+| ASSENT | Accepted as Done |
+| ESCALATION | Impediment |
+| SUSPENSION | Blocked |
+| CONFLICT | Merge Conflict |
+| DEADLOCK | No Consensus |
+| SPAWN | Split the Story |
+| DISSOLVE | Sprint Ends |
+| EXIT | Left the Team |
+Mode: Constitutional with an immutable Working Agreement · resolution: majority · exit: none · termination: objective
+
+The process most software teams run today, shipped as the baseline the other
+protocols can be measured against ([RESEARCH.md](RESEARCH.md), Case Study I).
+Available, not the default. One session is one Sprint. Under Scrum the Product
+Owner owns *what* is built and the Developers own *how*, so most decisions are a
+role's call rather than a vote; the review of tabled work is where a Division
+applies, and the Product Owner's acceptance is Assent. The Working Agreement
+(including the Definition of Done) changes at the Retrospective, between
+Sprints, so it is fixed for the Sprint. **Not modelled:** estimation
+(planning poker): secret simultaneous estimates, revealed together and repeated
+until they converge, are a mechanic CANON does not have.
+
 ---
 
 ### Competitive
@@ -288,6 +323,7 @@ not force agents to play them.
 | Elimination Tournament | All-pay elimination | Aggressive early, conservative late |
 | Peer Review | Multi-player review, information asymmetry | Honest assessment when anonymity is credible |
 | Adversarial Collaboration | Two-player, pre-committed | Honest reporting — defection contractually costly |
+| Scrum / Agile | Cooperative, shared payoff, single acceptor | Consensus-seeking, slow convergence (RESEARCH.md) |
 
 ---
 
