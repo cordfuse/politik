@@ -76,6 +76,16 @@ describe('mode families', () => {
     assert.equal(p.roles.OBSERVER, 'Safety Officer');
   });
 
+  it('scrum is constitutional, keeps its Working Agreement fixed, and votes nobody out', () => {
+    const p = load('scrum.yml');
+    assert.equal(p.mode, 'constitutional');
+    assert.equal(p.immutable_charter, true);
+    assert.equal(p.roles.AUTHORITY, 'Product Owner');
+    assert.equal(p.roles.DELEGATE, 'Scrum Master');
+    assert.equal(p.mechanics.exit, 'none');
+    assert.equal(p.mechanics.termination, 'objective');
+  });
+
   it('peer-review grants a reviewer-level domain veto', () => {
     assert.deepEqual([...load('peer-review.yml').domain_veto], ['OPERATOR']);
   });
