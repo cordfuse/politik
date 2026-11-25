@@ -14,10 +14,12 @@ framework runs, governs, and has been exercised live — Motions tabled by real
 agents, carried by Division, enacted by Assent, a simulated constitutional
 collapse. Protocols now genuinely **behave** differently (one shared engine,
 composable mechanics — ADR-0007) and **read** differently (vocabulary display).
-~40 modules, 764 tests, CI green. Every command, all 12 protocols, the agent
+42 modules, 771 tests, CI green. Every command, all 12 protocols, the agent
 turn (`run`), and live SCM projection have been dogfooded end to end.
-**Released: v0.4.0 (2026-11-05)** — npm `@cordfuse/politik@0.4.0`, Zenodo
-10.5281/zenodo.23990434 (concept DOI 10.5281/zenodo.19490358).
+**Released: v0.5.0 (2026-11-25)** — npm `@cordfuse/politik@0.5.0`. Zenodo version
+DOI for v0.5.0 pending a manual deposit (`zenodo-newversion`); concept DOI
+10.5281/zenodo.19490358 always resolves to the latest. Previous: v0.4.0
+(2026-11-05), 10.5281/zenodo.23990434.
 
 Architecture decisions are in [`docs/adr/`](docs/adr/). ADR-0001 (transport),
 ADR-0002 (CHARTER.md schema), ADR-0003 (STATE.json schema), ADR-0004 (motion
@@ -44,6 +46,39 @@ is now closed; the remaining entries are documentation history.
 
 Phase 1's only remaining item is the arXiv preprint. Phase 8 (public launch) has
 not started.
+
+## Where we left off (2026-11-25)
+
+**v0.5.0 — Scrum, and the agent turn keeps what agents do in it.** PRs #37, #38.
+
+- **Scrum / Agile protocol (#37)** — `protocols/scrum.yml`, protocol #12,
+  available and **not** the default (parliamentary stays the default). Product
+  Owner (AUTHORITY) accepts; Scrum Master (DELEGATE); Developers (OPERATOR) table
+  Backlog Items; the Sprint Review is the Division. Immutable Working Agreement,
+  majority, `exit: none`, `termination: objective`. It is the baseline RESEARCH.md
+  measures the others against. Planning poker is **not** modelled — CANON has no
+  secret-ballot convergence mechanic (open finding).
+- **Validated by a real-agent UAT, not just unit tests.** A Monte Carlo pi sprint in
+  `/tmp`: Claude Code and agy each built an item, reviewed both, and voted from
+  inside their own `politik run` turns; Product Owner accepted; prorogued clean.
+  The first two runs failed and found the bugs below — run a real UAT before
+  calling a protocol or engine change done.
+- **Bugs fixed (#38):** (1) `runTurn` wrote back the pre-turn HANSARD/STATE and
+  **erased acts recorded during the turn** (votes) — it now re-reads them; a
+  committed append is kept and noted (`Acts during turn`), a dirty or non-append
+  change is a violation and the record is restored. (2) The runner's git helper
+  `trim()`med porcelain output, so the first unstaged file lost a letter and a
+  hand edit went unflagged — now `trimEnd()`. (3) The CLI printed success for an
+  act git refused to commit — now `[ERROR] … NOT committed` on stderr.
+  (4) **agy's sandbox** hides paths outside the workspace and makes `.git`
+  read-only, so an agy agent could not vote through the CLI —
+  `AgentSpec.session_args` now passes agy a per-run `--settings` grant
+  (write the session git dir, read the CLI install); never saved.
+- **Open (found in the UAT):** every agent turn is recorded as `MOTION_TABLED`,
+  even a review that touched no files; commits are authored under the Speaker's
+  git identity, not the acting agent's; scaffolded Charter and role prose stays
+  parliamentary under every protocol (and some messages say "Standing Orders"
+  regardless); a planning-poker / estimation mechanic.
 
 ## Where we left off (2026-11-05)
 
@@ -224,7 +259,7 @@ The engine speaks in canonical terms. Protocols translate them to industry vocab
 
 ### Protocols
 
-Protocols are vocabulary translation manifests on top of CANON. Parliamentary Democracy is the reference protocol. 35+ protocols span Politics, Software Development, Sports, Military, Legal, Healthcare, Creative, Business, Education, Community, Scientific Research, and Novel domains.
+Protocols are vocabulary translation manifests on top of CANON, plus composable mechanics (ADR-0007). Parliamentary Democracy is the reference protocol and the default. **Twelve ship** in `protocols/` — curated from a design exploration of 52 shapes, plus Scrum / Agile as the research baseline — and anyone can compose their own (`politik protocol new`, `protocols/CONTRIBUTING.md`).
 
 ### The Session Repo
 
@@ -235,13 +270,13 @@ The git repository IS the Politik session — charter, record, state, and invite
 ## Reading This Repo
 
 - **POLITIK-ARCHITECTURE.md** — Lean core: CANON, session structure, broadcast envelope, chamber transport. Read this first.
-- **PROTOCOLS.md** — Full protocol library, 35+ protocols across 12 domains.
+- **PROTOCOLS.md** — The twelve shipped protocols: vocabulary, mechanics, game structure.
 - **RUNTIME.md** — Session mechanics, escalation flows, cost model, governance tiers, fault handling.
 - **RESEARCH.md** — Human Flaw thesis, game theory analytical layer, publication strategy.
 - **EXECUTION.md** — Phases 0–11, Politik Tree hierarchical architecture.
 - **README.md** — Public-facing brief description with DOI.
 
-### The implementation — 32 modules
+### The implementation — 42 modules
 
 **Governance core** (pure: no I/O, no clock, no randomness — timestamps and
 GUIDs are always caller-supplied, which is what makes the logic deterministic
@@ -264,6 +299,11 @@ and testable without a network):
 - **`tree.ts`** — Charter inheritance, cascade, quarantine, scope moves
 - **`protocol.ts`** / **`protocol-sdk.ts`** — vocabulary translation, lint, generate
 - **`ledger.ts`** — measured cost per act; never an estimate dressed as one
+- **`conflict.ts`** — CONFLICT: two Motions touching the same lines; routine, not a fault
+- **`containment.ts`** — Hard Containment detection (not prevention): paths above the session
+- **`fault.ts`** — fault classification and PATH_A auto-retry policy
+- **`integrity.ts`** — bad-faith detector over the record; reports, never punishes
+- **`tournament.ts`** / **`standings.ts`** — the MATCH primitive, pairing, and scoring (ADR-0009)
 - **`templates/parliamentary.ts`** — protocol #1 templates and label taxonomy
 
 **I/O and integration** (everything that touches the world lives here):
@@ -278,16 +318,22 @@ and testable without a network):
 - **`scm.ts`** — the `ScmProvider` interface every provider implements
 - **`providers/github.ts`** — reference SCM provider, REST only
 - **`doctor.ts`** — host capability probe
+- **`federation.ts`** — the session hierarchy as local traversal: `registry`, `cascade` (ADR-0008)
+- **`operator.ts`** / **`pending.ts`** — who is driving the CLI, provenance, staged acts the Speaker confirms (ADR-0010)
+- **`remote.ts`** — shared sessions: fetch, fast-forward, act, push, recompute (ADR-0011)
 - **`cli.ts`** / **`bin/politik.js`** — the `politik` binary
 - **`index.ts`** — public entry point; re-exports every module above
 
 ### The CLI
 
-`version` · `doctor` · `scaffold` · `protocol lint|new` · `validate` · `init` ·
-`status` · `run` · `broadcast` · `motion link` · `division call|vote|tally` ·
-`assent` · `escalate` · `rule` · `crisis file|check|review` ·
-`actor hire|promote|demote|exit|veto|spawn|list` · `heartbeat` · `snapshot` ·
-`resume` · `ledger` · `prorogue` · `registry` · `cascade`
+`version` · `new` · `doctor` · `scaffold` · `protocol list|lint|new` · `validate` ·
+`init` · `status` · `hansard` · `integrity` · `pending` · `confirm` · `reject` ·
+`remote` · `join` · `sync` · `run` · `broadcast` · `motion link` ·
+`division call|vote|tally|break` · `assent` · `escalate` · `rule` · `challenge` ·
+`crisis file|check|review` ·
+`actor hire|promote|demote|exit|veto|spawn|dispute|reinstate|list` · `heartbeat` ·
+`snapshot` · `resume` · `conflict check|resolve` · `ledger` · `prorogue` ·
+`pair` · `match report|list` · `standings` · `registry` · `cascade`
 
 ### Federation — the tree, at a glance
 
