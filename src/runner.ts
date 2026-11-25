@@ -26,7 +26,7 @@ import { parseCharter, type Charter } from './charter.ts';
 import { parseEnvelope, claimSlot, type Envelope } from './envelope.ts';
 import { standForElection, bowOut, type ElectionOptions } from './election.ts';
 import { nodeLockFs } from './lockfs.ts';
-import { appendEntry, type HansardEntry } from './hansard.ts';
+import { appendEntry, parseEntries, type HansardEntry } from './hansard.ts';
 import { spawnAgent, type SpawnResult } from './spawn.ts';
 import {
   appendLedgerRow, parseResultText, parseUsage, type Usage,
@@ -122,7 +122,11 @@ const git = (dir: string, args: readonly string[], spawnFn: typeof spawn): Promi
     child.stdout?.on('data', (c: Buffer) => {
       output += c.toString();
     });
-    child.on('close', () => resolve(output.trim()));
+    // trimEnd, not trim: `git status --porcelain` lines start with a status
+    // column that may be a space (" M file"). Trimming the front stripped it
+    // from the first line, so the first unstaged file lost its first letter
+    // ("ANSARD.md") and a hand edit of the record went unflagged.
+    child.on('close', () => resolve(output.trimEnd()));
     child.on('error', () => resolve(''));
   });
 
@@ -384,8 +388,37 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     // § File Sovereignty Rules). An actor writing to them is a Standing Orders
     // violation, and it must be recorded rather than silently tolerated —
     // a record an actor can write is not a record.
+    //
+    // An agent may also act *through the CLI* during its turn — cast a vote,
+    // call a Division — and those acts write and commit these same files. The
+    // record must keep them. So the files are read again after the turn, and a
+    // change to them is lawful only when it reached the record the way the CLI
+    // writes it: committed (nothing left dirty) and, for the Hansard, purely
+    // appended. Anything else is a hand edit: a violation, and the record is
+    // restored from the pre-turn copy rather than carrying the edit forward.
     const OWNED_BY_RECORD = ['HANSARD.md', 'STATE.json', 'LEDGER.md'];
-    const violations = touched.filter((f) => OWNED_BY_RECORD.includes(f));
+    const dirtyAfter = await dirtyFiles(options.dir, spawnFn);
+    const hansardAfter = (await readIf(join(options.dir, 'HANSARD.md'))) ?? '';
+    const hansardAppended =
+      hansardAfter.startsWith(hansard) && !dirtyAfter.includes('HANSARD.md');
+    const violations = touched.filter(
+      (f) =>
+        OWNED_BY_RECORD.includes(f) &&
+        (dirtyAfter.includes(f) || (f === 'HANSARD.md' && !hansardAppended)),
+    );
+    // Entries the CLI appended during the turn — votes, Divisions — kept as
+    // the base the turn's own entry is appended to.
+    const recordBase = hansardAppended ? hansardAfter : hansard;
+    const actsDuringTurn = hansardAppended
+      ? parseEntries(hansardAfter).length - parseEntries(hansard).length
+      : 0;
+    // The same rule for STATE.json: a committed CLI act may have moved it (a
+    // tally that deadlocks suspends the sitting), and the turn must not undo it.
+    const stateAfterRaw = dirtyAfter.includes('STATE.json')
+      ? null
+      : await readIf(join(options.dir, 'STATE.json'));
+    const stateBase =
+      (stateAfterRaw === null ? null : parseState(stateAfterRaw)) ?? state;
 
     // An agent that hits a decision above its authority is told (composePrompt,
     // Rules of the Floor) to file a Point of Order instead of proceeding. On a
@@ -424,6 +457,9 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
             : `exit ${String(result.exit_code)}`,
         'Elapsed ms': String(result.elapsed_ms),
         'Files touched': touched.length > 0 ? touched.join(', ') : 'none',
+        ...(actsDuringTurn > 0
+          ? { 'Acts during turn': `${String(actsDuringTurn)} recorded through the CLI` }
+          : {}),
         ...(violations.length > 0
           ? {
               'Standing Orders violation': `actor wrote to ${violations.join(', ')} — owned by RECORD`,
@@ -447,7 +483,7 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
 
     // Faults are recorded before the turn's own entry: they happened first, and
     // a reader should see the retries that led to the outcome.
-    let record = hansard;
+    let record = recordBase;
     for (const fault of faultEntries) record = appendEntry(record, fault);
     record = appendEntry(record, entry);
 
@@ -495,10 +531,12 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     // POINT_OF_ORDER cause. A breach names no escalation file; an agent's Point
     // of Order does, so its path is recorded as the escalation reference.
     const suspend = !containment.contained || agentEscalated;
+    // Built on the post-turn state, so a suspension or quorum change an act
+    // made during the turn survives; the turn only adds its own suspension.
     const nextState = createState({
-      session_guid: state.session_guid,
-      protocol: state.protocol,
-      state: suspend ? 'SUSPENDED' : 'CONVENED',
+      session_guid: stateBase.session_guid,
+      protocol: stateBase.protocol,
+      state: suspend ? 'SUSPENDED' : stateBase.state,
       ...(suspend
         ? {
             suspension: {
@@ -508,9 +546,11 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
               escalation_ref: agentEscalated ? (escalationFiles[0] ?? null) : null,
             },
           }
-        : {}),
-      quorum: state.quorum,
-      hansard_head: state.hansard_head,
+        : stateBase.suspension !== null
+          ? { suspension: stateBase.suspension }
+          : {}),
+      quorum: stateBase.quorum,
+      hansard_head: stateBase.hansard_head,
       updated_at: options.now,
     });
     await writeFile(join(options.dir, 'STATE.json'), serializeState(nextState), 'utf8');
