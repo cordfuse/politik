@@ -1,0 +1,87 @@
+# Scrum / Agile — Constitutional protocol. The process most software teams run
+# today, shipped so Politik can be compared against it on the same task
+# (RESEARCH.md, Case Study I). Available, not the default: parliamentary stays
+# protocol #1.
+#
+# One session is one Sprint. Developers take Backlog Items and table the work;
+# the team reviews it; the Product Owner accepts it. Under Scrum the Product
+# Owner owns *what* is built and the Developers own *how*, so most decisions
+# are a role's call rather than a vote. The review vote is the one place
+# Politik's Division applies directly.
+#
+# Not modelled: estimation (planning poker). Secret simultaneous estimates,
+# revealed together and repeated until they converge, are a mechanic CANON
+# does not have. Per protocols/CONTRIBUTING.md that is a finding to raise, not
+# something to encode here.
+#
+# Attribution: Steve Krisjanovs, Cordfuse
+protocol:
+  name: scrum
+  version: 1.0.0
+
+  # Constitutional: impediments can be raised and ruled on, and the Product
+  # Owner (always human) holds the final say on acceptance.
+  mode: constitutional
+
+  # Distributed: per-commit attribution, as a git-native development team
+  # expects. Forbids merge_strategy: squash in a Charter under this protocol.
+  record_mode: distributed
+
+  roles:
+    AUTHORITY: Product Owner
+    # The Scrum Master serves the process, not the product: facilitates,
+    # removes impediments, does not decide what gets built.
+    DELEGATE: Scrum Master
+    OPERATOR: Developer
+    # Scrum has three roles. MEMBER covers anyone on the team who contributes
+    # without carrying a Developer seat.
+    MEMBER: Team Member
+    OBSERVER: Stakeholder
+
+  primitives:
+    SESSION: Sprint
+    PROCEEDING: Release
+    CHARTER: Working Agreement
+    RECORD: Sprint Log
+    MOTION: Backlog Item
+    DIVISION: Sprint Review
+    ESCALATION: Impediment
+    SUSPENSION: Blocked
+    QUORUM: Quorum
+    CONFLICT: Merge Conflict
+    DEADLOCK: No Consensus
+
+    # Verbs
+    ASSENT: Accepted as Done
+    VOTE: Review
+    ESCALATE: Raise an Impediment
+    SUSPEND: Pause the Sprint
+    EXPEL: Removed from the Team
+    VETO: Rejected by the Product Owner
+    SPAWN: Split the Story
+    DISSOLVE: Sprint Ends
+    EXIT: Left the Team
+
+  # AUTHORITY already holds VETO; nobody else has a domain veto in Scrum.
+  domain_veto: []
+
+  # Impediments are raised and resolved; that is the Scrum Master's job.
+  no_escalation: false
+
+  # The Sprint Log is kept.
+  no_record: false
+
+  # The Working Agreement (including the Definition of Done) changes at the
+  # Retrospective, between Sprints, not during one. This flag usually travels
+  # with mode: immutable; it is set here on purpose, because Scrum is otherwise
+  # constitutional.
+  immutable_charter: true
+
+  mechanics:
+    # A peer review needs agreement, not unanimity; a Charter can raise this to
+    # unanimity for a team that works by full consensus.
+    resolution: majority
+    # Nobody is voted off a Scrum team.
+    exit: none
+    # The Sprint ends when its goal is met.
+    termination: objective

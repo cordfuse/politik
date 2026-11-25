@@ -263,7 +263,7 @@ unread template.
 **Framing note:** Parliamentary is protocol #1, not a privileged mode.
 All protocols are equal. The framework is protocol-agnostic.
 
-**Shipped with framework (reference protocols):** all eleven in `protocols/`,
+**Shipped with framework (reference protocols):** all twelve in `protocols/`,
 every one lint-clean.
 
 ```
@@ -278,6 +278,7 @@ every one lint-clean.
 [x] Peer Review (scientific research)                           peer-review.yml
 [x] Adversarial Collaboration (scientific research)             adversarial-collaboration.yml
 [x] Solo (single-lead)                                          solo.yml
+[x] Scrum / Agile (the comparison baseline)                     scrum.yml
 ```
 
 The eleven were curated from a much wider design exploration — 52 shapes down to
@@ -285,7 +286,8 @@ eleven professional exemplars, with fascism and organized-crime cut as liabiliti
 and games and toys trimmed. Modes represented: constitutional (parliamentary,
 republic, corporate, peer-review), a unanimity Jury, a darwinist elimination
 Tournament, and an authoritarian ICS incident command. PROTOCOLS.md documents the
-eleven.
+eleven. Scrum / Agile was added later as a twelfth: not a curated exemplar but the
+baseline RESEARCH.md measures the others against, available and never the default.
 
 **Power inversions are declared, never inferred.** `jury-deliberation.yml` and
 `peer-review.yml` let a lower-trust role — a juror, a reviewer — override the
