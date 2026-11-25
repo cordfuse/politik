@@ -516,3 +516,46 @@ describe('acts recorded during a turn survive it', () => {
     }
   });
 });
+
+describe('a sandboxed harness is granted the session for the turn', () => {
+  it('passes agy a --settings grant naming the session git directory', async () => {
+    const dir = await session();
+    let agentArgs: readonly string[] = [];
+    const spawnFn = ((command: string, args: readonly string[]) => {
+      const listeners: Record<string, ((...a: unknown[]) => void)[]> = {};
+      const stdoutListeners: ((c: Buffer) => void)[] = [];
+      const child = {
+        stdout: { on: (_e: string, fn: (c: Buffer) => void) => stdoutListeners.push(fn) },
+        stderr: { on: () => undefined },
+        kill: () => undefined,
+        on: (event: string, fn: (...a: unknown[]) => void) => {
+          (listeners[event] ??= []).push(fn);
+          return child;
+        },
+      };
+      queueMicrotask(() => {
+        let output = '';
+        if (command === 'git' && args.includes('--absolute-git-dir')) output = '/work/session/.git';
+        else if (command === 'git' && args[0] === 'rev-parse') output = 'abc123';
+        else if (command === 'git') output = '';
+        else { agentArgs = args; output = 'done'; }
+        for (const fn of stdoutListeners) fn(Buffer.from(output));
+        for (const fn of listeners['close'] ?? []) fn(0);
+      });
+      return child as never;
+    }) as never;
+    try {
+      const outcome = await runTurn({
+        dir, agent_id: 'antigravity', actor: 'dev-agy', role: 'OPERATOR',
+        task: 'Vote.', now: NOW, spawnFn,
+      });
+      assert.ok(outcome.ok, JSON.stringify(outcome));
+      const i = agentArgs.indexOf('--settings');
+      assert.ok(i >= 0, `agy args: ${agentArgs.join(' ')}`);
+      assert.match(agentArgs[i + 1] ?? '', /write_file\(\/work\/session\/\.git\)/);
+      assert.match(agentArgs[i + 1] ?? '', /read_file\(/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

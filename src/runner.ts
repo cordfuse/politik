@@ -17,8 +17,10 @@
  */
 
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { findAgent, composePrompt, type AgentSpec } from './agents.ts';
 import type { Role, Verb } from './canon.ts';
@@ -323,6 +325,27 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
     const beforeDirty = await dirtyFiles(options.dir, spawnFn);
 
     const measure = options.measure !== false && agent.json_args !== undefined;
+
+    // Per-turn grants for harnesses that sandbox their own shell (agents.ts
+    // session_args): the session's git directory, which an enclosing repo may
+    // own, and where this CLI runs from, so the agent can act through it.
+    const gitDir =
+      (await git(options.dir, ['rev-parse', '--absolute-git-dir'], spawnFn)) ||
+      join(resolve(options.dir), '.git');
+    const politikRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+    // Where the agent will find `politik`: the directory it was invoked from and
+    // the one holding it on PATH (a global npm bin often lives under $HOME,
+    // which a sandbox hides). Read-only grants, deduplicated.
+    const invokedFrom = process.argv[1] === undefined ? null : dirname(resolve(process.argv[1]));
+    const onPath = (process.env['PATH'] ?? '')
+      .split(':')
+      .find((d) => d !== '' && existsSync(join(d, 'politik')));
+    const readPaths = [...new Set([politikRoot, invokedFrom, onPath === undefined ? null : resolve(onPath)])]
+      .filter((p): p is string => p !== null)
+      // A path inside the CLI's own install is already covered by politikRoot.
+      .filter((p) => p === politikRoot || !p.startsWith(`${politikRoot}/`));
+    const sessionArgs = agent.session_args?.({ git_dir: gitDir, read_paths: readPaths }) ?? [];
+    const turnArgs = [...(measure ? (agent.json_args ?? []) : []), ...sessionArgs];
     const sleepFn = options.sleepFn ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
     const policy = {
       auto_retry_max: charter.fault_handling.auto_retry_max,
@@ -337,7 +360,7 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
       cwd: options.dir,
       timeout_ms: options.timeout_ms,
       spawnFn,
-      extraArgs: measure ? agent.json_args : undefined,
+      extraArgs: turnArgs,
     });
 
     let attempts = 1;
@@ -367,7 +390,7 @@ export const runTurn = async (options: RunOptions): Promise<RunOutcome> => {
         cwd: options.dir,
         timeout_ms: options.timeout_ms,
         spawnFn,
-        extraArgs: measure ? agent.json_args : undefined,
+        extraArgs: turnArgs,
       });
     }
 
