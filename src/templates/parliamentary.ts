@@ -542,7 +542,8 @@ them through first-time setup as a conversation.
    install it (\`npm i -g @cordfuse/politik\`) and stop until they have.
 2. **Ask, in plain language:** what is this session for; which protocol fits
    (\`politik protocol list\` shows them; \`parliamentary\` is the default, \`solo\` suits one
-   person); how many votes carry a decision (quorum); who is seated.
+   person, \`scrum\` mirrors how a software team already works); how many votes
+   carry a decision (quorum); who is seated.
 3. **Scaffold in place:** \`politik scaffold --dir . --protocol <p> --quorum <n>\`.
    This replaces this file with the protocol's own guide; it lists what it
    replaced.
