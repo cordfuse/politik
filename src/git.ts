@@ -80,7 +80,10 @@ export const commitRecord = async (
 
   const add = await git(dir, ['add', '--', ...present], spawnFn);
   if (add.code !== 0) {
-    return { committed: false, sha: null, reason: 'nothing to stage' };
+    // Not "nothing to stage": an empty change is caught below. A failing
+    // `git add` means git could not write the index (a read-only .git in a
+    // sandboxed harness, a held index.lock) and the act is not on the record.
+    return { committed: false, sha: null, reason: 'git add failed' };
   }
 
   const staged = await git(dir, ['diff', '--cached', '--name-only'], spawnFn);
