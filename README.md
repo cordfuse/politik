@@ -138,7 +138,12 @@ politik run --dir ./session --agent claude-code --actor ada --role OPERATOR \
 ```
 
 The agent's turn is captured, its cost measured, and the result recorded — see
-`politik ledger --dir ./session`.
+`politik ledger --dir ./session`. An agent may also act through the CLI during its
+turn — review a Motion and cast its own vote — and those acts stay on the record,
+noted on the turn's entry. Editing `HANSARD.md` or `STATE.json` by hand is not
+acting: it is recorded as a Standing Orders violation and the record is restored.
+A harness that sandboxes its own shell (agy) is granted, for that turn only, write
+access to the session's `.git` and read access to the `politik` CLI — nothing else.
 
 ---
 
@@ -203,7 +208,7 @@ The Speaker works through **their own AI harness**, opened in the session folder
 
 ### Governance Protocols
 
-**Twelve reference protocols ship** — Parliamentary, Republic, Monarchy, Socialism (political archetypes), Jury Deliberation, Elimination Tournament, Emergency Response (ICS), Corporate, Scrum / Agile, Peer Review, Adversarial Collaboration, and Solo (single-lead) — spanning constitutional, authoritarian and darwinist modes. Each is a vocabulary translation **plus** a composition of behavioral mechanics — how a decision resolves (majority · supermajority · unanimity), how an actor exits (voted out · elimination · none), and when a session ends (objective · last-standing · verdict) — on top of CANON. You compose your own for anything else; the framework is the product, these are exemplars. Parliamentary is protocol #1, not a privileged mode. Each protocol's vocabulary and mechanics are documented in [PROTOCOLS.md](PROTOCOLS.md).
+**Twelve reference protocols ship** — Parliamentary, Republic, Monarchy, Socialism (political archetypes), Jury Deliberation, Elimination Tournament, Emergency Response (ICS), Corporate, Scrum / Agile, Peer Review, Adversarial Collaboration, and Solo (single-lead) — spanning constitutional, authoritarian and darwinist modes. Each is a vocabulary translation **plus** a composition of behavioral mechanics — how a decision resolves (majority · supermajority · unanimity), how an actor exits (voted out · elimination · none), and when a session ends (objective · last-standing · verdict) — on top of CANON. You compose your own for anything else; the framework is the product, these are exemplars. Parliamentary is protocol #1, not a privileged mode, and stays the default. **Scrum / Agile** ships as the baseline the others are measured against — the process most software teams already run, available with `--protocol scrum`: the Product Owner accepts, Developers table work and review it in a Sprint Review, and the Working Agreement is fixed for the Sprint. Each protocol's vocabulary and mechanics are documented in [PROTOCOLS.md](PROTOCOLS.md).
 
 Competitive protocols run on the `MATCH` primitive — a real 1v1 contest that a Motion-and-vote Division cannot model. `politik pair` generates a round (Swiss, round-robin, or single-elimination), `politik match report` settles a result, and `politik standings` scores the field from the record.
 
@@ -233,7 +238,9 @@ Every protocol in Politik instantiates a formal game structure:
 | Emergency Response (ICS) | Stackelberg leader-follower | Full compliance, zero deviation |
 | Jury Deliberation | Unanimity / holdout game | Convergence to consensus, or a hung result |
 | Elimination Tournament | All-pay elimination | Aggressive early, conservative late |
+| Peer Review | Multi-player review, information asymmetry | Honest assessment when anonymity is credible |
 | Adversarial Collaboration | Two-player, pre-committed | Maximum honest disclosure |
+| Scrum / Agile | Cooperative, shared payoff, single acceptor | Consensus-seeking, slow convergence |
 
 **The research question** (not yet a built feature — see [RESEARCH.md](RESEARCH.md)): do AI agents converge on Nash Equilibrium predictions when governed by protocols that formally instantiate known game structures? If yes — protocol selection becomes a mechanism design problem. If no — why do agents deviate? Either result is publishable.
 
